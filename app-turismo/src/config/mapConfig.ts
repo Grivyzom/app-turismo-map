@@ -13,5 +13,5 @@ export const MAP_CONFIG = {
    * - 'google': Usa Google Maps premium (en Móvil usa el SDK nativo, en Web usa celdas de Google Maps).
    * - 'open-source': Usa mapas gratuitos (en Móvil usa mapas del sistema, en Web usa OpenFreeMap y ESRI).
    */
-  provider: 'google' as MapProviderType, // Cambia a 'open-source' si quieres evitar Google Maps
+  provider: 'open-source' as MapProviderType, // Cambia a 'open-source' si quieres evitar Google Maps
 };
