@@ -1,0 +1,41 @@
+/* Glass Panel Effect */
+.glass-panel {
+  background: rgba(248, 249, 250, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 20px 40px rgba(26, 67, 53, 0.08);
+}
+
+/* Map Background */
+.map-bg {
+  background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuBPiYH6_lQ8eNkH5pdQfMR65qKH_hp2RMiNbSFJitwpcA9Iwea5yx9a5GWFITSocD79P8DDsdrYCgBxPaRQY8TONtj_MX-623t_Pac8yemncuyB2WmqS8gBV0x1PpVVK6p9etXGZ93Fk8z9tB5375xtDZpVUGHGxcrONswzKkiruwAd1Llf3f9e-dBePbIBu6Q6Sm76OWgtsLvD0D8wRjDN5lnvJFHdE6xvKCEDX9dwT82_OqR-DlUt_AX9JIhEtd8Tv9tKTFQi_WQE);
+  background-size: cover;
+  background-position: center;
+}
+
+/* Custom scrollbar for the feed */
+.feed-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.feed-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.feed-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(65, 72, 68, 0.2);
+  border-radius: 10px;
+}
+
+/* Material Symbols Font */
+.material-symbols-outlined {
+  font-variation-settings:
+    'wght' 400,
+    'FILL' 0;
+}
+
+.material-symbols-outlined[style*='font-variation-settings'] {
+  /* Allow inline style overrides */
+  all: revert;
+}

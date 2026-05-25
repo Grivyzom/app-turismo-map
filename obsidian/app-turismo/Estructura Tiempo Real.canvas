@@ -1,0 +1,16 @@
+{
+	"nodes":[
+		{"id":"dbffe5f486d94705","type":"file","file":"05_Frontend_Expo/STACK SELECCIONADO.md.md","x":-4360,"y":-1885,"width":400,"height":2144},
+		{"id":"9108cd0f07b69fb5","type":"file","file":"04_Backend_Go/STACK SELECCIONADO.md.md","x":-3940,"y":-1885,"width":400,"height":1257},
+		{"id":"22b6150d0112a1c6","type":"text","text":"Front-end","x":-4218,"y":-1995,"width":117,"height":27},
+		{"id":"58ca36934d7d9fda","type":"text","text":"Back-end","x":-3796,"y":-1995,"width":112,"height":27},
+		{"id":"b5c009ca70ab576f","type":"text","text":"Arquitectura","x":-4440,"y":-2540,"width":134,"height":27},
+		{"id":"9e4a2393bf08c62c","type":"file","file":"03_Arquitectura/Diagramas/casos-de-uso-general.png","x":-4440,"y":-2480,"width":400,"height":333},
+		{"id":"601b3b83aea21ed9","type":"file","file":"03_Arquitectura/Diagramas/flujo-registro-mvp.png","x":-4020,"y":-2480,"width":220,"height":326}
+	],
+	"edges":[
+		{"id":"eb2b7cd2504489ce","fromNode":"22b6150d0112a1c6","fromSide":"right","toNode":"58ca36934d7d9fda","toSide":"left"},
+		{"id":"5016fc1d268c8a6e","fromNode":"22b6150d0112a1c6","fromSide":"bottom","toNode":"dbffe5f486d94705","toSide":"top"},
+		{"id":"d5c42b302d5fc034","fromNode":"58ca36934d7d9fda","fromSide":"bottom","toNode":"9108cd0f07b69fb5","toSide":"top"}
+	]
+}

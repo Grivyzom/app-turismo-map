@@ -1,0 +1,15 @@
+allowBuilds:
+  msgpackr-extract: false
+  unrs-resolver: true
+minimumReleaseAgeExclude:
+  - '@expo/cli@56.1.10'
+  - '@expo/fingerprint@0.19.1'
+  - '@expo/prebuild-config@56.0.12'
+  - '@expo/router-server@56.0.11'
+  - babel-preset-expo@56.0.11
+  - expo-asset@56.0.13
+  - expo-constants@56.0.14
+  - expo-modules-autolinking@56.0.11
+  - expo-modules-core@56.0.12
+  - expo@56.0.3
+  - '@expo/metro-runtime@56.0.11'
