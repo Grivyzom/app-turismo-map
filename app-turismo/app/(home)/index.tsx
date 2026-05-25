@@ -148,6 +148,7 @@ type CategoryFilter = 'todos' | 'gastronomia' | 'cultura' | 'naturaleza' | 'musi
 const MAP_LAYER_OPTIONS: { key: MapLayer; label: string; icon: string }[] = [
   { key: 'dark', label: 'Noche', icon: '🌙' },
   { key: 'streets', label: 'Calles', icon: '🛣️' },
+  { key: 'light', label: 'Claro', icon: '☀️' },
   { key: 'satellite', label: 'Satélite', icon: '🛰️' },
   { key: 'terrain', label: 'Relieve', icon: '⛰️' },
 ];
@@ -469,9 +470,7 @@ export default function HomeScreen() {
         <View
           style={[
             styles.filterOverlay,
-            isDesktop
-              ? { right: 56, width: 300 }
-              : { left: 12, right: 68, width: 'auto' }, // Deja espacio libre para la barra de control en pantallas móviles
+            isDesktop ? { right: 56, width: 300 } : { left: 12, right: 68, width: 'auto' }, // Deja espacio libre para la barra de control en pantallas móviles
           ]}
         >
           <Text style={styles.filterSectionTitle}>Categorías</Text>

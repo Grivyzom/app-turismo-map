@@ -3,8 +3,9 @@ import maplibregl from 'maplibre-gl';
 import { MapLayer } from '../components/Map/types';
 
 export const WEB_MAP_STYLES: Record<MapLayer, string | maplibregl.StyleSpecification> = {
-  dark: 'https://tiles.openfreemap.org/styles/dark',
-  streets: 'https://tiles.openfreemap.org/styles/liberty',
+  dark: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+  streets: 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json',
+  light: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
   satellite: {
     version: 8,
     sources: {

@@ -13,7 +13,7 @@ export interface TurismoEvent {
   status?: 'agendado' | 'en_proceso' | 'finalizado';
 }
 
-export type MapLayer = 'dark' | 'streets' | 'satellite' | 'terrain';
+export type MapLayer = 'dark' | 'streets' | 'satellite' | 'terrain' | 'light';
 
 export type UserLocation = { latitude: number; longitude: number; accuracy?: number } | null;
 

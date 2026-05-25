@@ -7,13 +7,15 @@ import { MaterialIcons } from '@expo/vector-icons';
 
 import { VALDIVIA_LAT, VALDIVIA_LNG } from '../../constants/location';
 import { getCategoryColor, getCategoryIcon } from '../../utils/mapUtils';
-import { getActiveMapStyles } from '../../config/mapStyles.web';
 import { addMissingStyleImage, applyDarkTheme } from '../../utils/mapWebUtils';
+import { getActiveMapStyles } from '../../config/mapStyles.web';
 
 import { MapContainerProps } from './types';
 
 // URL de estilo público vectorial de CARTO - Dark Matter (Selva Valdiviana Base)
 const CARTO_VECTOR_STYLE_URL = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
+
+const mapStyles = getActiveMapStyles();
 
 export function MapLibreContainer({
   events,
@@ -42,6 +44,7 @@ export function MapLibreContainer({
   const selectedEventRef = useRef(selectedEvent);
   const mapLayerRef = useRef(mapLayer);
   const onZoomChangeRef = useRef(onZoomChange);
+  const updateAestheticsRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     eventsRef.current = events;
@@ -49,9 +52,11 @@ export function MapLibreContainer({
     selectedEventRef.current = selectedEvent;
     mapLayerRef.current = mapLayer;
     onZoomChangeRef.current = onZoomChange;
-  }, [events, onSelectEvent, selectedEvent, mapLayer, onZoomChange]);
 
-  const mapStyles = getActiveMapStyles();
+    if (updateAestheticsRef.current) {
+      updateAestheticsRef.current();
+    }
+  }, [events, onSelectEvent, selectedEvent, mapLayer, onZoomChange]);
 
   // Initialization
   useEffect(() => {
@@ -59,13 +64,137 @@ export function MapLibreContainer({
 
     const map = new maplibregl.Map({
       container: mapNodeRef.current,
-      // Usamos el vector tile de CARTO por defecto para todas las capas visuales de mapa base
-      style: CARTO_VECTOR_STYLE_URL,
+      style: mapStyles[mapLayerRef.current] || CARTO_VECTOR_STYLE_URL,
       center: [VALDIVIA_LNG, VALDIVIA_LAT],
       zoom: 13,
+      attributionControl: false, // Deshabilitar la atribución en la esquina inferior derecha para evitar colisiones
     });
 
     mapRef.current = map;
+
+    // Inyectar estilos personalizados para hacer la atribución ultra-discreta y estética
+    const styleId = 'maplibre-custom-attribution-styles';
+    if (!document.getElementById(styleId)) {
+      const style = document.createElement('style');
+      style.id = styleId;
+      style.innerHTML = `
+        .maplibregl-ctrl-attrib {
+          opacity: 0.25 !important;
+          transition: opacity 0.2s ease !important;
+          background-color: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+        }
+        .maplibregl-ctrl-attrib:hover {
+          opacity: 0.85 !important;
+        }
+        .maplibregl-ctrl-attrib-button {
+          background-color: rgba(34, 34, 34, 0.6) !important;
+          border-radius: 50% !important;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    // Agregar atribución compacta de forma segura en la esquina inferior izquierda
+    map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left');
+
+    const updateAesthetics = () => {
+      const z = map.getZoom();
+      const pitch = map.getPitch();
+
+      Object.keys(markersRef.current).forEach((id) => {
+        const markerObj = markersRef.current[id];
+        if (!markerObj) return;
+
+        const isSelected = selectedEventRef.current?.id === id;
+        const el = markerObj.el;
+
+        const inner = el.querySelector('.marker-3d-container') as HTMLDivElement | null;
+        const shadow = el.querySelector('.marker-3d-shadow') as HTMLDivElement | null;
+        const stem = el.querySelector('.marker-3d-stem') as HTMLDivElement | null;
+        const pin = el.querySelector('.marker-3d-pin') as HTMLDivElement | null;
+        const icon = el.querySelector('.marker-3d-icon') as HTMLDivElement | null;
+
+        if (!inner || !pin) return;
+
+        // 1. Zoom Adaptation (disappear or turn into dot)
+        let zoomScale = 1;
+        let zoomOpacity = 1;
+        let showIcon = true;
+        let isVisible = true;
+
+        if (z >= 13) {
+          zoomScale = 1.0;
+          zoomOpacity = 1.0;
+          showIcon = true;
+        } else if (z >= 11) {
+          const ratio = (z - 11) / (13 - 11); // 0 to 1
+          zoomScale = 0.4 + ratio * 0.6; // 0.4 to 1.0
+          zoomOpacity = 0.3 + ratio * 0.7; // 0.3 to 1.0
+          showIcon = z >= 12; // hide icon at zoom < 12 (small dot)
+        } else {
+          zoomScale = 0;
+          zoomOpacity = 0;
+          isVisible = false;
+        }
+
+        // Apply visibility and pointer-events
+        el.style.visibility = isVisible ? 'visible' : 'hidden';
+        el.style.pointerEvents = isVisible ? 'auto' : 'none';
+
+        // 2. Pitch 3D Effect
+        const maxElevation = isSelected ? 36 : 28;
+        const elevation = isVisible
+          ? Math.sin((pitch * Math.PI) / 180) * maxElevation * zoomScale
+          : 0;
+
+        const baseScale = isSelected ? 1.25 : 1.0;
+        const finalScale = baseScale * zoomScale;
+
+        pin.style.transform = `translateY(-${elevation}px) scale(${finalScale})`;
+        pin.style.opacity = `${zoomOpacity}`;
+
+        if (icon) {
+          icon.style.opacity = showIcon ? '1' : '0';
+        }
+
+        if (stem) {
+          if (pitch > 0 && isVisible) {
+            stem.style.height = `${elevation}px`;
+            stem.style.bottom = `${12 * zoomScale}px`;
+            stem.style.opacity = `${(pitch / 60) * 0.9}`;
+          } else {
+            stem.style.height = '0px';
+            stem.style.opacity = '0';
+          }
+        }
+
+        if (shadow) {
+          if (isVisible) {
+            const shadowScaleX = 1 + (pitch / 60) * 0.4;
+            const shadowScaleY = Math.max(0.3, 1 - (pitch / 60) * 0.6);
+            const skewX = -pitch * 0.4;
+            const shadowShiftX = (pitch / 60) * 4;
+
+            shadow.style.transform = `translateX(${shadowShiftX}px) scaleX(${shadowScaleX}) scaleY(${shadowScaleY}) skewX(${skewX}deg)`;
+            shadow.style.opacity = `${(0.3 + (pitch / 60) * 0.5) * zoomOpacity}`;
+            shadow.style.width = `${20 * zoomScale}px`;
+            shadow.style.height = `${6 * zoomScale}px`;
+          } else {
+            shadow.style.opacity = '0';
+          }
+        }
+      });
+    };
+
+    updateAestheticsRef.current = updateAesthetics;
+
+    // Bind map events for real-time 3D updates
+    map.on('zoom', updateAesthetics);
+    map.on('pitch', updateAesthetics);
+    map.on('rotate', updateAesthetics);
+    map.on('move', updateAesthetics);
 
     map.on('styleimagemissing', (event) => {
       addMissingStyleImage(map, event.id, mapLayerRef.current);
@@ -104,7 +233,13 @@ export function MapLibreContainer({
         userMarkerRef.current = null;
       }
 
-      map.remove();
+      if (map) {
+        map.off('zoom', updateAesthetics);
+        map.off('pitch', updateAesthetics);
+        map.off('rotate', updateAesthetics);
+        map.off('move', updateAesthetics);
+        map.remove();
+      }
       mapRef.current = null;
     };
   }, []);
@@ -146,7 +281,11 @@ export function MapLibreContainer({
           onSelectEventRef.current(event);
         });
 
-        const marker = new maplibregl.Marker({ element: el })
+        // Use 'bottom' anchor for 3D standing pins
+        const marker = new maplibregl.Marker({
+          element: el,
+          anchor: 'bottom',
+        })
           .setLngLat([event.longitude, event.latitude])
           .addTo(map);
 
@@ -166,21 +305,86 @@ export function MapLibreContainer({
       // Render the marker UI with React
       markerObj.root.render(
         <div
+          className="marker-3d-container"
           style={{
+            position: 'relative',
             width: 28,
             height: 28,
-            borderRadius: '50%',
-            backgroundColor: color,
-            border: '2px solid #111827',
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0px 2px 4px rgba(0,0,0,0.5)',
-            transform: isSelected ? 'scale(1.25)' : 'scale(1)',
-            transition: 'transform 0.2s ease',
+            justifyContent: 'flex-end', // Align contents to bottom
           }}
         >
-          <MaterialIcons name={iconName} size={15} color="#FFFFFF" />
+          {/* 1. Flat Shadow underneath */}
+          <div
+            className="marker-3d-shadow"
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              width: 20,
+              height: 6,
+              borderRadius: '50%',
+              backgroundColor: 'rgba(0, 0, 0, 0.4)',
+              filter: 'blur(1px)',
+              transform: 'scale(1)',
+              opacity: 0.3,
+              transition: 'transform 0.15s ease, opacity 0.15s ease',
+              zIndex: 0,
+              pointerEvents: 'none',
+            }}
+          />
+
+          {/* 2. Standing Stem */}
+          <div
+            className="marker-3d-stem"
+            style={{
+              position: 'absolute',
+              bottom: 12,
+              width: 2.5,
+              height: 0,
+              backgroundColor: '#9CA3AF',
+              backgroundImage: `linear-gradient(to top, #4B5563, ${color})`,
+              opacity: 0,
+              transformOrigin: 'bottom center',
+              transition: 'height 0.15s ease, opacity 0.15s ease',
+              zIndex: 1,
+              pointerEvents: 'none',
+              borderRadius: 1,
+            }}
+          />
+
+          {/* 3. The Interactive Pin */}
+          <div
+            className="marker-3d-pin"
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: '50%',
+              backgroundColor: color,
+              border: '2px solid #111827',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0px 2px 4px rgba(0,0,0,0.5)',
+              transform: isSelected ? 'scale(1.25)' : 'scale(1)',
+              transition: 'transform 0.15s ease, opacity 0.15s ease',
+              zIndex: 2,
+              position: 'relative',
+            }}
+          >
+            <div
+              className="marker-3d-icon"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'opacity 0.15s ease',
+              }}
+            >
+              <MaterialIcons name={iconName} size={15} color="#FFFFFF" />
+            </div>
+          </div>
         </div>,
       );
     });
@@ -301,6 +505,11 @@ export function MapLibreContainer({
       if (map.getLayer('user-accuracy-layer')) map.removeLayer('user-accuracy-layer');
       if (map.getSource('user-accuracy')) map.removeSource('user-accuracy');
     }
+
+    // Apply immediate 3D and Zoom styling to all markers
+    if (updateAestheticsRef.current) {
+      updateAestheticsRef.current();
+    }
   }, [events, selectedEvent, userLocation]);
 
   // Sync Style
@@ -312,8 +521,11 @@ export function MapLibreContainer({
       map.removeImage('wood-pattern');
     }
 
-    // Usando CARTO Vector Tiles
-    map.setStyle(CARTO_VECTOR_STYLE_URL);
+    // Usar el estilo correspondiente seleccionado en mapLayer
+    const selectedStyle = mapStyles[mapLayer];
+    if (selectedStyle) {
+      map.setStyle(selectedStyle);
+    }
   }, [mapLayer]);
 
   // Sync Map Camera on Selection change
