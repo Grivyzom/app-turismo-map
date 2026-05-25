@@ -12,8 +12,8 @@ import { addMissingStyleImage, applyDarkTheme } from '../../utils/mapWebUtils';
 
 import { MapContainerProps } from './types';
 
-// URL de estilo público vectorial de CARTO - Dark Matter (Selva Valdiviana Base)
-const CARTO_VECTOR_STYLE_URL = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
+// URL de estilo público vectorial de CARTO - Personalizado (Selva Valdiviana Base)
+const CARTO_VECTOR_STYLE_URL = 'https://gcp-us-east1.api.carto.com/v3/maps/public/styles/d2acc27a-e9b5-4087-819b-2e01e25f1218';
 
 
 export function MapLibreContainer({
