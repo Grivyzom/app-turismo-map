@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
+
 import { syncPendingReports } from '../utils/offlineSyncQueue';
 
 export function useNetworkStatus() {

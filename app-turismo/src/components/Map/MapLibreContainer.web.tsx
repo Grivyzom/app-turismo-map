@@ -15,7 +15,6 @@ import { MapContainerProps } from './types';
 // URL de estilo público vectorial de CARTO - Dark Matter (Selva Valdiviana Base)
 const CARTO_VECTOR_STYLE_URL = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 
-
 export function MapLibreContainer({
   events,
   selectedEvent,
@@ -215,14 +214,16 @@ export function MapLibreContainer({
             type: 'circle',
             source: 'user-accuracy',
             paint: {
-              // Aproximación visual del radio de precisión. En un escenario real 
+              // Aproximación visual del radio de precisión. En un escenario real
               // se calcularía el radio en píxeles basado en el nivel de zoom y latitud.
               'circle-radius': [
                 'interpolate',
                 ['exponential', 2],
                 ['zoom'],
-                10, Math.max(1, userLocation.accuracy / 10),
-                20, Math.max(10, userLocation.accuracy * 2)
+                10,
+                Math.max(1, userLocation.accuracy / 10),
+                20,
+                Math.max(10, userLocation.accuracy * 2),
               ],
               'circle-color': '#3B82F6',
               'circle-opacity': 0.15,
@@ -296,7 +297,7 @@ export function MapLibreContainer({
       // Remove user marker if userLocation is null
       userMarkerRef.current.marker.remove();
       userMarkerRef.current = null;
-      
+
       if (map.getLayer('user-accuracy-layer')) map.removeLayer('user-accuracy-layer');
       if (map.getSource('user-accuracy')) map.removeSource('user-accuracy');
     }

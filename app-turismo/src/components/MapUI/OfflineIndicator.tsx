@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Platform, Animated } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
 
 export function OfflineIndicator() {

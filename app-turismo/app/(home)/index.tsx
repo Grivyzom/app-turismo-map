@@ -415,11 +415,7 @@ export default function HomeScreen() {
           onPress={() => setShowFilters(!showFilters)}
           activeOpacity={0.7}
         >
-          <MaterialIcons
-            name="tune"
-            size={18}
-            color={showFilters ? '#34D399' : '#9CA3AF'}
-          />
+          <MaterialIcons name="tune" size={18} color={showFilters ? '#34D399' : '#9CA3AF'} />
         </TouchableOpacity>
       </View>
 
@@ -470,7 +466,14 @@ export default function HomeScreen() {
       )}
 
       {showFilters && (
-        <View style={styles.filterOverlay}>
+        <View
+          style={[
+            styles.filterOverlay,
+            isDesktop
+              ? { right: 56, width: 300 }
+              : { left: 12, right: 68, width: 'auto' }, // Deja espacio libre para la barra de control en pantallas móviles
+          ]}
+        >
           <Text style={styles.filterSectionTitle}>Categorías</Text>
           <View style={styles.categoriesWrapper}>
             {(

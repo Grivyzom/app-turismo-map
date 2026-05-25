@@ -13,50 +13,52 @@ import { TurismoEvent } from './types';
 import { MapContainerProps } from './types';
 
 // ─── UserMarkerAnimated ──────────────────────────────────────────────────────
-const UserMarkerAnimated = React.memo(({ userLocation }: { userLocation: { latitude: number; longitude: number } }) => {
-  const pulseAnim = useRef(new Animated.Value(0)).current;
+const UserMarkerAnimated = React.memo(
+  ({ userLocation }: { userLocation: { latitude: number; longitude: number } }) => {
+    const pulseAnim = useRef(new Animated.Value(0)).current;
 
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 2000,
-          easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 0,
-          duration: 0,
-          useNativeDriver: true,
-        })
-      ])
-    ).start();
-  }, [pulseAnim]);
+    useEffect(() => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 2000,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 0,
+            duration: 0,
+            useNativeDriver: true,
+          }),
+        ]),
+      ).start();
+    }, [pulseAnim]);
 
-  const scale = pulseAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 3]
-  });
+    const scale = pulseAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [1, 3],
+    });
 
-  const opacity = pulseAnim.interpolate({
-    inputRange: [0, 0.7, 1],
-    outputRange: [0.8, 0.4, 0]
-  });
+    const opacity = pulseAnim.interpolate({
+      inputRange: [0, 0.7, 1],
+      outputRange: [0.8, 0.4, 0],
+    });
 
-  return (
-    <Marker
-      coordinate={{ latitude: userLocation.latitude, longitude: userLocation.longitude }}
-      anchor={{ x: 0.5, y: 0.5 }}
-      zIndex={2}
-    >
-      <View style={styles.userMarkerWrapper}>
-        <Animated.View style={[styles.userMarkerPulse, { transform: [{ scale }], opacity }]} />
-        <View style={styles.userMarkerCore} />
-      </View>
-    </Marker>
-  );
-});
+    return (
+      <Marker
+        coordinate={{ latitude: userLocation.latitude, longitude: userLocation.longitude }}
+        anchor={{ x: 0.5, y: 0.5 }}
+        zIndex={2}
+      >
+        <View style={styles.userMarkerWrapper}>
+          <Animated.View style={[styles.userMarkerPulse, { transform: [{ scale }], opacity }]} />
+          <View style={styles.userMarkerCore} />
+        </View>
+      </Marker>
+    );
+  },
+);
 
 // ─── Memoized EventMarker ────────────────────────────────────────────────────
 // Cada marcador se renderiza de forma independiente. Solo se re-renderiza si
@@ -198,7 +200,7 @@ function MapContainerInner({
           longitude: currentRegionRef.current.longitude,
           ...deltas,
         },
-        400
+        400,
       );
     }
   }, [zoom]);
