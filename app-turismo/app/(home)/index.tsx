@@ -112,6 +112,20 @@ const INITIAL_EVENTS: TurismoEvent[] = [
     imageUrl:
       'https://images.unsplash.com/photo-1555025062-811c7fb3bf56?auto=format&fit=crop&q=80&w=800',
   },
+  {
+    id: '6',
+    title: 'Gran Carnaval del Río Calle-Calle',
+    description:
+      'Evento masivo al aire libre con carros alegóricos, comparsas y fuegos artificiales a orillas del río.',
+    latitude: -39.8122,
+    longitude: -73.2480,
+    category: 'publico',
+    organizer: 'Ilustre Municipalidad de Valdivia',
+    time: '18:00 - 23:30',
+    attendeesCount: 500, // Asistencia mediana
+    imageUrl:
+      'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?auto=format&fit=crop&q=80&w=800',
+  },
 ];
 
 const WS_SIMULATION_POOL: Omit<TurismoEvent, 'id' | 'isRealTime'>[] = [
@@ -156,7 +170,7 @@ const WS_SIMULATION_POOL: Omit<TurismoEvent, 'id' | 'isRealTime'>[] = [
   },
 ];
 
-type CategoryFilter = 'todos' | 'gastronomia' | 'cultura' | 'naturaleza' | 'musica' | 'deportes';
+type CategoryFilter = 'todos' | 'gastronomia' | 'cultura' | 'naturaleza' | 'musica' | 'deportes' | 'publico';
 
 const CATEGORY_ICONS: Record<CategoryFilter, { name: any; family: 'Ionicons' | 'MaterialIcons' }> = {
   todos: { name: 'apps', family: 'Ionicons' },
@@ -165,6 +179,7 @@ const CATEGORY_ICONS: Record<CategoryFilter, { name: any; family: 'Ionicons' | '
   naturaleza: { name: 'park', family: 'MaterialIcons' },
   musica: { name: 'music-note', family: 'MaterialIcons' },
   deportes: { name: 'sports-soccer', family: 'MaterialIcons' },
+  publico: { name: 'groups', family: 'MaterialIcons' },
 };
 
 const MAP_LAYER_OPTIONS: { key: MapLayer; label: string; iconName: any; iconFamily: 'Ionicons' | 'MaterialIcons' }[] = [
@@ -699,6 +714,7 @@ export default function HomeScreen() {
                 'naturaleza',
                 'musica',
                 'deportes',
+                'publico',
               ] as CategoryFilter[]
             ).map((cat) => {
               const iconData = CATEGORY_ICONS[cat];
