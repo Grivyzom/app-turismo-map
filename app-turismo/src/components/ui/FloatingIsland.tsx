@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -107,14 +107,16 @@ export default function FloatingIsland({
 
   const currentItems = items || DEFAULT_ITEMS;
 
-  const renderContent = () => {
-    if (children) {
-      return children;
-    }
-    const activeItem = currentItems.find((item) => item.id === activeTab);
-    if (!activeItem) return null;
-    return activeItem.render ? activeItem.render() : activeItem.component;
-  };
+  // Instanciar y memorizar cada pantalla una sola vez al montar
+  const screenElements = useMemo(() => {
+    return currentItems.map((item) => {
+      const Element = item.render ? item.render() : item.component;
+      return {
+        id: item.id,
+        element: Element,
+      };
+    });
+  }, [currentItems]);
 
   const getHeaderTitle = () => {
     if (children) {
@@ -286,7 +288,24 @@ export default function FloatingIsland({
           <View style={styles.contentWrapper}>
             {/* Animación fade-in controlada mediante CSS en Web */}
             <View style={styles.innerContent}>
-              {renderContent()}
+              {children ? (
+                children
+              ) : (
+                screenElements.map((screen) => {
+                  const isActive = activeTab === screen.id;
+                  return (
+                    <View
+                      key={screen.id}
+                      style={{
+                        display: isActive ? 'flex' : 'none',
+                        flex: 1,
+                      }}
+                    >
+                      {screen.element}
+                    </View>
+                  );
+                })
+              )}
             </View>
           </View>
         </View>
