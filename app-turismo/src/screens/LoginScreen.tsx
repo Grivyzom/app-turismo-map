@@ -11,7 +11,7 @@ import {
   Image,
 } from 'react-native';
 // Si utilizas expo/vector-icons o react-native-vector-icons
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 type LoginScreenProps = {
   onLogin: () => void;

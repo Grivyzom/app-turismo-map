@@ -1,6 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, View, Platform } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { NavLinkProps } from '../types';
 
@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
   },
 });
 
-export const NavLink: React.FC<NavLinkProps> = ({ icon, label, active = false, onClick }) => {
+export const NavLink: React.FC<NavLinkProps & { onHover?: () => void }> = ({ icon, label, active = false, onClick, onHover }) => {
   const [isHovered, setIsHovered] = React.useState(false);
 
   return (
@@ -58,7 +58,7 @@ export const NavLink: React.FC<NavLinkProps> = ({ icon, label, active = false, o
       onPress={onClick}
       activeOpacity={0.7}
       //@ts-ignore
-      onMouseEnter={() => setIsHovered(true)}
+      onMouseEnter={() => { setIsHovered(true); if (onHover) onHover(); }}
       onMouseLeave={() => setIsHovered(false)}
       style={[
         styles.base,

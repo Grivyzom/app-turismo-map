@@ -1,8 +1,9 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ComponentProps } from 'react';
-import { MaterialIcons } from '@expo/vector-icons';
-import { OTP } from 'otplib';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+// Note: otplib is intentionally NOT imported at the top level.
+// It is lazy-loaded inside each 2FA function to keep it out of the initial bundle.
 
 export type UserProfileIconName = ComponentProps<typeof MaterialIcons>['name'];
 
@@ -19,7 +20,7 @@ export type NormalUserProfile = {
 };
 
 const USER_PROFILE_STORAGE_KEY = 'app-turismo.normal-user-profile';
-const twoFactorOtp = new OTP({ strategy: 'totp' });
+// twoFactorOtp singleton removed — each function lazy-loads otplib instead.
 
 export const PROFILE_ICON_OPTIONS: UserProfileIconName[] = [
   'person',
@@ -121,16 +122,20 @@ export const saveUserProfile = async (
   return nextProfile;
 };
 
-export const generateTwoFactorSecret = (): string => {
-  return twoFactorOtp.generateSecret();
+export const generateTwoFactorSecret = async (): Promise<string> => {
+  const { OTP } = await import('otplib');
+  const otp = new OTP({ strategy: 'totp' });
+  return otp.generateSecret();
 };
 
-export const buildTwoFactorOtpUri = (
+export const buildTwoFactorOtpUri = async (
   profile: Pick<NormalUserProfile, 'email' | 'fullName'>,
   secret: string,
-): string => {
+): Promise<string> => {
+  const { OTP } = await import('otplib');
+  const otp = new OTP({ strategy: 'totp' });
   const identifier = profile.email.trim() || profile.fullName.trim() || 'usuario';
-  return twoFactorOtp.generateURI({
+  return otp.generateURI({
     issuer: 'App Turismo',
     label: identifier,
     secret,
@@ -143,7 +148,9 @@ export const verifyTwoFactorCode = async (secret: string, token: string): Promis
     return false;
   }
 
-  const verificationResult = await twoFactorOtp.verify({
+  const { OTP } = await import('otplib');
+  const otp = new OTP({ strategy: 'totp' });
+  const verificationResult = await otp.verify({
     secret,
     token: normalizedToken,
   });

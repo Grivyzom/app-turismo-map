@@ -7,7 +7,8 @@ import {
   Platform,
   Dimensions,
 } from 'react-native';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { loadUserProfile, getDefaultUserProfile, type NormalUserProfile } from '../../utils/userProfileStorage';
 
 import FeedScreen from '../../screens/FeedScreen';

@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { StyleSheet, View, Text, Platform, TouchableOpacity, Animated, Easing } from 'react-native';
 import MapView, { Marker, Callout, Polygon, Circle, PROVIDER_DEFAULT, PROVIDER_GOOGLE } from 'react-native-maps';
-import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { MAP_CONFIG } from '../../config/mapConfig';
 import { INITIAL_REGION } from '../../constants/location';

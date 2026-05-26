@@ -8,7 +8,7 @@ import {
   TextInput,
   Platform,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import {
   buildTwoFactorOtpUri,
@@ -108,7 +108,7 @@ export default function UserProfileScreen() {
       return;
     }
 
-    const secret = generateTwoFactorSecret();
+    const secret = await generateTwoFactorSecret();
     const nextProfile = await saveUserProfile({
       ...profile,
       fullName,
@@ -131,12 +131,18 @@ export default function UserProfileScreen() {
     { label: 'Actualizado', value: formatDate(profile.updatedAt) },
   ];
 
-  const twoFactorUri = profile.twoFactorSecret
-    ? buildTwoFactorOtpUri(
+  const [twoFactorUri, setTwoFactorUri] = React.useState('');
+
+  React.useEffect(() => {
+    if (profile.twoFactorSecret) {
+      void buildTwoFactorOtpUri(
         { email: email || profile.email, fullName: fullName || profile.fullName },
         profile.twoFactorSecret,
-      )
-    : '';
+      ).then(setTwoFactorUri);
+    } else {
+      setTwoFactorUri('');
+    }
+  }, [profile.twoFactorSecret, email, fullName, profile.email, profile.fullName]);
 
   return (
     <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>

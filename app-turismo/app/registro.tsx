@@ -13,7 +13,7 @@ import {
   FlatList,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { useEffect } from 'react';
 

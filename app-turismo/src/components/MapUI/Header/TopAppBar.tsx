@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Platform, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { TopAppBarProps, TabType } from '../types';
 import { NavLink } from './NavLink';
@@ -57,8 +57,8 @@ const styles = StyleSheet.create({
   }
 });
 
-export const TopAppBar: React.FC<TopAppBarProps & { onHoverIn?: () => void; onHoverOut?: () => void; onVoiceSearch?: (res: ParsedSearch) => void }> = (props) => {
-  const { currentTab = 'map', onTabChange, onVoiceSearch } = props;
+export const TopAppBar: React.FC<TopAppBarProps & { onHoverIn?: () => void; onHoverOut?: () => void; onVoiceSearch?: (res: ParsedSearch) => void; onTabHover?: (tab: TabType) => void }> = (props) => {
+  const { currentTab = 'map', onTabChange, onVoiceSearch, onTabHover } = props;
   const [activeTab, setActiveTab] = useState<TabType>(currentTab);
   const [isSearchActive, setIsSearchActive] = useState(false);
 
@@ -130,6 +130,7 @@ export const TopAppBar: React.FC<TopAppBarProps & { onHoverIn?: () => void; onHo
               label={tab.label}
               active={activeTab === tab.id}
               onClick={() => handleTabChange(tab.id)}
+              onHover={onTabHover ? () => onTabHover(tab.id) : undefined}
             />
           ))}
         </View>

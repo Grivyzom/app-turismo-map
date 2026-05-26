@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, Suspense } from 'react';
 import {
   SafeAreaView,
   StyleSheet,
@@ -14,25 +14,38 @@ import {
   Image,
 } from 'react-native';
 import { TelemetryWidget } from '../../src/components/MapUI/TelemetryWidget';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { StatusBar } from 'expo-status-bar';
 
 import { TopAppBar, type TabType } from '../../src/components/MapUI';
 import { MapContainer } from '../../src/components/Map/MapContainer';
 import { MapLayer, TurismoEvent, MAX_ZOOM_PER_LAYER } from '../../src/components/Map/types';
 import FloatingIsland from '../../src/components/ui/FloatingIsland';
+import { LoadingFallback } from '../../src/components/ui/LoadingFallback';
 import { getCategoryColor } from '../../src/utils/mapUtils';
 import {
   DEFAULT_MAP_LAYER,
   loadPersistedMapLayer,
   savePersistedMapLayer,
 } from '../../src/utils/mapPreferences';
-import UserProfileScreen from '../../src/screens/UserProfileScreen';
-import FeedScreen from '../../src/screens/FeedScreen';
-import PassportScreen from '../../src/screens/PassportScreen';
-import ForumScreen from '../../src/screens/ForumScreen';
 import { useUserLocation } from '../../src/hooks/useUserLocation';
 import { ParsedSearch } from '../../src/utils/aiSearchParser';
+
+// --- Lazy-loaded screens ---
+// Each screen is split into its own JS chunk that is downloaded only when the
+// user navigates to that tab, keeping the initial entry bundle as small as possible.
+const UserProfileScreen = React.lazy(() => import('../../src/screens/UserProfileScreen'));
+const FeedScreen        = React.lazy(() => import('../../src/screens/FeedScreen'));
+const PassportScreen    = React.lazy(() => import('../../src/screens/PassportScreen'));
+const ForumScreen       = React.lazy(() => import('../../src/screens/ForumScreen'));
+
+// Prefetch helpers — call these on tab hover to pre-download the chunk before
+// the user clicks, eliminating the visible loading delay.
+const prefetchFeed    = () => import('../../src/screens/FeedScreen');
+const prefetchSaved   = () => import('../../src/screens/PassportScreen');
+const prefetchForum   = () => import('../../src/screens/ForumScreen');
+const prefetchProfile = () => import('../../src/screens/UserProfileScreen');
 
 const INITIAL_EVENTS: TurismoEvent[] = [
   {
@@ -361,11 +374,17 @@ export default function HomeScreen() {
         <StatusBar style="light" />
 
         <View style={styles.topBarWrapper}>
-          <TopAppBar currentTab={activeTab} onTabChange={setActiveTab} />
+          <TopAppBar
+            currentTab={activeTab}
+            onTabChange={setActiveTab}
+            onTabHover={prefetchProfile}
+          />
         </View>
 
         <View style={styles.profileContainer}>
-          <UserProfileScreen />
+          <Suspense fallback={<LoadingFallback />}>
+            <UserProfileScreen />
+          </Suspense>
         </View>
       </SafeAreaView>
     );
@@ -377,15 +396,18 @@ export default function HomeScreen() {
         <StatusBar style="light" />
 
         <View style={styles.topBarWrapper}>
-          <TopAppBar 
-            currentTab={activeTab} 
-            onTabChange={setActiveTab} 
-            onVoiceSearch={handleVoiceSearch} 
+          <TopAppBar
+            currentTab={activeTab}
+            onTabChange={setActiveTab}
+            onVoiceSearch={handleVoiceSearch}
+            onTabHover={prefetchFeed}
           />
         </View>
 
         <View style={styles.profileContainer}>
-          <FeedScreen />
+          <Suspense fallback={<LoadingFallback />}>
+            <FeedScreen />
+          </Suspense>
         </View>
       </SafeAreaView>
     );
@@ -397,15 +419,18 @@ export default function HomeScreen() {
         <StatusBar style="light" />
 
         <View style={styles.topBarWrapper}>
-          <TopAppBar 
-            currentTab={activeTab} 
-            onTabChange={setActiveTab} 
-            onVoiceSearch={handleVoiceSearch} 
+          <TopAppBar
+            currentTab={activeTab}
+            onTabChange={setActiveTab}
+            onVoiceSearch={handleVoiceSearch}
+            onTabHover={prefetchSaved}
           />
         </View>
 
         <View style={styles.profileContainer}>
-          <PassportScreen />
+          <Suspense fallback={<LoadingFallback />}>
+            <PassportScreen />
+          </Suspense>
         </View>
       </SafeAreaView>
     );
@@ -417,15 +442,18 @@ export default function HomeScreen() {
         <StatusBar style="light" />
 
         <View style={styles.topBarWrapper}>
-          <TopAppBar 
-            currentTab={activeTab} 
-            onTabChange={setActiveTab} 
-            onVoiceSearch={handleVoiceSearch} 
+          <TopAppBar
+            currentTab={activeTab}
+            onTabChange={setActiveTab}
+            onVoiceSearch={handleVoiceSearch}
+            onTabHover={prefetchForum}
           />
         </View>
 
         <View style={styles.profileContainer}>
-          <ForumScreen />
+          <Suspense fallback={<LoadingFallback />}>
+            <ForumScreen />
+          </Suspense>
         </View>
       </SafeAreaView>
     );

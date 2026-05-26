@@ -8,7 +8,7 @@ import {
   useApiLoadingStatus,
   APILoadingStatus,
 } from '@vis.gl/react-google-maps';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { INITIAL_REGION } from '../../constants/location';
 import { CategoryIconName, getCategoryColor, getCategoryIcon } from '../../utils/mapUtils';

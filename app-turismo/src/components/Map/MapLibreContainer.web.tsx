@@ -3,7 +3,7 @@ import maplibregl, { Map as MapLibreMap } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { StyleSheet, View } from 'react-native';
 import { createRoot, Root } from 'react-dom/client';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { VALDIVIA_LAT, VALDIVIA_LNG } from '../../constants/location';
 import { getCategoryColor, getCategoryIcon } from '../../utils/mapUtils';
