@@ -266,9 +266,9 @@ const styles = StyleSheet.create({
   },
   islandContainer: {
     width: '96vw',
-    height: '82vh',
+    height: '88vh',
     maxWidth: 1750,
-    maxHeight: 900,
+    maxHeight: 1000,
     borderRadius: 24,
     flexDirection: 'row',
     overflow: 'hidden',
@@ -432,7 +432,7 @@ const styles = StyleSheet.create({
   contentArea: {
     flex: 1,
     height: '100%',
-    backgroundColor: '#040914',
+    backgroundColor: 'transparent',
   },
   contentHeader: {
     height: 72,

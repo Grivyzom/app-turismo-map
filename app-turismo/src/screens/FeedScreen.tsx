@@ -318,7 +318,7 @@ const styles = StyleSheet.create({
     paddingTop: 32,
     paddingBottom: 90,
     gap: 24,
-    backgroundColor: '#040914',
+    backgroundColor: 'transparent',
   },
   heroCard: {
     position: 'relative',

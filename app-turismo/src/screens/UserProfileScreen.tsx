@@ -344,9 +344,9 @@ const glassShadow = Platform.select({
 const styles = StyleSheet.create({
   container: {
     paddingTop: 32,
-    paddingBottom: 80,
-    gap: 32,
-    backgroundColor: '#040914',
+    paddingBottom: 90,
+    gap: 24,
+    backgroundColor: 'transparent',
   },
   heroCard: {
     position: 'relative',
