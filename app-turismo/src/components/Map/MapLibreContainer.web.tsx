@@ -119,6 +119,10 @@ export function MapLibreContainer({
           background-color: rgba(34, 34, 34, 0.6) !important;
           border-radius: 50% !important;
         }
+        @keyframes webPublicPulse {
+          0% { transform: translate(-50%, -50%) scale(1); opacity: 0.6; }
+          100% { transform: translate(-50%, -50%) scale(var(--max-scale, 3)); opacity: 0; }
+        }
       `;
       document.head.appendChild(style);
     }
@@ -421,6 +425,46 @@ export function MapLibreContainer({
               position: 'relative',
             }}
           >
+            {/* Ondas expansivas para eventos públicos en Web */}
+            {event.category === 'publico' && (
+              <>
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    width: 28,
+                    height: 28,
+                    borderRadius: '50%',
+                    backgroundColor: color,
+                    animation: 'webPublicPulse 2.5s infinite ease-out',
+                    pointerEvents: 'none',
+                    zIndex: -1,
+                    // @ts-ignore
+                    '--max-scale': 1.5 + (Math.min(event.attendeesCount || 0, 1000) / 1000) * 2.5,
+                  }}
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    width: 28,
+                    height: 28,
+                    borderRadius: '50%',
+                    backgroundColor: color,
+                    animation: 'webPublicPulse 2.5s infinite ease-out',
+                    animationDelay: '1.25s',
+                    pointerEvents: 'none',
+                    zIndex: -1,
+                    // @ts-ignore
+                    '--max-scale': (1.5 + (Math.min(event.attendeesCount || 0, 1000) / 1000) * 2.5) * 0.7,
+                  }}
+                />
+              </>
+            )}
             <div
               className="marker-3d-icon"
               style={{
