@@ -856,8 +856,9 @@ export default function HomeScreen() {
                     <TouchableOpacity
                       onPress={() => setSelectedEvent(null)}
                       style={styles.closeButtonLight}
+                      activeOpacity={0.7}
                     >
-                      <Text style={styles.closeButtonText}>✕</Text>
+                      <Ionicons name="close" size={20} color="#FFFFFF" />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -874,8 +875,9 @@ export default function HomeScreen() {
                   <TouchableOpacity
                     onPress={() => setSelectedEvent(null)}
                     style={styles.closeButton}
+                    activeOpacity={0.7}
                   >
-                    <Text style={styles.closeButtonText}>✕</Text>
+                    <Ionicons name="close" size={20} color="#A0AEC0" />
                   </TouchableOpacity>
                 </View>
               )}
@@ -1191,7 +1193,7 @@ const styles = StyleSheet.create({
   },
   sidePanelBackdrop: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(0, 0, 0, 0.01)',
   },
   sidePanel: {
     position: 'absolute',
@@ -1314,6 +1316,9 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
   closeButtonText: {
     color: '#A0AEC0',
