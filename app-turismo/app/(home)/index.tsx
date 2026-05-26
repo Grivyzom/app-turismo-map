@@ -20,6 +20,7 @@ import { StatusBar } from 'expo-status-bar';
 import { TopAppBar, type TabType } from '../../src/components/MapUI';
 import { MapContainer } from '../../src/components/Map/MapContainer';
 import { MapLayer, TurismoEvent, MAX_ZOOM_PER_LAYER } from '../../src/components/Map/types';
+import FloatingIsland from '../../src/components/ui/FloatingIsland';
 import { getCategoryColor } from '../../src/utils/mapUtils';
 import {
   DEFAULT_MAP_LAYER,
@@ -336,7 +337,9 @@ export default function HomeScreen() {
     setSelectedEvent(event);
   }, []);
 
-  if (activeTab === 'profile') {
+  const showMainUI = !isDesktop || activeTab === 'map';
+
+  if (!isDesktop && activeTab === 'profile') {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar style="light" />
@@ -352,7 +355,7 @@ export default function HomeScreen() {
     );
   }
 
-  if (activeTab === 'feed') {
+  if (!isDesktop && activeTab === 'feed') {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar style="light" />
@@ -372,7 +375,7 @@ export default function HomeScreen() {
     );
   }
 
-  if (activeTab === 'saved') {
+  if (!isDesktop && activeTab === 'saved') {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar style="light" />
@@ -392,7 +395,7 @@ export default function HomeScreen() {
     );
   }
 
-  if (activeTab === 'forum') {
+  if (!isDesktop && activeTab === 'forum') {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar style="light" />
@@ -416,7 +419,18 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
 
-      <View style={styles.mapContainer}>
+      <View style={[
+        styles.mapContainer,
+        isDesktop && activeTab !== 'map' && {
+          // Blur y escala en Web
+          ...Platform.select({
+            web: {
+              filter: 'blur(12px) brightness(0.65)',
+              transform: 'scale(1.025)',
+            } as any
+          })
+        }
+      ]}>
         <MapContainer
           events={filteredEvents}
           selectedEvent={selectedEvent}
@@ -432,13 +446,15 @@ export default function HomeScreen() {
         />
       </View>
 
-      <View style={styles.topBarWrapper}>
-        <TopAppBar 
-          currentTab={activeTab} 
-          onTabChange={setActiveTab} 
-          onVoiceSearch={handleVoiceSearch} 
-        />
-      </View>
+      {showMainUI && (
+        <View style={styles.topBarWrapper}>
+          <TopAppBar 
+            currentTab={activeTab} 
+            onTabChange={setActiveTab} 
+            onVoiceSearch={handleVoiceSearch} 
+          />
+        </View>
+      )}
 
       {toastMessage && (
         <Animated.View style={[styles.toast, { transform: [{ translateY: toastY }] }]}>
@@ -447,99 +463,101 @@ export default function HomeScreen() {
       )}
 
       {/* PANEL DE CONTROL UNIFICADO DE NAVEGACIÓN (Diseño Obsidian Glassmorphism) */}
-      <View style={styles.unifiedControlsContainer}>
-        {/* Zoom In */}
-        <TouchableOpacity
-          style={styles.controlButton}
-          onPress={() => setZoom((z) => Math.min(z + 1, currentMaxZoom))}
-          activeOpacity={0.7}
-        >
-          <MaterialIcons name="add" size={20} color="#9CA3AF" />
-        </TouchableOpacity>
+      {showMainUI && (
+        <View style={styles.unifiedControlsContainer}>
+          {/* Zoom In */}
+          <TouchableOpacity
+            style={styles.controlButton}
+            onPress={() => setZoom((z) => Math.min(z + 1, currentMaxZoom))}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons name="add" size={20} color="#9CA3AF" />
+          </TouchableOpacity>
 
-        <View style={styles.controlDivider} />
+          <View style={styles.controlDivider} />
 
-        {/* Zoom Out */}
-        <TouchableOpacity
-          style={styles.controlButton}
-          onPress={() => setZoom((z) => Math.max(z - 1, 1))}
-          activeOpacity={0.7}
-        >
-          <MaterialIcons name="remove" size={20} color="#9CA3AF" />
-        </TouchableOpacity>
+          {/* Zoom Out */}
+          <TouchableOpacity
+            style={styles.controlButton}
+            onPress={() => setZoom((z) => Math.max(z - 1, 1))}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons name="remove" size={20} color="#9CA3AF" />
+          </TouchableOpacity>
 
-        <View style={styles.controlDivider} />
+          <View style={styles.controlDivider} />
 
-        {/* Ubicarme (Location) */}
-        <TouchableOpacity
-          style={[styles.controlButton, userLocation && styles.controlButtonActive]}
-          onPress={() => {
-            if (userLocation) {
-              setCenterTrigger((prev) => prev + 1);
-            } else {
-              retryLocation();
-              showNotification('📍 Obteniendo tu ubicación...');
-            }
-          }}
-          activeOpacity={0.7}
-        >
-          <MaterialIcons
-            name="my-location"
-            size={18}
-            color={userLocation ? '#34D399' : isLoadingLocation ? '#A0AEC0' : '#EF4444'}
-          />
-        </TouchableOpacity>
+          {/* Ubicarme (Location) */}
+          <TouchableOpacity
+            style={[styles.controlButton, userLocation && styles.controlButtonActive]}
+            onPress={() => {
+              if (userLocation) {
+                setCenterTrigger((prev) => prev + 1);
+              } else {
+                retryLocation();
+                showNotification('📍 Obteniendo tu ubicación...');
+              }
+            }}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons
+              name="my-location"
+              size={18}
+              color={userLocation ? '#34D399' : isLoadingLocation ? '#A0AEC0' : '#EF4444'}
+            />
+          </TouchableOpacity>
 
-        <View style={styles.controlDivider} />
+          <View style={styles.controlDivider} />
 
-        {/* Modo Precisión (Modo Táctico) */}
-        <TouchableOpacity
-          style={[styles.controlButton, isTacticalModeActive && styles.controlButtonActive]}
-          onPress={() => {
-            setIsTacticalModeActive(!isTacticalModeActive);
-            if (!isTacticalModeActive) {
-              showNotification('🎯 Modo Táctico activado');
-            }
-          }}
-          activeOpacity={0.7}
-        >
-          <MaterialIcons
-            name="center-focus-strong"
-            size={18}
-            color={isTacticalModeActive ? '#34D399' : '#9CA3AF'}
-          />
-        </TouchableOpacity>
+          {/* Modo Precisión (Modo Táctico) */}
+          <TouchableOpacity
+            style={[styles.controlButton, isTacticalModeActive && styles.controlButtonActive]}
+            onPress={() => {
+              setIsTacticalModeActive(!isTacticalModeActive);
+              if (!isTacticalModeActive) {
+                showNotification('🎯 Modo Táctico activado');
+              }
+            }}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons
+              name="center-focus-strong"
+              size={18}
+              color={isTacticalModeActive ? '#34D399' : '#9CA3AF'}
+            />
+          </TouchableOpacity>
 
-        <View style={styles.controlDivider} />
+          <View style={styles.controlDivider} />
 
-        {/* Tráfico (Real-time) */}
-        <TouchableOpacity
-          style={[styles.controlButton, showTraffic && styles.controlButtonActive]}
-          onPress={() => {
-            setShowTraffic(!showTraffic);
-            if (!showTraffic) {
-              showNotification('🚗 Tráfico en vivo activado');
-            }
-          }}
-          activeOpacity={0.7}
-        >
-          <MaterialIcons name="traffic" size={18} color={showTraffic ? '#34D399' : '#9CA3AF'} />
-        </TouchableOpacity>
+          {/* Tráfico (Real-time) */}
+          <TouchableOpacity
+            style={[styles.controlButton, showTraffic && styles.controlButtonActive]}
+            onPress={() => {
+              setShowTraffic(!showTraffic);
+              if (!showTraffic) {
+                showNotification('🚗 Tráfico en vivo activado');
+              }
+            }}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons name="traffic" size={18} color={showTraffic ? '#34D399' : '#9CA3AF'} />
+          </TouchableOpacity>
 
-        <View style={styles.controlDivider} />
+          <View style={styles.controlDivider} />
 
-        {/* Filtros de Mapa */}
-        <TouchableOpacity
-          style={[styles.controlButton, showFilters && styles.controlButtonActive]}
-          onPress={() => setShowFilters(!showFilters)}
-          activeOpacity={0.7}
-        >
-          <MaterialIcons name="tune" size={18} color={showFilters ? '#34D399' : '#9CA3AF'} />
-        </TouchableOpacity>
-      </View>
+          {/* Filtros de Mapa */}
+          <TouchableOpacity
+            style={[styles.controlButton, showFilters && styles.controlButtonActive]}
+            onPress={() => setShowFilters(!showFilters)}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons name="tune" size={18} color={showFilters ? '#34D399' : '#9CA3AF'} />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* HUD Táctico */}
-      {isTacticalModeActive && tacticalLocation && (
+      {showMainUI && isTacticalModeActive && tacticalLocation && (
         <View
           style={[
             styles.tacticalHudContainer,
@@ -589,7 +607,7 @@ export default function HomeScreen() {
       )}
 
       {/* Dashboard de Telemetría (Live Telemetry HUD) */}
-      {Platform.OS !== 'web' && userLocation && (
+      {showMainUI && Platform.OS !== 'web' && userLocation && (
         <View style={styles.telemetryHudContainer} pointerEvents="box-none">
           <View style={styles.telemetryHudGlass}>
             {/* Cabecera / Status */}
@@ -661,7 +679,7 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {showFilters && (
+      {showMainUI && showFilters && (
         <View
           style={[
             styles.filterOverlay,
@@ -740,7 +758,7 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {selectedEvent && (
+      {showMainUI && selectedEvent && (
         <View style={styles.sidePanelOverlay}>
           {/* Tap-to-dismiss backdrop (transparent, covers full area behind) */}
           <Pressable style={styles.sidePanelBackdrop} onPress={() => setSelectedEvent(null)} />
@@ -906,6 +924,14 @@ export default function HomeScreen() {
           </Animated.View>
         </View>
       )}
+
+      {isDesktop && activeTab !== 'map' && (
+        <FloatingIsland
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          onClose={() => setActiveTab('map')}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -929,6 +955,11 @@ const styles = StyleSheet.create({
   },
   mapContainer: {
     ...StyleSheet.absoluteFill,
+    ...Platform.select({
+      web: {
+        transition: 'filter 0.5s cubic-bezier(0.16, 1, 0.3, 1), transform 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
+      } as any,
+    }),
   },
   topOverlay: {
     position: 'absolute',
