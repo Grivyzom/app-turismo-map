@@ -560,6 +560,7 @@ const styles = StyleSheet.create({
         animation: 'fadeIn 0.3s ease-out forwards',
         height: '100%',
         overflowY: 'auto',
+        overscrollBehavior: 'contain',
       } as any,
       default: {
         height: '100%',
@@ -579,6 +580,34 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
     .hover-glow:hover {
       box-shadow: 0 0 20px rgba(110, 231, 183, 0.15) !important;
       border-color: rgba(110, 231, 183, 0.3) !important;
+    }
+    
+    /* Premium Smooth Scrolling & Glassmorphic Scrollbar */
+    * {
+      scroll-behavior: smooth;
+    }
+    
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+      background: transparent;
+      border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      border: 2px solid transparent;
+      background-clip: padding-box;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.2);
+      border: 2px solid transparent;
+      background-clip: padding-box;
     }
   `;
   document.head.appendChild(style);
