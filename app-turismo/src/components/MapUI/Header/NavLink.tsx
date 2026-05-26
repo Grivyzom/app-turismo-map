@@ -23,6 +23,7 @@ const styles = StyleSheet.create({
     ...Platform.select({
       web: {
         cursor: 'pointer',
+        transition: 'background-color 0.2s ease',
       },
     }),
   },
@@ -50,11 +51,21 @@ const styles = StyleSheet.create({
 });
 
 export const NavLink: React.FC<NavLinkProps> = ({ icon, label, active = false, onClick }) => {
+  const [isHovered, setIsHovered] = React.useState(false);
+
   return (
     <TouchableOpacity
       onPress={onClick}
       activeOpacity={0.7}
-      style={[styles.base, active ? styles.active : styles.inactive, !label && styles.iconOnly]}
+      //@ts-ignore
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      style={[
+        styles.base,
+        active ? styles.active : styles.inactive,
+        !label && styles.iconOnly,
+        isHovered && ({ backgroundColor: 'rgba(255, 255, 255, 0.15)' } as any),
+      ]}
     >
       <MaterialIcons
         name={icon as any}

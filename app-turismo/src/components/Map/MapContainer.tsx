@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { StyleSheet, View, Text, Platform, TouchableOpacity, Animated, Easing } from 'react-native';
-import MapView, { Marker, Callout, PROVIDER_DEFAULT, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, Callout, Polygon, Circle, PROVIDER_DEFAULT, PROVIDER_GOOGLE } from 'react-native-maps';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 
 import { MAP_CONFIG } from '../../config/mapConfig';
@@ -14,8 +14,12 @@ import { MapContainerProps } from './types';
 
 // ─── UserMarkerAnimated ──────────────────────────────────────────────────────
 const UserMarkerAnimated = React.memo(
-  ({ userLocation }: { userLocation: { latitude: number; longitude: number } }) => {
-    const pulseAnim = useRef(new Animated.Value(0)).current;
+  ({
+    userLocation,
+  }: {
+    userLocation: { latitude: number; longitude: number; heading?: number | null };
+  }) => {
+    const [pulseAnim] = useState(() => new Animated.Value(0));
 
     useEffect(() => {
       Animated.loop(
@@ -52,6 +56,20 @@ const UserMarkerAnimated = React.memo(
         zIndex={2}
       >
         <View style={styles.userMarkerWrapper}>
+          {/* Haz de luz o Cono direccional que apunta según el heading */}
+          {userLocation.heading !== null && userLocation.heading !== undefined && (
+            <View
+              style={[
+                styles.coneWrapper,
+                {
+                  transform: [{ rotate: `${userLocation.heading}deg` }],
+                },
+              ]}
+            >
+              <View style={styles.directionalCone} />
+            </View>
+          )}
+
           <Animated.View style={[styles.userMarkerPulse, { transform: [{ scale }], opacity }]} />
           <View style={styles.userMarkerCore} />
         </View>
@@ -59,6 +77,7 @@ const UserMarkerAnimated = React.memo(
     );
   },
 );
+UserMarkerAnimated.displayName = 'UserMarkerAnimated';
 
 // ─── Memoized EventMarker ────────────────────────────────────────────────────
 // Cada marcador se renderiza de forma independiente. Solo se re-renderiza si
@@ -86,7 +105,7 @@ const EventMarker = React.memo(
 
     // Re-activar brevemente si cambia la selección (para capturar el scale change)
     useEffect(() => {
-      setTrackChanges(true);
+      Promise.resolve().then(() => setTrackChanges(true));
       const timer = setTimeout(() => {
         setTrackChanges(false);
       }, 150);
@@ -162,6 +181,7 @@ function MapContainerInner({
   onTacticalLocationChange,
   zoom,
   onZoomChange,
+  showTraffic,
 }: MapContainerProps) {
   const [showProviderInfo, setShowProviderInfo] = React.useState(false);
 
@@ -258,6 +278,7 @@ function MapContainerInner({
         style={styles.map}
         customMapStyle={mapStyle}
         mapType={mapType}
+        maxZoomLevel={18} // Limitar el zoom máximo para consistencia
         initialRegion={INITIAL_REGION}
         // ── Optimizaciones de rendimiento ──
         moveOnMarkerPress={false} // Evita que el mapa se mueva automáticamente al tocar un pin
@@ -268,7 +289,7 @@ function MapContainerInner({
         pitchEnabled={false} // Desactivar pitch 3D mejora rendimiento en dispositivos bajos
         showsPointsOfInterests={false} // Reducir POIs de Google mejora la velocidad de render de tiles
         showsBuildings={false} // Desactivar edificios 3D libera GPU
-        showsTraffic={false} // Sin capa de tráfico
+        showsTraffic={showTraffic ?? false} // Capa de tráfico opcional
         showsIndoors={false} // Sin mapas interiores
         showsUserLocation={true} // Usa el GPS nativo del dispositivo
         showsMyLocationButton={false} // Ocultar botón nativo porque ya tenemos un FAB
@@ -281,14 +302,43 @@ function MapContainerInner({
           currentRegionRef.current = region;
         }}
       >
-        {events.map((event) => (
-          <EventMarker
-            key={event.id}
-            event={event}
-            isSelected={selectedEvent?.id === event.id}
-            onPress={onSelectEvent}
-          />
-        ))}
+        {events.map((event) => {
+          if (event.polygon && event.polygon.length > 0) {
+            return (
+              <Polygon
+                key={event.id}
+                coordinates={event.polygon}
+                fillColor={`${getCategoryColor(event.category)}40`}
+                strokeColor={getCategoryColor(event.category)}
+                strokeWidth={2}
+                tappable={true}
+                onPress={() => onSelectEvent(event)}
+              />
+            );
+          }
+          if (event.radius && event.radius > 0) {
+            return (
+              <Circle
+                key={event.id}
+                center={{ latitude: event.latitude, longitude: event.longitude }}
+                radius={event.radius}
+                fillColor={`${getCategoryColor(event.category)}40`}
+                strokeColor={getCategoryColor(event.category)}
+                strokeWidth={2}
+                tappable={true}
+                onPress={() => onSelectEvent(event)}
+              />
+            );
+          }
+          return (
+            <EventMarker
+              key={event.id}
+              event={event}
+              isSelected={selectedEvent?.id === event.id}
+              onPress={onSelectEvent}
+            />
+          );
+        })}
 
         {/* Custom Marker for Web (showsUserLocation native feature doesn't work well on web) */}
         {Platform.OS === 'web' && userLocation && (
@@ -317,7 +367,8 @@ export const MapContainer = React.memo(MapContainerInner, (prev, next) => {
     prev.userLocation?.latitude === next.userLocation?.latitude &&
     prev.userLocation?.longitude === next.userLocation?.longitude &&
     prev.centerTrigger === next.centerTrigger &&
-    prev.tacticalMode === next.tacticalMode
+    prev.tacticalMode === next.tacticalMode &&
+    prev.showTraffic === next.showTraffic
   );
 });
 
@@ -398,6 +449,28 @@ const styles = StyleSheet.create({
     height: 48,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  coneWrapper: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 80,
+    height: 80,
+    zIndex: -1,
+  },
+  directionalCone: {
+    position: 'absolute',
+    top: -6, // Proyecto de haz hacia el frente de la posición
+    width: 32,
+    height: 32,
+    borderStyle: 'solid',
+    borderLeftWidth: 16,
+    borderRightWidth: 16,
+    borderBottomWidth: 32,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: 'rgba(59, 130, 246, 0.25)', // Luz azul suave de barrido
+    transform: [{ scaleX: 0.5 }], // Esbelto para simular linterna de orientación
   },
   userMarkerPulse: {
     position: 'absolute',

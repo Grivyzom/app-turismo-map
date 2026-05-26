@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import maplibregl, { Map as MapLibreMap } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { StyleSheet, View } from 'react-native';
@@ -8,9 +8,11 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { VALDIVIA_LAT, VALDIVIA_LNG } from '../../constants/location';
 import { getCategoryColor, getCategoryIcon } from '../../utils/mapUtils';
 import { addMissingStyleImage, applyDarkTheme } from '../../utils/mapWebUtils';
-import { getActiveMapStyles } from '../../config/mapStyles.web';
+import { getActiveMapStyles, getSatelliteStyle } from '../../config/mapStyles.web';
+import { SatelliteTileCache } from '../../utils/satelliteTileCache';
+import { TrafficTileCache, TRAFFIC_PROTOCOL } from '../../utils/trafficTileCache';
 
-import { MapContainerProps } from './types';
+import { MapContainerProps, MAX_ZOOM_PER_LAYER } from './types';
 
 // URL de estilo público vectorial de CARTO - Dark Matter (Selva Valdiviana Base)
 const CARTO_VECTOR_STYLE_URL = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
@@ -28,6 +30,7 @@ export function MapLibreContainer({
   onTacticalLocationChange,
   zoom = 13,
   onZoomChange,
+  showTraffic = false,
 }: MapContainerProps) {
   const mapNodeRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -45,6 +48,10 @@ export function MapLibreContainer({
   const mapLayerRef = useRef(mapLayer);
   const onZoomChangeRef = useRef(onZoomChange);
   const updateAestheticsRef = useRef<() => void>(() => {});
+  const tileCacheRef = useRef<SatelliteTileCache | null>(null);
+  const trafficCacheRef = useRef<TrafficTileCache | null>(null);
+  const syncUserLocationRef = useRef<() => void>(() => {});
+  const syncTrafficRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     eventsRef.current = events;
@@ -62,12 +69,32 @@ export function MapLibreContainer({
   useEffect(() => {
     if (!mapNodeRef.current || mapRef.current) return;
 
+    // Registrar siempre el protocolo de caché de tiles satelitales
+    const cache = SatelliteTileCache.getInstance();
+    cache.registerProtocol();
+    tileCacheRef.current = cache;
+
+    // Registrar caché de tráfico
+    const trafficCache = TrafficTileCache.getInstance();
+    trafficCache.registerProtocol();
+    trafficCacheRef.current = trafficCache;
+
+    // Determinar estilo inicial
+    const initialLayer = mapLayerRef.current;
+    const initialMaxZoom = MAX_ZOOM_PER_LAYER[initialLayer] || 18;
+    // Satélite siempre usa el protocolo cacheado para Ultra HD automático
+    const initialStyle =
+      initialLayer === 'satellite'
+        ? getSatelliteStyle(true)
+        : mapStyles[initialLayer] || CARTO_VECTOR_STYLE_URL;
+
     const map = new maplibregl.Map({
       container: mapNodeRef.current,
-      style: mapStyles[mapLayerRef.current] || CARTO_VECTOR_STYLE_URL,
+      style: initialStyle,
       center: [VALDIVIA_LNG, VALDIVIA_LAT],
       zoom: 13,
-      attributionControl: false, // Deshabilitar la atribución en la esquina inferior derecha para evitar colisiones
+      maxZoom: initialMaxZoom,
+      attributionControl: false,
     });
 
     mapRef.current = map;
@@ -144,12 +171,13 @@ export function MapLibreContainer({
         el.style.pointerEvents = isVisible ? 'auto' : 'none';
 
         // 2. Pitch 3D Effect
-        const maxElevation = isSelected ? 36 : 28;
+        const isHovered = el.dataset.hovered === 'true';
+        const maxElevation = isSelected ? 36 : isHovered ? 32 : 28;
         const elevation = isVisible
           ? Math.sin((pitch * Math.PI) / 180) * maxElevation * zoomScale
           : 0;
 
-        const baseScale = isSelected ? 1.25 : 1.0;
+        const baseScale = isSelected ? 1.25 : isHovered ? 1.15 : 1.0;
         const finalScale = baseScale * zoomScale;
 
         pin.style.transform = `translateY(-${elevation}px) scale(${finalScale})`;
@@ -210,6 +238,12 @@ export function MapLibreContainer({
       if (mapLayerRef.current === 'dark') {
         applyDarkTheme(map);
       }
+      if (syncUserLocationRef.current) {
+        syncUserLocationRef.current();
+      }
+      if (syncTrafficRef.current) {
+        syncTrafficRef.current();
+      }
     });
 
     // Deselect when clicking on empty map
@@ -224,7 +258,9 @@ export function MapLibreContainer({
       // Cleanup all markers
       Object.values(markersRef.current).forEach(({ marker, root }) => {
         marker.remove();
-        setTimeout(() => root.unmount(), 0);
+        setTimeout(() => {
+          if (root) root.unmount();
+        }, 0);
       });
       markersRef.current = {};
 
@@ -245,7 +281,7 @@ export function MapLibreContainer({
   }, []);
 
   // Sync Markers and Data
-  useEffect(() => {
+  const sync = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
 
@@ -254,8 +290,9 @@ export function MapLibreContainer({
     // Remove old markers
     Object.keys(markersRef.current).forEach((id) => {
       if (!newMarkerIds.has(id)) {
-        markersRef.current[id].marker.remove();
-        setTimeout(() => markersRef.current[id].root.unmount(), 0);
+        const markerObj = markersRef.current[id];
+        markerObj.marker.remove();
+        setTimeout(() => markerObj.root.unmount(), 0);
         delete markersRef.current[id];
       }
     });
@@ -275,6 +312,17 @@ export function MapLibreContainer({
         el.style.display = 'flex';
         el.style.alignItems = 'center';
         el.style.justifyContent = 'center';
+        el.dataset.hovered = 'false';
+
+        el.addEventListener('mouseenter', () => {
+          el.dataset.hovered = 'true';
+          if (updateAestheticsRef.current) updateAestheticsRef.current();
+        });
+
+        el.addEventListener('mouseleave', () => {
+          el.dataset.hovered = 'false';
+          if (updateAestheticsRef.current) updateAestheticsRef.current();
+        });
 
         el.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -368,7 +416,7 @@ export function MapLibreContainer({
               justifyContent: 'center',
               boxShadow: '0px 2px 4px rgba(0,0,0,0.5)',
               transform: isSelected ? 'scale(1.25)' : 'scale(1)',
-              transition: 'transform 0.15s ease, opacity 0.15s ease',
+              transition: 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.15s ease',
               zIndex: 2,
               position: 'relative',
             }}
@@ -391,68 +439,73 @@ export function MapLibreContainer({
 
     // Handle User Location Marker
     if (userLocation) {
-      // Manejo de la precisión de la ubicación (accuracy)
-      // Representamos la tolerancia del check-in dinámico mediante un source y layer en el mapa
-      if (userLocation.accuracy) {
-        const accuracyData: GeoJSON.FeatureCollection = {
-          type: 'FeatureCollection',
-          features: [
-            {
-              type: 'Feature',
-              geometry: {
-                type: 'Point',
-                coordinates: [userLocation.longitude, userLocation.latitude],
+      // Manejo de la precisión de la ubicación (accuracy) - SOLO si el estilo está cargado
+      if (map.isStyleLoaded()) {
+        if (userLocation.accuracy) {
+          const accuracyData: GeoJSON.FeatureCollection = {
+            type: 'FeatureCollection',
+            features: [
+              {
+                type: 'Feature',
+                geometry: {
+                  type: 'Point',
+                  coordinates: [userLocation.longitude, userLocation.latitude],
+                },
+                properties: {},
               },
-              properties: {},
-            },
-          ],
-        };
+            ],
+          };
 
-        if (!map.getSource('user-accuracy')) {
-          map.addSource('user-accuracy', {
-            type: 'geojson',
-            data: accuracyData,
-          });
-          map.addLayer({
-            id: 'user-accuracy-layer',
-            type: 'circle',
-            source: 'user-accuracy',
-            paint: {
-              // Aproximación visual del radio de precisión. En un escenario real
-              // se calcularía el radio en píxeles basado en el nivel de zoom y latitud.
-              'circle-radius': [
-                'interpolate',
-                ['exponential', 2],
-                ['zoom'],
-                10,
-                Math.max(1, userLocation.accuracy / 10),
-                20,
-                Math.max(10, userLocation.accuracy * 2),
-              ],
-              'circle-color': '#3B82F6',
-              'circle-opacity': 0.15,
-              'circle-stroke-width': 1,
-              'circle-stroke-color': '#3B82F6',
-            },
-          });
-        } else {
-          const source = map.getSource('user-accuracy') as maplibregl.GeoJSONSource;
-          if (source.setData) {
-            source.setData(accuracyData);
+          if (!map.getSource('user-accuracy')) {
+            map.addSource('user-accuracy', {
+              type: 'geojson',
+              data: accuracyData,
+            });
+            map.addLayer({
+              id: 'user-accuracy-layer',
+              type: 'circle',
+              source: 'user-accuracy',
+              paint: {
+                'circle-radius': [
+                  'interpolate',
+                  ['exponential', 2],
+                  ['zoom'],
+                  10,
+                  Math.max(1, userLocation.accuracy / 10),
+                  20,
+                  Math.max(10, userLocation.accuracy * 2),
+                ],
+                'circle-color': '#3B82F6',
+                'circle-opacity': 0.15,
+                'circle-stroke-width': 1,
+                'circle-stroke-color': '#3B82F6',
+              },
+            });
+          } else {
+            const source = map.getSource('user-accuracy') as maplibregl.GeoJSONSource;
+            if (source.setData) {
+              source.setData(accuracyData);
+            }
           }
+        } else {
+          // Remover si ya no hay accuracy
+          if (map.getLayer('user-accuracy-layer')) map.removeLayer('user-accuracy-layer');
+          if (map.getSource('user-accuracy')) map.removeSource('user-accuracy');
         }
-      } else {
-        // Remover si ya no hay accuracy
-        if (map.getLayer('user-accuracy-layer')) map.removeLayer('user-accuracy-layer');
-        if (map.getSource('user-accuracy')) map.removeSource('user-accuracy');
       }
 
+      // Marcador DOM del usuario (se puede crear inmediatamente, no depende del canvas style!)
       if (!userMarkerRef.current) {
         // Create user marker element
         const el = document.createElement('div');
         el.className = 'user-marker';
 
-        // Inline styles for pulse animation
+        // Elemento para el haz de luz / cono direccional
+        const coneEl = document.createElement('div');
+        coneEl.className = 'user-cone';
+        el.appendChild(coneEl);
+
+        // Inline styles for pulse animation and cone
         const styleId = 'user-marker-styles';
         if (!document.getElementById(styleId)) {
           const style = document.createElement('style');
@@ -481,6 +534,21 @@ export function MapLibreContainer({
               z-index: -1;
               animation: userPulse 2s infinite;
             }
+            .user-cone {
+              position: absolute;
+              top: -24px; /* proyecta al frente */
+              left: 50%;
+              width: 0;
+              height: 0;
+              border-left: 14px solid transparent;
+              border-right: 14px solid transparent;
+              border-bottom: 28px solid rgba(59, 130, 246, 0.3);
+              transform-origin: bottom center;
+              transform: translateX(-50%) scaleX(0.6);
+              pointer-events: none;
+              display: none;
+              z-index: -2;
+            }
             @keyframes userPulse {
               0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0.8; }
               100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
@@ -497,13 +565,29 @@ export function MapLibreContainer({
       } else {
         userMarkerRef.current.marker.setLngLat([userLocation.longitude, userLocation.latitude]);
       }
+
+      // Actualizar la rotación en tiempo real del cono direccional
+      const userEl = userMarkerRef.current?.el;
+      if (userEl) {
+        const cone = userEl.querySelector('.user-cone') as HTMLDivElement | null;
+        if (cone) {
+          if (userLocation.heading !== null && userLocation.heading !== undefined) {
+            cone.style.display = 'block';
+            cone.style.transform = `translateX(-50%) rotate(${userLocation.heading}deg)`;
+          } else {
+            cone.style.display = 'none';
+          }
+        }
+      }
     } else if (userMarkerRef.current) {
       // Remove user marker if userLocation is null
       userMarkerRef.current.marker.remove();
       userMarkerRef.current = null;
 
-      if (map.getLayer('user-accuracy-layer')) map.removeLayer('user-accuracy-layer');
-      if (map.getSource('user-accuracy')) map.removeSource('user-accuracy');
+      if (map.isStyleLoaded()) {
+        if (map.getLayer('user-accuracy-layer')) map.removeLayer('user-accuracy-layer');
+        if (map.getSource('user-accuracy')) map.removeSource('user-accuracy');
+      }
     }
 
     // Apply immediate 3D and Zoom styling to all markers
@@ -512,7 +596,54 @@ export function MapLibreContainer({
     }
   }, [events, selectedEvent, userLocation]);
 
-  // Sync Style
+  useEffect(() => {
+    syncUserLocationRef.current = sync;
+    sync();
+  }, [sync]);
+
+  // Sync Traffic Layer
+  const syncTraffic = useCallback(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    if (showTraffic) {
+      if (!map.getSource('google-traffic')) {
+        map.addSource('google-traffic', {
+          type: 'raster',
+          tiles: [
+            `${TRAFFIC_PROTOCOL}://{z}/{x}/{y}`
+          ],
+          tileSize: 256,
+        });
+      }
+      if (!map.getLayer('google-traffic-layer')) {
+        map.addLayer({
+          id: 'google-traffic-layer',
+          type: 'raster',
+          source: 'google-traffic',
+          paint: {
+            'raster-opacity': 0.8,
+          },
+        });
+      }
+    } else {
+      if (map.getLayer('google-traffic-layer')) {
+        map.removeLayer('google-traffic-layer');
+      }
+      if (map.getSource('google-traffic')) {
+        map.removeSource('google-traffic');
+      }
+    }
+  }, [showTraffic]);
+
+  useEffect(() => {
+    syncTrafficRef.current = syncTraffic;
+    if (mapRef.current?.isStyleLoaded()) {
+      syncTraffic();
+    }
+  }, [syncTraffic]);
+
+  // Sync Style (with dynamic maxZoom per layer)
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -521,8 +652,13 @@ export function MapLibreContainer({
       map.removeImage('wood-pattern');
     }
 
-    // Usar el estilo correspondiente seleccionado en mapLayer
-    const selectedStyle = mapStyles[mapLayer];
+    // Update maxZoom based on the current layer
+    const layerMaxZoom = MAX_ZOOM_PER_LAYER[mapLayer] || 18;
+    map.setMaxZoom(layerMaxZoom);
+
+    // Satélite siempre usa el protocolo cacheado para Ultra HD
+    const selectedStyle = mapLayer === 'satellite' ? getSatelliteStyle(true) : mapStyles[mapLayer];
+
     if (selectedStyle) {
       map.setStyle(selectedStyle);
     }

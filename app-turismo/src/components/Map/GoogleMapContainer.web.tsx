@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import {
   APIProvider,
   Map,
   AdvancedMarker,
   Pin,
-  InfoWindow,
   useApiLoadingStatus,
   APILoadingStatus,
 } from '@vis.gl/react-google-maps';
@@ -21,8 +20,6 @@ const GOOGLE_MAPS_API_KEY =
   process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || 'YOUR_GOOGLE_MAPS_API_KEY';
 
 export function GoogleMapContainer(props: MapContainerProps) {
-  const [showProviderInfo, setShowProviderInfo] = useState(false);
-
   return (
     <View style={styles.container}>
       {/* APIProvider must wrap the map components to load the SDK */}
@@ -53,10 +50,13 @@ function InnerGoogleMap({
 
   useEffect(() => {
     if (selectedEvent) {
-      setMapCenter({ lat: selectedEvent.latitude, lng: selectedEvent.longitude });
-      if (onZoomChange) onZoomChange(15);
+      const timer = setTimeout(() => {
+        setMapCenter({ lat: selectedEvent.latitude, lng: selectedEvent.longitude });
+        if (onZoomChange) onZoomChange(15);
+      }, 0);
+      return () => clearTimeout(timer);
     }
-  }, [selectedEvent]);
+  }, [selectedEvent, onZoomChange]);
 
   if (status === APILoadingStatus.FAILED) {
     return (
@@ -93,6 +93,7 @@ function InnerGoogleMap({
       defaultCenter={{ lat: INITIAL_REGION.latitude, lng: INITIAL_REGION.longitude }}
       center={mapCenter}
       zoom={zoom}
+      maxZoom={18} // Limitar el zoom máximo para consistencia
       onCenterChanged={(ev) => setMapCenter(ev.detail.center)}
       onZoomChanged={(ev) => onZoomChange && onZoomChange(ev.detail.zoom)}
       mapTypeId={mapTypeId}

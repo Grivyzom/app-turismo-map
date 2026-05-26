@@ -32,9 +32,15 @@ importers:
       expo-auth-session:
         specifier: ^56.0.11
         version: 56.0.11(expo@56.0.4)(react-native@0.85.3(@babel/core@7.29.0)(@react-native/metro-config@0.85.3(@babel/core@7.29.0))(@types/react@19.2.15)(react@19.2.3))(react@19.2.3)
+      expo-av:
+        specifier: ^16.0.8
+        version: 16.0.8(expo@56.0.4)(react-native-web@0.21.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react-native@0.85.3(@babel/core@7.29.0)(@react-native/metro-config@0.85.3(@babel/core@7.29.0))(@types/react@19.2.15)(react@19.2.3))(react@19.2.3)
       expo-crypto:
         specifier: ^56.0.3
         version: 56.0.3(expo@56.0.4)
+      expo-file-system:
+        specifier: ~56.0.7
+        version: 56.0.7(expo@56.0.4)(react-native@0.85.3(@babel/core@7.29.0)(@react-native/metro-config@0.85.3(@babel/core@7.29.0))(@types/react@19.2.15)(react@19.2.3))
       expo-linking:
         specifier: ^56.0.11
         version: 56.0.11(expo@56.0.4)(react-native@0.85.3(@babel/core@7.29.0)(@react-native/metro-config@0.85.3(@babel/core@7.29.0))(@types/react@19.2.15)(react@19.2.3))(react@19.2.3)
@@ -2237,6 +2243,17 @@ packages:
     peerDependencies:
       react: '*'
       react-native: '*'
+
+  expo-av@16.0.8:
+    resolution: {integrity: sha512-cmVPftGR/ca7XBgs7R6ky36lF3OC0/MM/lpgX/yXqfv0jASTsh7AYX9JxHCwFmF+Z6JEB1vne9FDx4GiLcGreQ==}
+    peerDependencies:
+      expo: '*'
+      react: '*'
+      react-native: '*'
+      react-native-web: '*'
+    peerDependenciesMeta:
+      react-native-web:
+        optional: true
 
   expo-constants@56.0.15:
     resolution: {integrity: sha512-7187sd55swLX+CM0noAV5LreEgkUaDG/zEXy9quonfzKpJxy8zJAszp9S++xOx/FcqBVEEEcQhE8tKTujwL8fg==}
@@ -7043,6 +7060,14 @@ snapshots:
     transitivePeerDependencies:
       - expo
       - supports-color
+
+  expo-av@16.0.8(expo@56.0.4)(react-native-web@0.21.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react-native@0.85.3(@babel/core@7.29.0)(@react-native/metro-config@0.85.3(@babel/core@7.29.0))(@types/react@19.2.15)(react@19.2.3))(react@19.2.3):
+    dependencies:
+      expo: 56.0.4(@babel/core@7.29.0)(@expo/dom-webview@56.0.5)(@expo/metro-runtime@56.0.12)(expo-router@56.2.6)(react-dom@19.2.3(react@19.2.3))(react-native-web@0.21.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react-native-worklets@0.8.3(@babel/core@7.29.0)(@react-native/metro-config@0.85.3(@babel/core@7.29.0))(react-native@0.85.3(@babel/core@7.29.0)(@react-native/metro-config@0.85.3(@babel/core@7.29.0))(@types/react@19.2.15)(react@19.2.3))(react@19.2.3))(react-native@0.85.3(@babel/core@7.29.0)(@react-native/metro-config@0.85.3(@babel/core@7.29.0))(@types/react@19.2.15)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)
+      react: 19.2.3
+      react-native: 0.85.3(@babel/core@7.29.0)(@react-native/metro-config@0.85.3(@babel/core@7.29.0))(@types/react@19.2.15)(react@19.2.3)
+    optionalDependencies:
+      react-native-web: 0.21.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
 
   expo-constants@56.0.15(expo@56.0.4)(react-native@0.85.3(@babel/core@7.29.0)(@react-native/metro-config@0.85.3(@babel/core@7.29.0))(@types/react@19.2.15)(react@19.2.3)):
     dependencies:

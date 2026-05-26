@@ -1,16 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
+import { View, StyleSheet, Platform, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { TopAppBarProps, TabType } from '../types';
-
 import { NavLink } from './NavLink';
-
-const colors = {
-  surface: '#1A1F2E', // Matching the dark theme of the app for the floating bar
-  'primary-container': '#34D399',
-  'on-primary-container': '#FFFFFF',
-  'on-surface-variant': '#A0AEC0',
-};
+import { SmartVoiceSearch } from '../../ui/SmartVoiceSearch';
+import { ParsedSearch } from '../../../utils/aiSearchParser';
 
 const styles = StyleSheet.create({
   container: {
@@ -25,6 +20,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
+    minHeight: 48,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -40,6 +36,7 @@ const styles = StyleSheet.create({
         marginHorizontal: 'auto',
         boxShadow: '0px 4px 10px rgba(0, 0, 0, 0.3)',
         backdropFilter: 'blur(10px)', // Glassmorphism para web
+        transition: 'background-color 0.3s ease',
       },
     }),
   },
@@ -48,13 +45,28 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     flex: 1,
   },
+  searchActiveContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    height: 40,
+  },
+  backButton: {
+    padding: 8,
+    marginRight: 4,
+  }
 });
 
-export const TopAppBar: React.FC<TopAppBarProps> = ({ currentTab = 'map', onTabChange }) => {
+export const TopAppBar: React.FC<TopAppBarProps & { onHoverIn?: () => void; onHoverOut?: () => void; onVoiceSearch?: (res: ParsedSearch) => void }> = (props) => {
+  const { currentTab = 'map', onTabChange, onVoiceSearch } = props;
   const [activeTab, setActiveTab] = useState<TabType>(currentTab);
+  const [isSearchActive, setIsSearchActive] = useState(false);
 
   useEffect(() => {
-    setActiveTab(currentTab);
+    const timer = setTimeout(() => {
+      setActiveTab(currentTab);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [currentTab]);
 
   const handleTabChange = (tab: TabType) => {
@@ -62,6 +74,18 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({ currentTab = 'map', onTabC
     if (onTabChange) {
       onTabChange(tab);
     }
+  };
+
+  const [isHovered, setIsHovered] = useState(false);
+
+  const handleMouseEnter = () => {
+    setIsHovered(true);
+    if ((props as any).onHoverIn) (props as any).onHoverIn();
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+    if ((props as any).onHoverOut) (props as any).onHoverOut();
   };
 
   const tabs: { id: TabType; icon: string; label?: string }[] = [
@@ -73,18 +97,43 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({ currentTab = 'map', onTabC
   ];
 
   return (
-    <View style={styles.container}>
-      <View style={styles.navContainer}>
-        {tabs.map((tab) => (
-          <NavLink
-            key={tab.id}
-            icon={tab.icon}
-            label={tab.label}
-            active={activeTab === tab.id}
-            onClick={() => handleTabChange(tab.id)}
+    <View
+      style={[styles.container, isHovered && { backgroundColor: 'rgba(54, 54, 54, 0.75)' }] as any}
+      //@ts-ignore
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      {isSearchActive ? (
+        <View style={styles.searchActiveContainer}>
+          <TouchableOpacity onPress={() => setIsSearchActive(false)} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+          </TouchableOpacity>
+          <SmartVoiceSearch 
+            isEmbedded={true} 
+            onSearchComplete={(res) => {
+              setIsSearchActive(false);
+              if (onVoiceSearch) onVoiceSearch(res);
+            }} 
           />
-        ))}
-      </View>
+        </View>
+      ) : (
+        <View style={styles.navContainer}>
+          <NavLink
+            icon="search"
+            active={false}
+            onClick={() => setIsSearchActive(true)}
+          />
+          {tabs.map((tab) => (
+            <NavLink
+              key={tab.id}
+              icon={tab.icon}
+              label={tab.label}
+              active={activeTab === tab.id}
+              onClick={() => handleTabChange(tab.id)}
+            />
+          ))}
+        </View>
+      )}
     </View>
   );
 };

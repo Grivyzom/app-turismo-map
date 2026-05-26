@@ -8,11 +8,12 @@ El frontend es una aplicación multiplataforma construida con **React / React N
 - **Estilos:** `NativeWind v4` + `TailwindCSS v4` (para diseño consistente multiplataforma)
 - **Mapas:** 
     - Móvil: `react-native-maps` (v1.27.2) — Configuración detallada en [[CONFIGURACION GOOGLE MAPS.md]].
-    - Web: `maplibre-gl` (v5.24.0) para alto rendimiento
+    - Web: `maplibre-gl` (v5.24.0) usando **CARTO Dark Matter** como base vectorial por defecto, asegurando un diseño "Dark Theme" fluido sin costos de Google Maps API en web.
+- **Telemetría Avanzada:** Hook `useUserLocation.ts` que captura coordenadas, altitud, precisión, velocidad y rumbo (heading) usando `expo-location` y fallback de magnetómetro web (`deviceorientation`). Se acompaña de un HUD (Telemetry Widget) con diseño Glassmorphism y pines de mapa 3D interactivos con conos direccionales.
 - **Animaciones:** `react-native-reanimated` (v4.3.1) para fluidez de 60fps
 - **Configuración:** `mapConfig.ts` centraliza la elección del proveedor (Google vs Open-Source)
-- **Estado & datos:** `React Hooks` (useState/useEffect) para prototipos; escalable a `Zustand`
-- **Tiempo real:** Simulación de WebSockets implementada en `App.tsx` para pruebas de flujo
+- **Estado & datos:** `React Hooks` (useState/useEffect/useCallback) para estado local y control de re-renders.
+- **Tiempo real:** Simulación de WebSockets implementada nativamente para pruebas de flujo.
 
 **🗺️ Arquitectura de Datos en Tiempo Real (Frontend)**
 

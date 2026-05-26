@@ -13,12 +13,13 @@ import {
   Pressable,
   Image,
 } from 'react-native';
+import { TelemetryWidget } from '../../src/components/MapUI/TelemetryWidget';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 
 import { TopAppBar, type TabType } from '../../src/components/MapUI';
 import { MapContainer } from '../../src/components/Map/MapContainer';
-import { MapLayer, TurismoEvent } from '../../src/components/Map/types';
+import { MapLayer, TurismoEvent, MAX_ZOOM_PER_LAYER } from '../../src/components/Map/types';
 import { getCategoryColor } from '../../src/utils/mapUtils';
 import {
   DEFAULT_MAP_LAYER,
@@ -27,6 +28,7 @@ import {
 } from '../../src/utils/mapPreferences';
 import UserProfileScreen from '../../src/screens/UserProfileScreen';
 import { useUserLocation } from '../../src/hooks/useUserLocation';
+import { ParsedSearch } from '../../src/utils/aiSearchParser';
 
 const INITIAL_EVENTS: TurismoEvent[] = [
   {
@@ -42,6 +44,7 @@ const INITIAL_EVENTS: TurismoEvent[] = [
     attendeesCount: 342,
     imageUrl:
       'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&q=80&w=800',
+    radius: 400,
   },
   {
     id: '2',
@@ -70,6 +73,12 @@ const INITIAL_EVENTS: TurismoEvent[] = [
     attendeesCount: 154,
     imageUrl:
       'https://images.unsplash.com/photo-1440342359743-84fcb8c21f21?auto=format&fit=crop&q=80&w=800',
+    polygon: [
+      { latitude: -39.806, longitude: -73.250 },
+      { latitude: -39.806, longitude: -73.246 },
+      { latitude: -39.810, longitude: -73.246 },
+      { latitude: -39.810, longitude: -73.250 },
+    ],
   },
   {
     id: '4',
@@ -145,12 +154,21 @@ const WS_SIMULATION_POOL: Omit<TurismoEvent, 'id' | 'isRealTime'>[] = [
 
 type CategoryFilter = 'todos' | 'gastronomia' | 'cultura' | 'naturaleza' | 'musica' | 'deportes';
 
-const MAP_LAYER_OPTIONS: { key: MapLayer; label: string; icon: string }[] = [
-  { key: 'dark', label: 'Noche', icon: '🌙' },
-  { key: 'streets', label: 'Calles', icon: '🛣️' },
-  { key: 'light', label: 'Claro', icon: '☀️' },
-  { key: 'satellite', label: 'Satélite', icon: '🛰️' },
-  { key: 'terrain', label: 'Relieve', icon: '⛰️' },
+const CATEGORY_ICONS: Record<CategoryFilter, { name: any; family: 'Ionicons' | 'MaterialIcons' }> = {
+  todos: { name: 'apps', family: 'Ionicons' },
+  gastronomia: { name: 'restaurant', family: 'MaterialIcons' },
+  cultura: { name: 'museum', family: 'MaterialIcons' },
+  naturaleza: { name: 'park', family: 'MaterialIcons' },
+  musica: { name: 'music-note', family: 'MaterialIcons' },
+  deportes: { name: 'sports-soccer', family: 'MaterialIcons' },
+};
+
+const MAP_LAYER_OPTIONS: { key: MapLayer; label: string; iconName: any; iconFamily: 'Ionicons' | 'MaterialIcons' }[] = [
+  { key: 'dark', label: 'Noche', iconName: 'moon', iconFamily: 'Ionicons' },
+  { key: 'streets', label: 'Calles', iconName: 'add-road', iconFamily: 'MaterialIcons' },
+  { key: 'light', label: 'Claro', iconName: 'sunny', iconFamily: 'Ionicons' },
+  { key: 'satellite', label: 'Satélite', iconName: 'satellite', iconFamily: 'MaterialIcons' },
+  { key: 'terrain', label: 'Relieve', iconName: 'terrain', iconFamily: 'MaterialIcons' },
 ];
 
 export default function HomeScreen() {
@@ -161,6 +179,7 @@ export default function HomeScreen() {
   const [simulationIndex, setSimulationIndex] = useState(0);
   const [mapLayer, setMapLayer] = useState<MapLayer>(DEFAULT_MAP_LAYER);
   const [mapLayerReady, setMapLayerReady] = useState(false);
+  const [showTraffic, setShowTraffic] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('map');
   const [showFilters, setShowFilters] = useState(false);
   const [isTacticalModeActive, setIsTacticalModeActive] = useState(false);
@@ -172,29 +191,41 @@ export default function HomeScreen() {
   } | null>(null);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const toastY = useRef(new Animated.Value(-150)).current;
-  const panelSlide = useRef(new Animated.Value(0)).current;
+  const [toastY] = useState(() => new Animated.Value(-150));
+  const [panelSlide] = useState(() => new Animated.Value(0));
 
   const { userLocation, locationError, isLoadingLocation, retryLocation } = useUserLocation();
   const [centerTrigger, setCenterTrigger] = useState(0);
   const [zoom, setZoom] = useState(13);
 
-  const showNotification = (message: string) => {
-    setToastMessage(message);
-    Animated.sequence([
-      Animated.timing(toastY, {
-        toValue: Platform.OS === 'web' ? 20 : 50,
-        duration: 400,
-        useNativeDriver: Platform.OS !== 'web',
-      }),
-      Animated.delay(3500),
-      Animated.timing(toastY, {
-        toValue: -150,
-        duration: 400,
-        useNativeDriver: Platform.OS !== 'web',
-      }),
-    ]).start(() => setToastMessage(null));
-  };
+  /** Zoom máximo dinámico según la capa activa */
+  const currentMaxZoom = MAX_ZOOM_PER_LAYER[mapLayer] || 18;
+
+  const showNotification = useCallback(
+    (message: string) => {
+      setToastMessage(message);
+      Animated.sequence([
+        Animated.timing(toastY, {
+          toValue: Platform.OS === 'web' ? 20 : 50,
+          duration: 400,
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+        Animated.delay(3500),
+        Animated.timing(toastY, {
+          toValue: -150,
+          duration: 400,
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+      ]).start(() => setToastMessage(null));
+    },
+    [toastY],
+  );
+
+  const handleVoiceSearch = useCallback((result: ParsedSearch) => {
+    setSelectedCategory(result.category as CategoryFilter);
+    setSearchQuery(result.query);
+    showNotification(`Búsqueda: "${result.originalText}"`);
+  }, [showNotification]);
 
   const triggerWebSocketEvent = useCallback(() => {
     if (simulationIndex >= WS_SIMULATION_POOL.length) {
@@ -214,7 +245,7 @@ export default function HomeScreen() {
     setSelectedEvent(newEvent);
     setSimulationIndex((prev) => prev + 1);
     showNotification(`⚡ Live WS: Nuevo evento en Valdivia! "${newEvent.title}"`);
-  }, [simulationIndex]);
+  }, [simulationIndex, showNotification]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -223,7 +254,7 @@ export default function HomeScreen() {
       }
     }, 15000);
     return () => clearTimeout(timer);
-  }, [simulationIndex]);
+  }, [simulationIndex, triggerWebSocketEvent]);
 
   useEffect(() => {
     let isMounted = true;
@@ -255,9 +286,12 @@ export default function HomeScreen() {
 
   useEffect(() => {
     if (locationError) {
-      showNotification(`📍 ${locationError}`);
+      const timer = setTimeout(() => {
+        showNotification(`📍 ${locationError}`);
+      }, 0);
+      return () => clearTimeout(timer);
     }
-  }, [locationError]);
+  }, [locationError, showNotification]);
 
   const screenWidth = Dimensions.get('window').width;
   const isDesktop = Platform.OS === 'web' && screenWidth > 768;
@@ -278,7 +312,7 @@ export default function HomeScreen() {
         useNativeDriver: false,
       }).start();
     }
-  }, [selectedEvent]);
+  }, [selectedEvent, panelSlide]);
 
   const filteredEvents = useMemo(
     () =>
@@ -331,11 +365,16 @@ export default function HomeScreen() {
           onTacticalLocationChange={setTacticalLocation}
           zoom={zoom}
           onZoomChange={setZoom}
+          showTraffic={showTraffic}
         />
       </View>
 
       <View style={styles.topBarWrapper}>
-        <TopAppBar currentTab={activeTab} onTabChange={setActiveTab} />
+        <TopAppBar 
+          currentTab={activeTab} 
+          onTabChange={setActiveTab} 
+          onVoiceSearch={handleVoiceSearch} 
+        />
       </View>
 
       {toastMessage && (
@@ -349,7 +388,7 @@ export default function HomeScreen() {
         {/* Zoom In */}
         <TouchableOpacity
           style={styles.controlButton}
-          onPress={() => setZoom((z) => Math.min(z + 1, 20))}
+          onPress={() => setZoom((z) => Math.min(z + 1, currentMaxZoom))}
           activeOpacity={0.7}
         >
           <MaterialIcons name="add" size={20} color="#9CA3AF" />
@@ -410,6 +449,22 @@ export default function HomeScreen() {
 
         <View style={styles.controlDivider} />
 
+        {/* Tráfico (Real-time) */}
+        <TouchableOpacity
+          style={[styles.controlButton, showTraffic && styles.controlButtonActive]}
+          onPress={() => {
+            setShowTraffic(!showTraffic);
+            if (!showTraffic) {
+              showNotification('🚗 Tráfico en vivo activado');
+            }
+          }}
+          activeOpacity={0.7}
+        >
+          <MaterialIcons name="traffic" size={18} color={showTraffic ? '#34D399' : '#9CA3AF'} />
+        </TouchableOpacity>
+
+        <View style={styles.controlDivider} />
+
         {/* Filtros de Mapa */}
         <TouchableOpacity
           style={[styles.controlButton, showFilters && styles.controlButtonActive]}
@@ -460,7 +515,84 @@ export default function HomeScreen() {
             </View>
             <View style={styles.hudDataRow}>
               <Text style={styles.hudLabel}>ALT</Text>
-              <Text style={styles.hudValue}>-- msnm</Text>
+              <Text style={styles.hudValue}>
+                {userLocation?.altitude !== null && userLocation?.altitude !== undefined
+                  ? `${userLocation.altitude} msnm`
+                  : '-- msnm'}
+              </Text>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Dashboard de Telemetría (Live Telemetry HUD) */}
+      {Platform.OS !== 'web' && userLocation && (
+        <View style={styles.telemetryHudContainer} pointerEvents="box-none">
+          <View style={styles.telemetryHudGlass}>
+            {/* Cabecera / Status */}
+            <View style={styles.telemetryHeader}>
+              <View style={styles.telemetryDot} />
+              <Text style={styles.telemetryTitle}>TELEMETRÍA EN VIVO</Text>
+            </View>
+
+            <View style={styles.telemetryMainRow}>
+              {/* Brújula Analógica */}
+              <View style={styles.compassWrapper}>
+                <View
+                  style={[
+                    styles.compassRing,
+                    {
+                      transform: [
+                        {
+                          rotate:
+                            userLocation.heading !== null ? `${-userLocation.heading}deg` : '0deg',
+                        },
+                      ],
+                    },
+                  ]}
+                >
+                  <Text style={[styles.compassText, styles.compassTextN]}>N</Text>
+                  <Text style={[styles.compassText, styles.compassTextE]}>E</Text>
+                  <Text style={[styles.compassText, styles.compassTextS]}>S</Text>
+                  <Text style={[styles.compassText, styles.compassTextO]}>O</Text>
+                </View>
+                <View style={styles.compassNeedle} />
+                <View style={styles.compassCenterDot} />
+              </View>
+
+              {/* Datos de Telemetría */}
+              <View style={styles.telemetryDataColumn}>
+                <View style={styles.telemetryDetailRow}>
+                  <MaterialIcons name="explore" size={10} color="#A0AEC0" />
+                  <Text style={styles.telemetryDetailLabel}>RUMBO</Text>
+                  <Text style={styles.telemetryDetailValue}>
+                    {userLocation.heading !== null
+                      ? `${Math.round(userLocation.heading)}° ${userLocation.headingDirection || ''}`
+                      : '--'}
+                  </Text>
+                </View>
+                <View style={styles.telemetryDetailRow}>
+                  <MaterialIcons name="speed" size={10} color="#A0AEC0" />
+                  <Text style={styles.telemetryDetailLabel}>VELOCIDAD</Text>
+                  <Text style={styles.telemetryDetailValue}>
+                    {userLocation.speed !== null ? `${userLocation.speed} km/h` : '0 km/h'}
+                  </Text>
+                </View>
+                <View style={styles.telemetryDetailRow}>
+                  <MaterialIcons name="filter-hdr" size={10} color="#A0AEC0" />
+                  <Text style={styles.telemetryDetailLabel}>ALTITUD</Text>
+                  <Text style={styles.telemetryDetailValue}>
+                    {userLocation.altitude !== null ? `${userLocation.altitude} m` : '-- m'}
+                  </Text>
+                </View>
+                <View style={styles.telemetryDetailRow}>
+                  <MaterialIcons name="gps-fixed" size={10} color="#A0AEC0" />
+                  <Text style={styles.telemetryDetailLabel}>EXACTITUD</Text>
+                  <Text style={styles.telemetryDetailValue}>
+                    {userLocation.accuracy !== null ? `±${userLocation.accuracy}m` : '--'}
+                  </Text>
+                </View>
+              </View>
             </View>
           </View>
         </View>
@@ -484,42 +616,63 @@ export default function HomeScreen() {
                 'musica',
                 'deportes',
               ] as CategoryFilter[]
-            ).map((cat) => (
-              <TouchableOpacity
-                key={cat}
-                style={[styles.categoryChip, selectedCategory === cat && styles.activeCategoryChip]}
-                onPress={() => setSelectedCategory(cat)}
-              >
-                <Text
-                  style={[
-                    styles.categoryText,
-                    selectedCategory === cat && styles.activeCategoryText,
-                  ]}
+            ).map((cat) => {
+              const iconData = CATEGORY_ICONS[cat];
+              const IconComponent = iconData.family === 'Ionicons' ? Ionicons : MaterialIcons;
+              const isActive = selectedCategory === cat;
+              return (
+                <TouchableOpacity
+                  key={cat}
+                  style={[styles.categoryChip, isActive && styles.activeCategoryChip]}
+                  onPress={() => setSelectedCategory(cat)}
                 >
-                  {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  <IconComponent 
+                    name={iconData.name} 
+                    size={14} 
+                    color={isActive ? '#FFFFFF' : '#CBD5E0'} 
+                    style={{ marginRight: 6 }}
+                  />
+                  <Text
+                    style={[
+                      styles.categoryText,
+                      isActive && styles.activeCategoryText,
+                    ]}
+                  >
+                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
           <Text style={styles.filterSectionTitle}>Capa del Mapa</Text>
           <View style={styles.layersWrapper}>
-            {MAP_LAYER_OPTIONS.map((layer) => (
-              <TouchableOpacity
-                key={layer.key}
-                style={[styles.layerChip, mapLayer === layer.key && styles.activeLayerChip]}
-                onPress={() => setMapLayer(layer.key)}
-              >
-                <Text
-                  style={[
-                    styles.layerChipText,
-                    mapLayer === layer.key && styles.activeLayerChipText,
-                  ]}
+            {MAP_LAYER_OPTIONS.map((layer) => {
+              const IconComponent = layer.iconFamily === 'Ionicons' ? Ionicons : MaterialIcons;
+              const isActive = mapLayer === layer.key;
+              return (
+                <TouchableOpacity
+                  key={layer.key}
+                  style={[styles.layerChip, isActive && styles.activeLayerChip]}
+                  onPress={() => setMapLayer(layer.key)}
                 >
-                  {layer.icon} {layer.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  <IconComponent 
+                    name={layer.iconName} 
+                    size={14} 
+                    color={isActive ? '#34D399' : '#CBD5E0'} 
+                    style={{ marginRight: 6 }}
+                  />
+                  <Text
+                    style={[
+                      styles.layerChipText,
+                      isActive && styles.activeLayerChipText,
+                    ]}
+                  >
+                    {layer.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
       )}
@@ -791,6 +944,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   categoryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginRight: 8,
     marginBottom: 8,
     paddingHorizontal: 14,
@@ -827,6 +982,8 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   layerChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginRight: 8,
     marginBottom: 8,
     paddingHorizontal: 12,
@@ -1168,10 +1325,10 @@ const styles = StyleSheet.create({
     bottom: 20,
     right: 12,
     zIndex: 110,
-    backgroundColor: 'rgba(34, 34, 34, 0.55)', // Coincide con TopAppBar
-    borderRadius: 18,
+    backgroundColor: 'rgba(30, 30, 30, 0.6)', // Glassmorphism premium
+    borderRadius: 24, // Mismo radio de borde que los paneles principales
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)', // Coincide con TopAppBar
+    borderColor: 'rgba(255, 255, 255, 0.1)',
     flexDirection: 'column',
     alignItems: 'center',
     paddingVertical: 4,
@@ -1185,9 +1342,9 @@ const styles = StyleSheet.create({
       },
       android: { elevation: 6 },
       web: {
-        backdropFilter: 'blur(10px)', // Coincide con TopAppBar
-        WebkitBackdropFilter: 'blur(10px)',
-        boxShadow: '0px 4px 10px rgba(0, 0, 0, 0.3)',
+        backdropFilter: 'blur(12px)', // Efecto cristal más pronunciado
+        WebkitBackdropFilter: 'blur(12px)',
+        boxShadow: '0px 8px 32px rgba(0, 0, 0, 0.2)',
       },
     }),
   },
@@ -1211,14 +1368,14 @@ const styles = StyleSheet.create({
   filterOverlay: {
     position: 'absolute',
     bottom: 20,
-    right: 56,
+    right: 76, // Separación clara de los controles de zoom (right: 12 + width ~44 + margen 20)
     width: 300,
     zIndex: 110,
-    backgroundColor: 'rgba(34, 34, 34, 0.85)', // Estilo TopAppBar opaco para contraste
-    borderRadius: 24,
+    backgroundColor: 'rgba(30, 30, 30, 0.6)', // Glassmorphism premium unificado
+    borderRadius: 24, // Mismo radio de borde
     paddingVertical: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)', // Coincide con TopAppBar
+    borderColor: 'rgba(255, 255, 255, 0.1)',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -1228,9 +1385,9 @@ const styles = StyleSheet.create({
       },
       android: { elevation: 12 },
       web: {
-        backdropFilter: 'blur(10px)',
-        WebkitBackdropFilter: 'blur(10px)',
-        boxShadow: '0 12px 40px rgba(0, 0, 0, 0.4)',
+        backdropFilter: 'blur(12px)', // Efecto cristal más pronunciado
+        WebkitBackdropFilter: 'blur(12px)',
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
       },
     }),
   },
@@ -1305,6 +1462,138 @@ const styles = StyleSheet.create({
   hudValue: {
     color: '#FFFFFF',
     fontSize: 12,
+    fontWeight: '600',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  telemetryHudContainer: {
+    position: 'absolute',
+    bottom: 20,
+    left: 12,
+    zIndex: 110,
+  },
+  telemetryHudGlass: {
+    backgroundColor: 'rgba(34, 34, 34, 0.65)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    width: 250,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+      },
+      android: { elevation: 8 },
+      web: {
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        boxShadow: '0px 4px 10px rgba(0, 0, 0, 0.3)',
+      },
+    }),
+  },
+  telemetryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  telemetryDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#3B82F6',
+    marginRight: 8,
+  },
+  telemetryTitle: {
+    color: '#60A5FA',
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+  },
+  telemetryMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  compassWrapper: {
+    position: 'relative',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  compassRing: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  compassText: {
+    position: 'absolute',
+    color: '#A0AEC0',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  compassTextN: {
+    top: 2,
+    color: '#EF4444',
+  },
+  compassTextS: {
+    bottom: 2,
+  },
+  compassTextE: {
+    right: 3,
+  },
+  compassTextO: {
+    left: 3,
+  },
+  compassNeedle: {
+    position: 'absolute',
+    top: 14,
+    width: 0,
+    height: 0,
+    borderStyle: 'solid',
+    borderLeftWidth: 4,
+    borderRightWidth: 4,
+    borderBottomWidth: 18,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: '#EF4444',
+  },
+  compassCenterDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#FFFFFF',
+    position: 'absolute',
+  },
+  telemetryDataColumn: {
+    flex: 1,
+    gap: 3,
+  },
+  telemetryDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: 4,
+  },
+  telemetryDetailLabel: {
+    color: '#A0AEC0',
+    fontSize: 8,
+    fontWeight: '700',
+    width: 60,
+  },
+  telemetryDetailValue: {
+    color: '#FFFFFF',
+    fontSize: 9.5,
     fontWeight: '600',
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },

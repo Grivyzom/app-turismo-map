@@ -162,11 +162,16 @@ export default function App() {
   const [simulationIndex, setSimulationIndex] = useState(0);
   const [mapLayer, setMapLayer] = useState<MapLayer>(DEFAULT_MAP_LAYER);
   const [mapLayerReady, setMapLayerReady] = useState(false);
+  const [showTraffic, setShowTraffic] = useState(false);
 
   // Estados de animación
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastY = useRef(new Animated.Value(-150)).current;
   const cardHeight = useRef(new Animated.Value(0)).current;
+  
+  // Submenú
+  const [isTopBarHovered, setIsTopBarHovered] = useState(false);
+  const submenuHeight = useRef(new Animated.Value(0)).current;
 
   // Animación del Toast flotante (para WebSockets en tiempo real)
   const showNotification = (message: string) => {
@@ -250,8 +255,8 @@ export default function App() {
     if (selectedEvent) {
       Animated.spring(cardHeight, {
         toValue: 1,
-        tension: 50,
-        friction: 8,
+        tension: 40,
+        friction: 9,
         useNativeDriver: false,
       }).start();
     } else {
@@ -261,7 +266,17 @@ export default function App() {
         useNativeDriver: false,
       }).start();
     }
-  }, [selectedEvent]);
+  }, [selectedEvent, cardHeight]);
+
+  // Manejar animación del submenú
+  useEffect(() => {
+    Animated.spring(submenuHeight, {
+      toValue: isTopBarHovered ? 1 : 0,
+      tension: 50,
+      friction: 8,
+      useNativeDriver: false, // height/opacity no soportan native driver en RN web para transformaciones complejas, pero opacity sí.
+    }).start();
+  }, [isTopBarHovered]);
 
   // Filtrar eventos por categoría y búsqueda
   const filteredEvents = events.filter((event) => {
@@ -296,6 +311,7 @@ export default function App() {
           selectedEvent={selectedEvent}
           onSelectEvent={setSelectedEvent}
           mapLayer={mapLayer}
+          showTraffic={showTraffic}
         />
       </View>
 
@@ -306,13 +322,99 @@ export default function App() {
         </Animated.View>
       )}
 
-      {/* BARRA SUPERIOR NUEVA */}
-      <View style={styles.topBarWrapper}>
+      {/* BARRA SUPERIOR NUEVA Y SUBMENÚ */}
+      <View 
+        style={styles.topBarWrapper}
+        //@ts-ignore
+        onMouseEnter={() => setIsTopBarHovered(true)}
+        onMouseLeave={() => setIsTopBarHovered(false)}
+      >
         <TopAppBar
           currentTab="map"
           onSearchClick={() => console.log('Search clicked')}
           onAccountClick={() => console.log('Account clicked')}
         />
+        
+        {/* SUBMENÚ DESPLEGABLE */}
+        <Animated.View
+          style={[
+            styles.submenuContainer,
+            {
+              opacity: submenuHeight,
+              transform: [
+                {
+                  translateY: submenuHeight.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-20, 0],
+                  }),
+                },
+              ],
+            },
+            !isTopBarHovered && { pointerEvents: 'none' } // Desactiva clics cuando está oculto
+          ]}
+        >
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.categoriesScroll}
+            contentContainerStyle={styles.categoriesContent}
+          >
+            <TouchableOpacity
+              style={[
+                styles.categoryChip,
+                selectedCategory === 'todos' && styles.activeCategoryChip,
+              ]}
+              onPress={() => setSelectedCategory('todos')}
+            >
+              <Text
+                style={[
+                  styles.categoryText,
+                  selectedCategory === 'todos' && styles.activeCategoryText,
+                ]}
+              >
+                Todos
+              </Text>
+            </TouchableOpacity>
+            {['gastronomia', 'cultura', 'naturaleza', 'musica', 'deportes'].map((cat) => (
+              <TouchableOpacity
+                key={cat}
+                style={[styles.categoryChip, selectedCategory === cat && styles.activeCategoryChip]}
+                onPress={() => setSelectedCategory(cat as CategoryFilter)}
+              >
+                <Text
+                  style={[styles.categoryText, selectedCategory === cat && styles.activeCategoryText]}
+                >
+                  {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.layersScroll}
+            contentContainerStyle={styles.layersContent}
+          >
+            <Text style={styles.layersLabel}>CAPAS:</Text>
+            {MAP_LAYER_OPTIONS.map((layer) => (
+              <TouchableOpacity
+                key={layer.key}
+                style={[styles.layerChip, mapLayer === layer.key && styles.activeLayerChip]}
+                onPress={() => setMapLayer(layer.key)}
+              >
+                <Text
+                  style={[
+                    styles.layerChipText,
+                    mapLayer === layer.key && styles.activeLayerChipText,
+                  ]}
+                >
+                  {layer.icon} {layer.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </Animated.View>
       </View>
 
       {/* PANEL DE CONTROL DE SIMULACIÓN Y WEBSOCKET (Esquina Derecha / Inferior) */}
@@ -420,6 +522,23 @@ const styles = StyleSheet.create({
       },
       web: {
         boxShadow: '0px 4px 5px rgba(0, 0, 0, 0.3)',
+      },
+    }),
+  },
+  submenuContainer: {
+    marginTop: 8,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(17, 24, 39, 0.75)',
+    borderRadius: 20,
+    marginHorizontal: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    ...Platform.select({
+      web: {
+        backdropFilter: 'blur(12px)',
+        maxWidth: 600,
+        alignSelf: 'center',
+        width: '100%',
       },
     }),
   },
@@ -637,20 +756,20 @@ const styles = StyleSheet.create({
     bottom: 24,
     left: 16,
     right: 16,
-    backgroundColor: 'rgba(17, 24, 39, 0.95)',
-    borderRadius: 20,
+    backgroundColor: 'rgba(17, 24, 39, 0.90)',
+    borderRadius: 28,
     padding: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.06)',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.4,
-        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 16 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
       },
       web: {
-        boxShadow: '0px 10px 12px rgba(0, 0, 0, 0.4)',
+        boxShadow: '0px 16px 30px rgba(0, 0, 0, 0.3)',
       },
     }),
     elevation: 10,
