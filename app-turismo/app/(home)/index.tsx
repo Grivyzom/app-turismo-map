@@ -27,6 +27,9 @@ import {
   savePersistedMapLayer,
 } from '../../src/utils/mapPreferences';
 import UserProfileScreen from '../../src/screens/UserProfileScreen';
+import FeedScreen from '../../src/screens/FeedScreen';
+import PassportScreen from '../../src/screens/PassportScreen';
+import ForumScreen from '../../src/screens/ForumScreen';
 import { useUserLocation } from '../../src/hooks/useUserLocation';
 import { ParsedSearch } from '../../src/utils/aiSearchParser';
 
@@ -344,6 +347,66 @@ export default function HomeScreen() {
 
         <View style={styles.profileContainer}>
           <UserProfileScreen />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (activeTab === 'feed') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+
+        <View style={styles.topBarWrapper}>
+          <TopAppBar 
+            currentTab={activeTab} 
+            onTabChange={setActiveTab} 
+            onVoiceSearch={handleVoiceSearch} 
+          />
+        </View>
+
+        <View style={styles.profileContainer}>
+          <FeedScreen />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (activeTab === 'saved') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+
+        <View style={styles.topBarWrapper}>
+          <TopAppBar 
+            currentTab={activeTab} 
+            onTabChange={setActiveTab} 
+            onVoiceSearch={handleVoiceSearch} 
+          />
+        </View>
+
+        <View style={styles.profileContainer}>
+          <PassportScreen />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (activeTab === 'forum') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+
+        <View style={styles.topBarWrapper}>
+          <TopAppBar 
+            currentTab={activeTab} 
+            onTabChange={setActiveTab} 
+            onVoiceSearch={handleVoiceSearch} 
+          />
+        </View>
+
+        <View style={styles.profileContainer}>
+          <ForumScreen />
         </View>
       </SafeAreaView>
     );

@@ -89,11 +89,11 @@ export const TopAppBar: React.FC<TopAppBarProps & { onHoverIn?: () => void; onHo
   };
 
   const tabs: { id: TabType; icon: string; label?: string }[] = [
-    { id: 'map', icon: 'map', label: 'Inicio' },
+    { id: 'map', icon: 'map', label: 'Mapa' },
+    { id: 'feed', icon: 'dynamic-feed', label: 'Feed' },
+    { id: 'saved', icon: 'bookmark', label: 'Pasaporte' },
     { id: 'forum', icon: 'forum', label: 'Foro' },
-    { id: 'saved', icon: 'bookmark' },
-    { id: 'settings', icon: 'settings' },
-    { id: 'profile', icon: 'person' },
+    { id: 'profile', icon: 'person', label: 'Perfil' },
   ];
 
   return (
