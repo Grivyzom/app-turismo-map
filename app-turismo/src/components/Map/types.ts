@@ -4,7 +4,7 @@ export interface TurismoEvent {
   description: string;
   latitude: number;
   longitude: number;
-  category: 'cultura' | 'gastronomia' | 'naturaleza' | 'musica' | 'deportes';
+  category: 'cultura' | 'gastronomia' | 'naturaleza' | 'musica' | 'deportes' | 'publico';
   organizer: string;
   time: string;
   attendeesCount: number;

@@ -13,6 +13,8 @@ export const getCategoryColor = (category: string) => {
       return '#F43F5E'; // Rosa/Neon
     case 'deportes':
       return '#06B6D4'; // Cian
+    case 'publico':
+      return '#FBBF24'; // Amarillo ámbar
     default:
       return '#3B82F6';
   }
@@ -32,6 +34,8 @@ export const getCategoryIcon = (category: string): CategoryIconName => {
       return 'music-note';
     case 'deportes':
       return 'sports-soccer';
+    case 'publico':
+      return 'groups'; // Icono de grupos para eventos públicos
     default:
       return 'place';
   }

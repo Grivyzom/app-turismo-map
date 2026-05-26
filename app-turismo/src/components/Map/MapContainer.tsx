@@ -79,15 +79,111 @@ const UserMarkerAnimated = React.memo(
 );
 UserMarkerAnimated.displayName = 'UserMarkerAnimated';
 
-// ─── Memoized EventMarker ────────────────────────────────────────────────────
-// Cada marcador se renderiza de forma independiente. Solo se re-renderiza si
-// cambian sus props (evento seleccionado, datos del evento, etc.)
-
+// ─── PublicEventMarkerAnimated ───────────────────────────────────────────────
 interface EventMarkerProps {
   event: TurismoEvent;
   isSelected: boolean;
   onPress: (event: TurismoEvent) => void;
 }
+
+const PublicEventMarkerAnimated = React.memo(
+  ({ event, isSelected, onPress }: EventMarkerProps) => {
+    const [pulseAnim] = useState(() => new Animated.Value(0));
+
+    useEffect(() => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 2500,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 0,
+            duration: 0,
+            useNativeDriver: true,
+          }),
+        ]),
+      ).start();
+    }, [pulseAnim]);
+
+    const attendeesRatio = Math.min(event.attendeesCount || 0, 1000) / 1000;
+    // maxScale goes from 1.5 (0 attendees) up to 4.0 (1000+ attendees)
+    const maxScale = 1.5 + (attendeesRatio * 2.5);
+
+    const scale1 = pulseAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [1, maxScale],
+    });
+
+    const opacity1 = pulseAnim.interpolate({
+      inputRange: [0, 0.7, 1],
+      outputRange: [0.6, 0.2, 0],
+    });
+    
+    const scale2 = pulseAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.5, maxScale * 0.7],
+    });
+    
+    const opacity2 = pulseAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.8, 0],
+    });
+
+    const color = getCategoryColor(event.category);
+    const iconName = getCategoryIcon(event.category);
+
+    const handlePress = useCallback(() => {
+      onPress(event);
+    }, [onPress, event]);
+
+    return (
+      <Marker
+        key={event.id}
+        coordinate={{ latitude: event.latitude, longitude: event.longitude }}
+        onPress={handlePress}
+        anchor={{ x: 0.5, y: 0.5 }}
+      >
+        <View style={styles.markerWrapper}>
+          {/* Ondas expansivas */}
+          <Animated.View style={[styles.publicEventPulse, { backgroundColor: color, transform: [{ scale: scale1 }], opacity: opacity1 }]} />
+          <Animated.View style={[styles.publicEventPulse, { backgroundColor: color, transform: [{ scale: scale2 }], opacity: opacity2 }]} />
+          
+          {/* Pin central */}
+          <View
+            style={[
+              styles.markerPin,
+              {
+                backgroundColor: color,
+                borderColor: '#111827',
+                transform: [{ scale: isSelected ? 1.3 : 1 }],
+              },
+            ]}
+          >
+            <MaterialIcons name={iconName} size={16} color="#FFFFFF" />
+          </View>
+        </View>
+      </Marker>
+    );
+  },
+  (prevProps, nextProps) => {
+    return (
+      prevProps.event.id === nextProps.event.id &&
+      prevProps.event.latitude === nextProps.event.latitude &&
+      prevProps.event.longitude === nextProps.event.longitude &&
+      prevProps.event.attendeesCount === nextProps.event.attendeesCount &&
+      prevProps.isSelected === nextProps.isSelected
+    );
+  },
+);
+PublicEventMarkerAnimated.displayName = 'PublicEventMarkerAnimated';
+
+// ─── Memoized EventMarker ────────────────────────────────────────────────────
+// Cada marcador se renderiza de forma independiente. Solo se re-renderiza si
+// cambian sus props (evento seleccionado, datos del evento, etc.)
+
 
 const EventMarker = React.memo(
   function EventMarker({ event, isSelected, onPress }: EventMarkerProps) {
@@ -330,6 +426,17 @@ function MapContainerInner({
               />
             );
           }
+          if (event.category === 'publico') {
+            return (
+              <PublicEventMarkerAnimated
+                key={event.id}
+                event={event}
+                isSelected={selectedEvent?.id === event.id}
+                onPress={onSelectEvent}
+              />
+            );
+          }
+
           return (
             <EventMarker
               key={event.id}
@@ -504,5 +611,11 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     backgroundColor: '#EF4444',
+  },
+  publicEventPulse: {
+    position: 'absolute',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
 });
