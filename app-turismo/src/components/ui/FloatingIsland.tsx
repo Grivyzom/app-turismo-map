@@ -112,6 +112,13 @@ export default function FloatingIsland({
 
   return (
     <View style={styles.overlayContainer}>
+      {/* Tap-to-dismiss background backdrop */}
+      <TouchableOpacity
+        style={StyleSheet.absoluteFill}
+        activeOpacity={1}
+        onPress={onClose}
+      />
+
       <View style={styles.islandContainer}>
         {/* Glowing sub-borders (Visual enhancement) */}
         <View style={styles.glowBorderTop} />
@@ -255,7 +262,7 @@ const styles = StyleSheet.create({
       }
     }),
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    pointerEvents: 'box-none',
+    pointerEvents: 'auto',
   },
   islandContainer: {
     width: '96vw',
