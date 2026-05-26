@@ -252,13 +252,14 @@ export default function HomeScreen() {
   }, [simulationIndex, showNotification]);
 
   useEffect(() => {
+    if (activeTab !== 'map') return;
     const timer = setTimeout(() => {
       if (simulationIndex < WS_SIMULATION_POOL.length) {
         triggerWebSocketEvent();
       }
     }, 15000);
     return () => clearTimeout(timer);
-  }, [simulationIndex, triggerWebSocketEvent]);
+  }, [simulationIndex, triggerWebSocketEvent, activeTab]);
 
   useEffect(() => {
     let isMounted = true;
@@ -419,18 +420,21 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
 
-      <View style={[
-        styles.mapContainer,
-        isDesktop && activeTab !== 'map' && {
-          // Blur y escala en Web
-          ...Platform.select({
-            web: {
-              filter: 'blur(12px) brightness(0.65)',
-              transform: 'scale(1.025)',
-            } as any
-          })
-        }
-      ]}>
+      <View 
+        pointerEvents={activeTab === 'map' ? 'auto' : 'none'}
+        style={[
+          styles.mapContainer,
+          isDesktop && activeTab !== 'map' && {
+            // Blur y escala en Web
+            ...Platform.select({
+              web: {
+                filter: 'blur(12px) brightness(0.65)',
+                transform: 'scale(1.025)',
+              } as any
+            })
+          }
+        ]}
+      >
         <MapContainer
           events={filteredEvents}
           selectedEvent={selectedEvent}
@@ -443,6 +447,7 @@ export default function HomeScreen() {
           zoom={zoom}
           onZoomChange={setZoom}
           showTraffic={showTraffic}
+          isFrozen={activeTab !== 'map'}
         />
       </View>
 

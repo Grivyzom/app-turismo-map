@@ -57,4 +57,5 @@ export interface MapContainerProps {
   zoom?: number;
   onZoomChange?: (zoom: number) => void;
   showTraffic?: boolean;
+  isFrozen?: boolean;
 }

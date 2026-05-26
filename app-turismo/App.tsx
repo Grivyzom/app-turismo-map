@@ -88,6 +88,18 @@ const INITIAL_EVENTS: TurismoEvent[] = [
     time: '08:30 - 13:00',
     attendeesCount: 450,
   },
+  {
+    id: '6',
+    title: 'Gran Carnaval del Río Calle-Calle',
+    description:
+      'Evento masivo al aire libre con carros alegóricos, comparsas y fuegos artificiales a orillas del río.',
+    latitude: -39.8122,
+    longitude: -73.2480,
+    category: 'publico',
+    organizer: 'Ilustre Municipalidad de Valdivia',
+    time: '18:00 - 23:30',
+    attendeesCount: 500, // Asistencia mediana para ver las ondas correspondientes
+  },
 ];
 
 // Cola de eventos listos para simular vía WebSocket
@@ -127,7 +139,7 @@ const WS_SIMULATION_POOL: Omit<TurismoEvent, 'id' | 'isRealTime'>[] = [
   },
 ];
 
-type CategoryFilter = 'todos' | 'gastronomia' | 'cultura' | 'naturaleza' | 'musica' | 'deportes';
+type CategoryFilter = 'todos' | 'gastronomia' | 'cultura' | 'naturaleza' | 'musica' | 'deportes' | 'publico';
 
 const MAP_LAYER_OPTIONS: { key: MapLayer; label: string; icon: string }[] = [
   { key: 'dark', label: 'Noche', icon: '🌙' },
@@ -148,6 +160,8 @@ const getCategoryColor = (category: string) => {
       return '#F43F5E'; // Rosa/Neon
     case 'deportes':
       return '#06B6D4'; // Cian
+    case 'publico':
+      return '#FBBF24'; // Amarillo/Ámbar
     default:
       return '#3B82F6';
   }
@@ -375,7 +389,7 @@ export default function App() {
                 Todos
               </Text>
             </TouchableOpacity>
-            {['gastronomia', 'cultura', 'naturaleza', 'musica', 'deportes'].map((cat) => (
+            {['gastronomia', 'cultura', 'naturaleza', 'musica', 'deportes', 'publico'].map((cat) => (
               <TouchableOpacity
                 key={cat}
                 style={[styles.categoryChip, selectedCategory === cat && styles.activeCategoryChip]}

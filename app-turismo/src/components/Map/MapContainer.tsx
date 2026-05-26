@@ -278,6 +278,7 @@ function MapContainerInner({
   zoom,
   onZoomChange,
   showTraffic,
+  isFrozen = false,
 }: MapContainerProps) {
   const [showProviderInfo, setShowProviderInfo] = React.useState(false);
 
@@ -465,6 +466,14 @@ function MapContainerInner({
 }
 
 export const MapContainer = React.memo(MapContainerInner, (prev, next) => {
+  // Si el mapa estaba congelado y sigue congelado, evitar completamente el renderizado
+  if (prev.isFrozen && next.isFrozen) {
+    return true;
+  }
+  // Si cambia el estado de congelación, debemos re-renderizar para reflejar el estado actual
+  if (prev.isFrozen !== next.isFrozen) {
+    return false;
+  }
   // Solo re-renderizar si cambian los datos que afectan al mapa
   return (
     prev.events === next.events &&

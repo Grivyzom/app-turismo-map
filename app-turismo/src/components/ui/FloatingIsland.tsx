@@ -22,7 +22,8 @@ export interface FloatingIslandItem {
   label: string;
   iconName: string;
   iconFamily: 'Ionicons' | 'MaterialIcons';
-  component: React.ReactNode;
+  component?: React.ReactNode;
+  render?: () => React.ReactNode;
   headerTitle: string;
 }
 
@@ -34,6 +35,41 @@ interface FloatingIslandProps {
   children?: React.ReactNode;
   showSidebar?: boolean;
 }
+
+const DEFAULT_ITEMS: FloatingIslandItem[] = [
+  {
+    id: 'feed',
+    label: 'Feed de Eventos',
+    iconName: 'dynamic-feed',
+    iconFamily: 'MaterialIcons',
+    render: () => <FeedScreen />,
+    headerTitle: 'El Pulso de la Ciudad',
+  },
+  {
+    id: 'saved',
+    label: 'Mi Pasaporte',
+    iconName: 'bookmark',
+    iconFamily: 'Ionicons',
+    render: () => <PassportScreen />,
+    headerTitle: 'Pasaporte Turístico',
+  },
+  {
+    id: 'forum',
+    label: 'Foro de Discusión',
+    iconName: 'forum',
+    iconFamily: 'MaterialIcons',
+    render: () => <ForumScreen />,
+    headerTitle: 'Comunidad & Foro',
+  },
+  {
+    id: 'profile',
+    label: 'Mi Perfil',
+    iconName: 'person',
+    iconFamily: 'MaterialIcons',
+    render: () => <UserProfileScreen />,
+    headerTitle: 'Mi Cuenta',
+  },
+];
 
 export default function FloatingIsland({
   activeTab,
@@ -69,49 +105,15 @@ export default function FloatingIsland({
     };
   }, [activeTab]); // Recargar cuando cambie de pestaña (por si editó su perfil)
 
-  const defaultItems: FloatingIslandItem[] = [
-    {
-      id: 'feed',
-      label: 'Feed de Eventos',
-      iconName: 'dynamic-feed',
-      iconFamily: 'MaterialIcons',
-      component: <FeedScreen />,
-      headerTitle: 'El Pulso de la Ciudad',
-    },
-    {
-      id: 'saved',
-      label: 'Mi Pasaporte',
-      iconName: 'bookmark',
-      iconFamily: 'Ionicons',
-      component: <PassportScreen />,
-      headerTitle: 'Pasaporte Turístico',
-    },
-    {
-      id: 'forum',
-      label: 'Foro de Discusión',
-      iconName: 'forum',
-      iconFamily: 'MaterialIcons',
-      component: <ForumScreen />,
-      headerTitle: 'Comunidad & Foro',
-    },
-    {
-      id: 'profile',
-      label: 'Mi Perfil',
-      iconName: 'person',
-      iconFamily: 'MaterialIcons',
-      component: <UserProfileScreen />,
-      headerTitle: 'Mi Cuenta',
-    },
-  ];
-
-  const currentItems = items || defaultItems;
+  const currentItems = items || DEFAULT_ITEMS;
 
   const renderContent = () => {
     if (children) {
       return children;
     }
     const activeItem = currentItems.find((item) => item.id === activeTab);
-    return activeItem ? activeItem.component : null;
+    if (!activeItem) return null;
+    return activeItem.render ? activeItem.render() : activeItem.component;
   };
 
   const getHeaderTitle = () => {
