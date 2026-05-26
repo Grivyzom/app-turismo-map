@@ -244,16 +244,24 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 1000,
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
     alignItems: 'center',
+    ...Platform.select({
+      web: {
+        paddingBottom: '3.5vh',
+      } as any,
+      default: {
+        paddingBottom: 24,
+      }
+    }),
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
     pointerEvents: 'box-none',
   },
   islandContainer: {
-    width: '90vw',
-    height: '85vh',
-    maxWidth: 1400,
-    maxHeight: 850,
+    width: '96vw',
+    height: '82vh',
+    maxWidth: 1750,
+    maxHeight: 900,
     borderRadius: 24,
     flexDirection: 'row',
     overflow: 'hidden',

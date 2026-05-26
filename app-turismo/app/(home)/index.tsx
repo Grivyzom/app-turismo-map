@@ -446,15 +446,13 @@ export default function HomeScreen() {
         />
       </View>
 
-      {showMainUI && (
-        <View style={styles.topBarWrapper}>
-          <TopAppBar 
-            currentTab={activeTab} 
-            onTabChange={setActiveTab} 
-            onVoiceSearch={handleVoiceSearch} 
-          />
-        </View>
-      )}
+      <View style={styles.topBarWrapper}>
+        <TopAppBar 
+          currentTab={activeTab} 
+          onTabChange={setActiveTab} 
+          onVoiceSearch={handleVoiceSearch} 
+        />
+      </View>
 
       {toastMessage && (
         <Animated.View style={[styles.toast, { transform: [{ translateY: toastY }] }]}>
@@ -951,7 +949,7 @@ const styles = StyleSheet.create({
     top: Platform.OS === 'ios' ? 45 : 0, // Ajuste para SafeArea si es absolute
     left: 0,
     right: 0,
-    zIndex: 100,
+    zIndex: 2000,
   },
   mapContainer: {
     ...StyleSheet.absoluteFill,
