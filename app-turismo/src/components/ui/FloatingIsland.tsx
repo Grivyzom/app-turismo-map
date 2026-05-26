@@ -44,6 +44,18 @@ export default function FloatingIsland({
   showSidebar = true,
 }: FloatingIslandProps) {
   const [profile, setProfile] = useState<NormalUserProfile>(getDefaultUserProfile());
+  const [isPinned, setIsPinned] = useState(true);
+  const [isHovered, setIsHovered] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'feed') {
+      setIsPinned(false);
+    } else {
+      setIsPinned(true);
+    }
+  }, [activeTab]);
+
+  const isExpanded = isPinned || isHovered;
 
   useEffect(() => {
     let isMounted = true;
@@ -125,15 +137,36 @@ export default function FloatingIsland({
 
         {/* SIDEBAR DE NAVEGACIÓN */}
         {showSidebar && (
-          <View style={styles.sidebar}>
-            <View style={styles.brandContainer}>
-              <View style={styles.logoBadge}>
-                <MaterialIcons name="explore" size={24} color="#6EE7B7" />
-              </View>
-              <View>
-                <Text style={styles.brandTitle}>Valdivia</Text>
-                <Text style={styles.brandSubtitle}>PORTAL TURÍSTICO</Text>
-              </View>
+          <View 
+            style={[styles.sidebar, { width: isExpanded ? 280 : 88, paddingHorizontal: isExpanded ? 24 : 12 }]}
+            {...(Platform.OS === 'web'
+              ? {
+                  onMouseEnter: () => setIsHovered(true),
+                  onMouseLeave: () => setIsHovered(false),
+                }
+              : {})}
+          >
+            <View style={[styles.brandContainer, !isExpanded && { justifyContent: 'center' }]}>
+              {isExpanded ? (
+                <>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <View style={styles.logoBadge}>
+                      <MaterialIcons name="explore" size={24} color="#6EE7B7" />
+                    </View>
+                    <View>
+                      <Text style={styles.brandTitle}>Valdivia</Text>
+                      <Text style={styles.brandSubtitle}>PORTAL TURÍSTICO</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity onPress={() => setIsPinned(!isPinned)} style={styles.pinButton}>
+                    <MaterialIcons name={"push-pin"} size={16} color={isPinned ? "#6EE7B7" : "#4B5563"} style={!isPinned ? { transform: [{ rotate: '45deg' }] } : {}} />
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <View style={styles.logoBadge}>
+                  <MaterialIcons name="explore" size={24} color="#6EE7B7" />
+                </View>
+              )}
             </View>
 
             <View style={styles.divider} />
@@ -144,6 +177,7 @@ export default function FloatingIsland({
               <TouchableOpacity
                 style={[
                   styles.navItem,
+                  !isExpanded && { justifyContent: 'center', paddingHorizontal: 0 },
                   activeTab === 'map' && styles.navItemActive,
                 ]}
                 onPress={onClose}
@@ -153,16 +187,22 @@ export default function FloatingIsland({
                   name="map"
                   size={20}
                   color={activeTab === 'map' ? '#6EE7B7' : '#9CA3AF'}
-                  style={styles.navIcon}
+                  style={isExpanded ? styles.navIcon : {}}
                 />
-                <Text style={[styles.navLabel, activeTab === 'map' && styles.navLabelActive]}>
-                  Explorar Mapa
-                </Text>
+                {isExpanded && (
+                  <Text style={[styles.navLabel, activeTab === 'map' && styles.navLabelActive]}>
+                    Explorar Mapa
+                  </Text>
+                )}
               </TouchableOpacity>
 
-              <View style={styles.sectionTitleWrapper}>
-                <Text style={styles.sectionTitle}>SECCIONES</Text>
-              </View>
+              {isExpanded ? (
+                <View style={styles.sectionTitleWrapper}>
+                  <Text style={styles.sectionTitle}>SECCIONES</Text>
+                </View>
+              ) : (
+                <View style={{ height: 24 }} />
+              )}
 
               {/* Resto de pestañas */}
               {currentItems.map((item) => {
@@ -174,6 +214,7 @@ export default function FloatingIsland({
                     key={item.id}
                     style={[
                       styles.navItem,
+                      !isExpanded && { justifyContent: 'center', paddingHorizontal: 0 },
                       isActive && styles.navItemActive,
                     ]}
                     onPress={() => onTabChange(item.id as any)}
@@ -183,12 +224,14 @@ export default function FloatingIsland({
                       name={item.iconName as any}
                       size={20}
                       color={isActive ? '#6EE7B7' : '#9CA3AF'}
-                      style={styles.navIcon}
+                      style={isExpanded ? styles.navIcon : {}}
                     />
-                    <Text style={[styles.navLabel, isActive && styles.navLabelActive]}>
-                      {item.label}
-                    </Text>
-                    {isActive && <View style={styles.activeDot} />}
+                    {isExpanded && (
+                      <Text style={[styles.navLabel, isActive && styles.navLabelActive]}>
+                        {item.label}
+                      </Text>
+                    )}
+                    {isActive && isExpanded && <View style={styles.activeDot} />}
                   </TouchableOpacity>
                 );
               })}
@@ -196,26 +239,33 @@ export default function FloatingIsland({
 
             {/* Tarjeta de Perfil al Fondo del Sidebar */}
             <TouchableOpacity
-              style={styles.sidebarProfile}
+              style={[
+                styles.sidebarProfile,
+                !isExpanded && { padding: 0, backgroundColor: 'transparent', borderWidth: 0, justifyContent: 'center' }
+              ]}
               onPress={() => onTabChange('profile')}
               activeOpacity={0.9}
             >
               <View style={styles.sidebarAvatar}>
                 <MaterialIcons name={profile.avatarIcon} size={20} color="#6EE7B7" />
               </View>
-              <View style={styles.profileTextContainer}>
-                <Text style={styles.profileName} numberOfLines={1}>
-                  {profile.fullName}
-                </Text>
-                <Text style={styles.profileRole}>
-                  {profile.userType === 'citizen'
-                    ? 'Turista'
-                    : profile.userType === 'partner_owner'
-                    ? 'Entidad'
-                    : 'Invitado'}
-                </Text>
-              </View>
-              <MaterialIcons name="chevron-right" size={18} color="#4B5563" />
+              {isExpanded && (
+                <>
+                  <View style={styles.profileTextContainer}>
+                    <Text style={styles.profileName} numberOfLines={1}>
+                      {profile.fullName}
+                    </Text>
+                    <Text style={styles.profileRole}>
+                      {profile.userType === 'citizen'
+                        ? 'Turista'
+                        : profile.userType === 'partner_owner'
+                        ? 'Entidad'
+                        : 'Invitado'}
+                    </Text>
+                  </View>
+                  <MaterialIcons name="chevron-right" size={18} color="#4B5563" />
+                </>
+              )}
             </TouchableOpacity>
           </View>
         )}
@@ -300,18 +350,32 @@ const styles = StyleSheet.create({
     }),
   },
   sidebar: {
-    width: 280,
     height: '100%',
-    padding: 24,
+    paddingVertical: 24,
     borderRightWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
     justifyContent: 'space-between',
     backgroundColor: 'rgba(10, 12, 18, 0.25)',
+    ...Platform.select({
+      web: {
+        transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+      } as any,
+    }),
+  },
+  pinButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   brandContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'space-between',
   },
   logoBadge: {
     width: 42,
