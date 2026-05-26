@@ -1,5 +1,5 @@
 # Stage 1: Build the static Expo Web assets
-FROM node:20-alpine AS builder
+FROM node:20 AS builder
 
 # Install pnpm globally
 RUN npm install -g pnpm
