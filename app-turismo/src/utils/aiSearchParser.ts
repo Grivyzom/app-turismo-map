@@ -16,11 +16,11 @@ export type ParsedSearch = {
  * Si el backend no está conectado, usa un mock para demostración de UI.
  */
 export async function processAudioSearch(audioUri: string): Promise<ParsedSearch> {
-  const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+  const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || process.env.EXPO_PUBLIC_API_URL;
   
   if (!backendUrl) {
     // ---- MOCK PARA PRUEBAS DE UI ----
-    console.log('No EXPO_PUBLIC_API_URL found. Using mock transcription.');
+    console.log('No EXPO_PUBLIC_BACKEND_URL or EXPO_PUBLIC_API_URL found. Using mock transcription.');
     return new Promise((resolve) => {
       setTimeout(() => {
         // Simulamos que la IA entendió algo sobre comida

@@ -1,0 +1,8 @@
+backend.exe
+*.ps1
+*.json
+Dockerfile
+.golangci.yml
+node_modules
+.git
+.gitignore

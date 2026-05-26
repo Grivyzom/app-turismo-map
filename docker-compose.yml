@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   db:
     image: postgis/postgis:15-3.3-alpine
@@ -10,7 +8,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-grivyzom@2026}
       POSTGRES_DB: ${DB_NAME:-app-turismo}
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -25,7 +23,7 @@ services:
     container_name: turismo_redis
     restart: always
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redis_data:/data
 
@@ -36,7 +34,7 @@ services:
     container_name: turismo_backend
     restart: unless-stopped
     ports:
-      - "${PORT:-8080}:${PORT:-8080}"
+      - "8081:8080"
     environment:
       # Point DB and Redis hostnames to their respective docker-compose services
       DB_HOST: db
@@ -65,11 +63,11 @@ services:
         EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY: ${EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY}
         EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: ${EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID}
         EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID: ${EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID}
-        EXPO_PUBLIC_BACKEND_URL: ${EXPO_PUBLIC_BACKEND_URL:-http://localhost:8080}
+        EXPO_PUBLIC_BACKEND_URL: ${EXPO_PUBLIC_BACKEND_URL:-http://localhost:8081}
     container_name: turismo_frontend
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "8082:80"
     depends_on:
       - backend
 
