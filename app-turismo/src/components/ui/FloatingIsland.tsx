@@ -273,16 +273,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
     ...Platform.select({
       web: {
-        background: 'linear-gradient(135deg, rgba(13, 20, 38, 0.8) 0%, rgba(6, 10, 20, 0.85) 100%)',
-        backdropFilter: 'blur(28px)',
-        boxShadow: '0 24px 64px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+        backgroundColor: 'rgba(15, 20, 28, 0.88)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        boxShadow: '0px 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.12)',
         transition: 'all 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
       } as any,
       default: {
-        backgroundColor: '#0d1426',
+        backgroundColor: '#0f141c',
       },
     }),
   },
@@ -303,9 +304,9 @@ const styles = StyleSheet.create({
     height: '100%',
     padding: 24,
     borderRightWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(4, 9, 20, 0.4)',
+    backgroundColor: 'rgba(10, 12, 18, 0.25)',
   },
   brandContainer: {
     flexDirection: 'row',
@@ -337,7 +338,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     marginVertical: 20,
   },
   navMenu: {
@@ -440,8 +441,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 32,
     borderBottomWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-    backgroundColor: 'rgba(4, 9, 20, 0.6)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(15, 20, 28, 0.4)',
   },
   contentHeaderTitle: {
     color: '#F9FAFB',
