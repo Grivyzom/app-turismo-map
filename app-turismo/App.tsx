@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useFonts } from 'expo-font';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import {
   SafeAreaView,
   StyleSheet,
@@ -14,6 +17,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 
 import { TopAppBar } from './src/components/MapUI';
+import { ToastToaster, toast } from './src/components/ui/ToastNotification';
 import './global.css';
 import './src/styles/custom.css';
 import { MapContainer } from './src/components/Map/MapContainer';
@@ -25,121 +29,7 @@ import {
   loadPersistedMapLayer,
   savePersistedMapLayer,
 } from './src/utils/mapPreferences';
-
-// Eventos iniciales de prueba en Valdivia, Chile
-const INITIAL_EVENTS: TurismoEvent[] = [
-  {
-    id: '1',
-    title: 'Muestra Gastronómica Kunstmann',
-    description:
-      'Disfruta de la mejor cerveza artesanal de Valdivia y platos típicos alemanes en el corazón de Torobayo.',
-    latitude: -39.8252,
-    longitude: -73.2845,
-    category: 'gastronomia',
-    organizer: 'Cervecería Kunstmann',
-    time: '12:00 - 23:00',
-    attendeesCount: 342,
-  },
-  {
-    id: '2',
-    title: 'Exposición Histórica Maurice van de Maele',
-    description:
-      'Un recorrido por el pasado colonial de Valdivia, su arqueología y la cultura mapuche-huilliche.',
-    latitude: -39.8172,
-    longitude: -73.2508,
-    category: 'cultura',
-    organizer: 'Museos UACh',
-    time: '10:00 - 18:00',
-    attendeesCount: 88,
-  },
-  {
-    id: '3',
-    title: 'Sendero de Lotos en Parque Saval',
-    description:
-      'Visita guiada por la laguna de los lotos gigantes y el bosque valdiviano en Isla Teja.',
-    latitude: -39.808,
-    longitude: -73.2482,
-    category: 'naturaleza',
-    organizer: 'Municipalidad de Valdivia',
-    time: '09:00 - 17:00',
-    attendeesCount: 154,
-  },
-  {
-    id: '4',
-    title: 'Concierto de Jazz en Esmeralda',
-    description:
-      'Noche de jazz en vivo en la calle más bohemia e histórica de Valdivia con músicos locales e invitados.',
-    latitude: -39.813,
-    longitude: -73.245,
-    category: 'musica',
-    organizer: 'Club de Jazz Valdivia',
-    time: '21:00 - 01:00',
-    attendeesCount: 120,
-  },
-  {
-    id: '5',
-    title: 'Regata Universitaria de Remo',
-    description:
-      'Competencia tradicional de remo olímpico sobre las aguas del Río Calle-Calle con universidades del sur de Chile.',
-    latitude: -39.8115,
-    longitude: -73.2415,
-    category: 'deportes',
-    organizer: 'Club Deportivo Phoenix',
-    time: '08:30 - 13:00',
-    attendeesCount: 450,
-  },
-  {
-    id: '6',
-    title: 'Gran Carnaval del Río Calle-Calle',
-    description:
-      'Evento masivo al aire libre con carros alegóricos, comparsas y fuegos artificiales a orillas del río.',
-    latitude: -39.8122,
-    longitude: -73.2480,
-    category: 'publico',
-    organizer: 'Ilustre Municipalidad de Valdivia',
-    time: '18:00 - 23:30',
-    attendeesCount: 500, // Asistencia mediana para ver las ondas correspondientes
-  },
-];
-
-// Cola de eventos listos para simular vía WebSocket
-const WS_SIMULATION_POOL: Omit<TurismoEvent, 'id' | 'isRealTime'>[] = [
-  {
-    title: 'Feria Fluvial del Libro',
-    description:
-      '¡NUEVO! Venta e intercambio de libros y charlas literarias junto al mercado fluvial frente al Río Valdivia.',
-    latitude: -39.8138,
-    longitude: -73.2435,
-    category: 'cultura',
-    organizer: 'Corporación Cultural Valdivia',
-    time: '11:00 - 20:00',
-    attendeesCount: 65,
-  },
-  {
-    title: 'Feria del Chocolate Artesanal',
-    description:
-      '¡NUEVO! Degustación y talleres de chocolatería fina de autor en la glorieta de la Plaza de la República.',
-    latitude: -39.8148,
-    longitude: -73.2465,
-    category: 'gastronomia',
-    organizer: 'Agrupación Chocolateros del Sur',
-    time: '10:00 - 21:00',
-    attendeesCount: 210,
-  },
-  {
-    title: 'Festival Internacional de Cine Valdivia (Charla)',
-    description:
-      '¡NUEVO! Conferencia magistral al aire libre sobre cine independiente iberoamericano en el Aula Magna UACh.',
-    latitude: -39.819,
-    longitude: -73.253,
-    category: 'musica',
-    organizer: 'CPC UACh',
-    time: '18:00 - 19:30',
-    attendeesCount: 310,
-  },
-];
-
-type CategoryFilter = 'todos' | 'gastronomia' | 'cultura' | 'naturaleza' | 'musica' | 'deportes' | 'publico';
+import { INITIAL_EVENTS, WS_SIMULATION_POOL, CategoryFilter } from './src/data/mockEvents';
 
 const MAP_LAYER_OPTIONS: { key: MapLayer; label: string; icon: string }[] = [
   { key: 'dark', label: 'Noche', icon: '🌙' },
@@ -148,26 +38,61 @@ const MAP_LAYER_OPTIONS: { key: MapLayer; label: string; icon: string }[] = [
   { key: 'terrain', label: 'Relieve', icon: '⛰️' },
 ];
 
-const getCategoryColor = (category: string) => {
+const getCategoryColor = (category: string, musicStyle?: string) => {
+  if (category === 'musica' && musicStyle) {
+    switch (musicStyle) {
+      case 'jazz':
+        return '#D97706'; // Gold/Amber
+      case 'rock':
+        return '#7C3AED'; // Purple/Indigo
+      case 'electronica':
+        return '#06B6D4'; // Neon Cyan
+      case 'acustico':
+        return '#EC4899'; // Hot Pink
+      case 'pop':
+      default:
+        return '#F43F5E'; // Rose/Neon
+    }
+  }
   switch (category) {
     case 'gastronomia':
       return '#F59E0B'; // Ámbar
     case 'cultura':
       return '#A78BFA'; // Morado
     case 'naturaleza':
-      return '#34D399'; // Esmeralda
+    case 'parque':
+      return '#10B981'; // Emerald
+    case 'humedal':
+      return '#059669'; // Teal/Dark green
+    case 'agua':
+      return '#3B82F6'; // Blue
+    case 'universidad':
+      return '#8B5CF6'; // Purple
     case 'musica':
       return '#F43F5E'; // Rosa/Neon
     case 'deportes':
       return '#06B6D4'; // Cian
     case 'publico':
       return '#FBBF24'; // Amarillo/Ámbar
+    case 'choque':
+      return '#EF4444'; // Rojo choque
+    case 'incendio':
+      return '#F97316'; // Naranja incendio
+    case 'accidente':
+      return '#DC2626'; // Rojo oscuro accidente
+    case 'calle_cortada':
+      return '#78716C'; // Gris calle cortada
     default:
       return '#3B82F6';
   }
 };
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    ...MaterialIcons.font,
+    ...Ionicons.font,
+  });
+
   const [screen, setScreen] = useState<'login' | 'register' | 'home'>('login');
   const [events, setEvents] = useState<TurismoEvent[]>(INITIAL_EVENTS);
   const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>('todos');
@@ -177,12 +102,13 @@ export default function App() {
   const [mapLayer, setMapLayer] = useState<MapLayer>(DEFAULT_MAP_LAYER);
   const [mapLayerReady, setMapLayerReady] = useState(false);
   const [showTraffic, setShowTraffic] = useState(false);
+  const [showSectors, setShowSectors] = useState(true);
 
   // Estados de animación
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastY = useRef(new Animated.Value(-150)).current;
   const cardHeight = useRef(new Animated.Value(0)).current;
-  
+
   // Submenú
   const [isTopBarHovered, setIsTopBarHovered] = useState(false);
   const submenuHeight = useRef(new Animated.Value(0)).current;
@@ -217,13 +143,21 @@ export default function App() {
       ...baseEvent,
       id: `ws-${Date.now()}`,
       isRealTime: true,
-      attendeesCount: baseEvent.attendeesCount + Math.floor(Math.random() * 20),
+      attendeesCount: (baseEvent.attendeesCount ?? 0) + Math.floor(Math.random() * 20),
     };
 
     setEvents((prev) => [newEvent, ...prev]);
     setSelectedEvent(newEvent); // Enfocar automáticamente el nuevo evento
     setSimulationIndex((prev) => prev + 1);
-    showNotification(`⚡ Live WS: Nuevo evento en Valdivia! "${newEvent.title}"`);
+
+    const isEmergencyEvent = ['choque', 'incendio', 'accidente', 'calle_cortada'].includes(
+      newEvent.category,
+    );
+    if (isEmergencyEvent) {
+      showNotification(`🚨 ALERTA: ¡Emergencia reportada! "${newEvent.title}"`);
+    } else {
+      showNotification(`Nuevo evento en Valdivia! "${newEvent.title}"`);
+    }
   };
 
   // Simulador automático de WebSocket (cada 30 segundos)
@@ -294,13 +228,23 @@ export default function App() {
 
   // Filtrar eventos por categoría y búsqueda
   const filteredEvents = events.filter((event) => {
-    const matchesCategory = selectedCategory === 'todos' || event.category === selectedCategory;
+    const isEmergencyEvent = ['choque', 'incendio', 'accidente', 'calle_cortada'].includes(
+      event.category,
+    );
+    const matchesCategory =
+      selectedCategory === 'todos' ||
+      (selectedCategory === 'emergencia' && isEmergencyEvent) ||
+      event.category === selectedCategory;
     const matchesSearch =
-      event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      event.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      event.organizer.toLowerCase().includes(searchQuery.toLowerCase());
+      (event.title?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+      (event.description?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+      (event.organizer?.toLowerCase() || '').includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
+
+  if (!fontsLoaded) {
+    return null;
+  }
 
   if (screen === 'login') {
     return (
@@ -317,6 +261,7 @@ export default function App() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
+      <ToastToaster />
 
       {/* Contenedor del Mapa Separado por Plataforma */}
       <View style={styles.mapContainer}>
@@ -326,6 +271,7 @@ export default function App() {
           onSelectEvent={setSelectedEvent}
           mapLayer={mapLayer}
           showTraffic={showTraffic}
+          showSectors={showSectors}
         />
       </View>
 
@@ -337,7 +283,7 @@ export default function App() {
       )}
 
       {/* BARRA SUPERIOR NUEVA Y SUBMENÚ */}
-      <View 
+      <View
         style={styles.topBarWrapper}
         //@ts-ignore
         onMouseEnter={() => setIsTopBarHovered(true)}
@@ -348,7 +294,7 @@ export default function App() {
           onSearchClick={() => console.log('Search clicked')}
           onAccountClick={() => console.log('Account clicked')}
         />
-        
+
         {/* SUBMENÚ DESPLEGABLE */}
         <Animated.View
           style={[
@@ -364,7 +310,7 @@ export default function App() {
                 },
               ],
             },
-            !isTopBarHovered && { pointerEvents: 'none' } // Desactiva clics cuando está oculto
+            !isTopBarHovered && { pointerEvents: 'none' }, // Desactiva clics cuando está oculto
           ]}
         >
           <ScrollView
@@ -389,14 +335,29 @@ export default function App() {
                 Todos
               </Text>
             </TouchableOpacity>
-            {['gastronomia', 'cultura', 'naturaleza', 'musica', 'deportes', 'publico'].map((cat) => (
+            {[
+              'gastronomia',
+              'cultura',
+              'naturaleza',
+              'parque',
+              'agua',
+              'humedal',
+              'universidad',
+              'musica',
+              'deportes',
+              'publico',
+              'emergencia',
+            ].map((cat) => (
               <TouchableOpacity
                 key={cat}
                 style={[styles.categoryChip, selectedCategory === cat && styles.activeCategoryChip]}
                 onPress={() => setSelectedCategory(cat as CategoryFilter)}
               >
                 <Text
-                  style={[styles.categoryText, selectedCategory === cat && styles.activeCategoryText]}
+                  style={[
+                    styles.categoryText,
+                    selectedCategory === cat && styles.activeCategoryText,
+                  ]}
                 >
                   {cat.charAt(0).toUpperCase() + cat.slice(1)}
                 </Text>
@@ -433,13 +394,33 @@ export default function App() {
 
       {/* PANEL DE CONTROL DE SIMULACIÓN Y WEBSOCKET (Esquina Derecha / Inferior) */}
       <View style={styles.controlPanel}>
-        <TouchableOpacity style={styles.simButton} onPress={triggerWebSocketEvent}>
-          <Text style={styles.simButtonText}>⚡ Simular WebSocket Go</Text>
-        </TouchableOpacity>
+        <View style={styles.controlPanelGroup}>
+          <TouchableOpacity style={styles.simButton} onPress={triggerWebSocketEvent}>
+            <Text style={styles.simButtonText}>⚡ Simular WebSocket Go</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.toggleButton, showSectors && styles.toggleButtonActive]}
+            onPress={() => {
+              setShowSectors(!showSectors);
+              toast.success({
+                title: showSectors ? 'Sectores ocultos' : 'Sectores visibles',
+              });
+            }}
+          >
+            <MaterialIcons
+              name={showSectors ? 'visibility' : 'visibility-off'}
+              size={16}
+              color={showSectors ? '#FFFFFF' : '#9CA3AF'}
+            />
+            <Text style={styles.toggleButtonText}>Sectores</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* TARJETA DETALLADA FLOTANTE (Efecto Emerger) */}
-      {selectedEvent && (
+      {selectedEvent && 
+       selectedEvent.category?.toLowerCase() !== 'tienda' && 
+       selectedEvent.category?.toLowerCase() !== 'fauna' && (
         <Animated.View
           style={[
             styles.detailsCard,
@@ -460,10 +441,21 @@ export default function App() {
             <View
               style={[
                 styles.cardBadge,
-                { backgroundColor: getCategoryColor(selectedEvent.category) },
+                {
+                  backgroundColor: getCategoryColor(
+                    selectedEvent.category,
+                    selectedEvent.musicStyle,
+                  ),
+                },
               ]}
             >
-              <Text style={styles.cardBadgeText}>{selectedEvent.category.toUpperCase()}</Text>
+              <Text style={styles.cardBadgeText}>
+                {['choque', 'incendio', 'accidente', 'calle_cortada'].includes(
+                  selectedEvent.category,
+                )
+                  ? `🚨 ${selectedEvent.category.toUpperCase().replace('_', ' ')}`
+                  : selectedEvent.category.toUpperCase()}
+              </Text>
             </View>
             <TouchableOpacity onPress={() => setSelectedEvent(null)} style={styles.closeButton}>
               <Text style={styles.closeButtonText}>✕</Text>
@@ -471,7 +463,12 @@ export default function App() {
           </View>
 
           <Text style={styles.cardTitle}>{selectedEvent.title}</Text>
-          <Text style={styles.cardOrganizer}>Organizado por: {selectedEvent.organizer}</Text>
+          <Text style={styles.cardOrganizer}>
+            {['choque', 'incendio', 'accidente', 'calle_cortada'].includes(selectedEvent.category)
+              ? 'Fuente / Reporte'
+              : 'Organizado por'}
+            : {selectedEvent.organizer}
+          </Text>
           <Text style={styles.cardDesc}>{selectedEvent.description}</Text>
 
           <View style={styles.cardDivider} />
@@ -490,7 +487,9 @@ export default function App() {
           <TouchableOpacity
             style={[
               styles.actionButton,
-              { backgroundColor: getCategoryColor(selectedEvent.category) },
+              {
+                backgroundColor: getCategoryColor(selectedEvent.category, selectedEvent.musicStyle),
+              },
             ]}
           >
             <Text style={styles.actionButtonText}>Asistir / Ver Detalles</Text>
@@ -508,7 +507,7 @@ const styles = StyleSheet.create({
   },
   topBarWrapper: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 45 : 0,
+    top: Platform.OS === 'ios' ? 56 : 16,
     left: 0,
     right: 0,
     zIndex: 100,
@@ -703,6 +702,9 @@ const styles = StyleSheet.create({
     right: 20,
     zIndex: 100,
   },
+  controlPanelGroup: {
+    gap: 10,
+  },
   simButton: {
     backgroundColor: '#10B981',
     paddingHorizontal: 14,
@@ -727,6 +729,38 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  toggleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: 'rgba(107, 114, 128, 0.5)',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 5,
+      },
+      web: {
+        boxShadow: '0px 4px 5px rgba(0, 0, 0, 0.3)',
+      },
+    }),
+    elevation: 6,
+  },
+  toggleButtonActive: {
+    backgroundColor: '#3B82F6',
+    borderColor: 'rgba(59, 130, 246, 0.5)',
+  },
+  toggleButtonText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '600',
   },
   toast: {
     position: 'absolute',

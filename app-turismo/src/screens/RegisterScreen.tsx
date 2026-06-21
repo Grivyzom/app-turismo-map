@@ -13,6 +13,7 @@ import {
   FlatList,
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { toast } from '../components/ui/ToastNotification';
 
 type RegisterScreenProps = {
   onRegister: (data: any) => void;
@@ -82,6 +83,11 @@ export default function RegisterScreen({ onRegister, onGoToLogin }: RegisterScre
   );
 
   const handleRegister = () => {
+    if (!fullName || !email || !password || (userType === 'citizen' && !location)) {
+      toast.error({ title: 'Por favor, completa todos los campos' });
+      return;
+    }
+
     const payload = {
       name: fullName,
       email,
@@ -90,6 +96,8 @@ export default function RegisterScreen({ onRegister, onGoToLogin }: RegisterScre
       ...(userType === 'partner_owner' && { entityType, phone }),
       ...(userType === 'citizen' && { location }),
     };
+
+    toast.success({ title: 'Registro exitoso, bienvenido a Valdivia' });
     onRegister(payload);
   };
 
@@ -400,14 +408,14 @@ export default function RegisterScreen({ onRegister, onGoToLogin }: RegisterScre
                   renderItem={({ item }) => (
                     <TouchableOpacity
                       onPress={() => {
-                        setLocation(`🇨🇱 Chile, ${item}`);
+                        setLocation(`Chile, ${item}`);
                         setShowLocationModal(false);
                         setSelectingRegion(false);
                         setSearchQuery('');
                       }}
                       className="flex-row items-center py-3.5 px-4 border-b border-white/10 active:bg-white/10 rounded-xl"
                     >
-                      <Text className="text-lg mr-3">📍</Text>
+                      <MaterialIcons name="location-on" size={20} color="rgba(255,255,255,0.5)" style={{ marginRight: 12 }} />
                       <Text className="text-base font-medium text-white flex-1">{item}</Text>
                       <MaterialIcons name="chevron-right" size={20} color="rgba(255,255,255,0.3)" />
                     </TouchableOpacity>
@@ -431,14 +439,14 @@ export default function RegisterScreen({ onRegister, onGoToLogin }: RegisterScre
                           setSelectingRegion(true);
                           setSearchQuery('');
                         } else {
-                          setLocation(`${item.flag} ${item.name}`);
+                          setLocation(`${item.name}`);
                           setShowLocationModal(false);
                           setSearchQuery('');
                         }
                       }}
                       className="flex-row items-center py-3.5 px-4 border-b border-white/10 active:bg-white/10 rounded-xl"
                     >
-                      <Text className="text-2xl mr-3">{item.flag}</Text>
+                      <MaterialIcons name="public" size={24} color="rgba(255,255,255,0.5)" style={{ marginRight: 12 }} />
                       <Text className="text-base font-medium text-white flex-1">{item.name}</Text>
                       {item.name === 'Chile' ? (
                         <View className="flex-row items-center gap-1">

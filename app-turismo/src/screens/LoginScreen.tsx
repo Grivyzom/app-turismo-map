@@ -10,8 +10,8 @@ import {
   StyleSheet,
   Image,
 } from 'react-native';
-// Si utilizas expo/vector-icons o react-native-vector-icons
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { toast } from '../components/ui/ToastNotification';
 
 type LoginScreenProps = {
   onLogin: () => void;
@@ -115,7 +115,14 @@ export default function LoginScreen({ onLogin, onGoToRegister }: LoginScreenProp
             <TouchableOpacity
               style={styles.primaryButton}
               className="mt-2 h-12 rounded-lg bg-[#6a44ff] active:opacity-90"
-              onPress={onLogin}
+              onPress={() => {
+                if (email && password) {
+                  toast.success({ title: 'Sesión iniciada exitosamente' });
+                  onLogin();
+                } else {
+                  toast.error({ title: 'Por favor, completa todos los campos' });
+                }
+              }}
             >
               <View className="h-full items-center justify-center">
                 <Text className="text-[15px] font-bold text-white">Inicia sesión</Text>
