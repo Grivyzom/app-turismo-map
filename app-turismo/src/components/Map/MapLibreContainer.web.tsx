@@ -57,6 +57,15 @@ const getAccuracyRadiusAtZoom = (accuracyMeters: number, latitude: number, zoom:
   return Math.max(minRadius, accuracyMeters / metersPerPixel);
 };
 
+const WAVE_PERIOD_MS = 1700;
+const WAVE_MIN_RADIUS_PX = 6;
+const WAVE_STROKE_WIDTH = 2;
+
+const getUserWaveColor = (mapLayer: string) => {
+  const isDark = mapLayer === 'dark' || mapLayer === 'satellite';
+  return isDark ? '#60A5FA' : '#1D4ED8';
+};
+
 function detectSurfaceType(map: maplibregl.Map, lng: number, lat: number): 'land' | 'water' {
   try {
     const point = map.project([lng, lat]);
@@ -2744,13 +2753,8 @@ export function MapLibreContainer({
       const z = map.getZoom();
       const pitch = map.getPitch();
       const accuracyState = userAccuracyRef.current;
-      if (accuracyState && map.getLayer('user-accuracy-layer')) {
-        const radius = getAccuracyRadiusAtZoom(
-          accuracyState.accuracyMeters,
-          accuracyState.latitude,
-          z,
-        );
-        map.setPaintProperty('user-accuracy-layer', 'circle-radius', radius);
+      if (accuracyState && map.getLayer('user-wave-layer')) {
+        userAccuracyRef.current = { ...accuracyState, latitude: accuracyState.latitude };
       }
 
       Object.keys(markersRef.current).forEach((id) => {
@@ -4316,15 +4320,17 @@ export function MapLibreContainer({
             data: accuracyData,
           });
           map.addLayer({
-            id: 'user-accuracy-layer',
+            id: 'user-wave-layer',
             type: 'circle',
             source: 'user-accuracy',
             paint: {
-              'circle-radius': radius,
-              'circle-color': '#3B82F6',
-              'circle-opacity': 0.15,
-              'circle-stroke-width': 1,
-              'circle-stroke-color': '#3B82F6',
+              'circle-radius': WAVE_MIN_RADIUS_PX,
+              'circle-color': 'transparent',
+              'circle-opacity': 0,
+              'circle-stroke-width': WAVE_STROKE_WIDTH,
+              'circle-stroke-color': getUserWaveColor(mapLayerRef.current),
+              'circle-stroke-opacity': 0,
+              'circle-pitch-alignment': 'map',
             },
           });
         } else {
@@ -4332,14 +4338,11 @@ export function MapLibreContainer({
           if (source.setData) {
             source.setData(accuracyData);
           }
-          if (map.getLayer('user-accuracy-layer')) {
-            map.setPaintProperty('user-accuracy-layer', 'circle-radius', radius);
-          }
         }
       } else if (!loc.accuracy || !map.isStyleLoaded()) {
         userAccuracyRef.current = null;
         if (map.isStyleLoaded()) {
-          if (map.getLayer('user-accuracy-layer')) map.removeLayer('user-accuracy-layer');
+          if (map.getLayer('user-wave-layer')) map.removeLayer('user-wave-layer');
           if (map.getSource('user-accuracy')) map.removeSource('user-accuracy');
         }
       }
@@ -4368,19 +4371,6 @@ export function MapLibreContainer({
               position: relative;
               z-index: 2000;
             }
-            .user-marker::after {
-              content: '';
-              position: absolute;
-              top: 50%;
-              left: 50%;
-              transform: translate(-50%, -50%);
-              width: 48px;
-              height: 48px;
-              background-color: rgba(59, 130, 246, 0.3);
-              border-radius: 50%;
-              z-index: -1;
-              animation: userPulse 2s infinite;
-            }
             .user-cone {
               position: absolute;
               top: -24px;
@@ -4395,11 +4385,6 @@ export function MapLibreContainer({
               pointer-events: none;
               display: none;
               z-index: -2;
-            }
-            @keyframes userPulse {
-              0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0.8; }
-              50% { transform: translate(-50%, -50%) scale(1.8); opacity: 0.4; }
-              100% { transform: translate(-50%, -50%) scale(1.1); opacity: 0; }
             }
           `;
           document.head.appendChild(style);
@@ -4442,6 +4427,40 @@ export function MapLibreContainer({
       window.removeEventListener('high-frequency-user-location', handleHighFreqLocation);
     };
   }, [userLocation]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const startTs = performance.now();
+    let rafId: number;
+
+    const tick = () => {
+      if (
+        map.isStyleLoaded() &&
+        userAccuracyRef.current &&
+        map.getLayer('user-wave-layer') &&
+        document.visibilityState !== 'hidden'
+      ) {
+        const t = ((performance.now() - startTs) % WAVE_PERIOD_MS) / WAVE_PERIOD_MS;
+        const eased = 1 - Math.pow(1 - t, 3);
+        const maxRadius = getAccuracyRadiusAtZoom(
+          userAccuracyRef.current.accuracyMeters,
+          userAccuracyRef.current.latitude,
+          map.getZoom(),
+        );
+        const radius = WAVE_MIN_RADIUS_PX + Math.max(0, maxRadius - WAVE_MIN_RADIUS_PX) * eased;
+
+        map.setPaintProperty('user-wave-layer', 'circle-radius', radius);
+        map.setPaintProperty('user-wave-layer', 'circle-stroke-opacity', (1 - t) * 0.85);
+        map.setPaintProperty('user-wave-layer', 'circle-stroke-color', getUserWaveColor(mapLayerRef.current));
+      }
+      rafId = requestAnimationFrame(tick);
+    };
+
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, []);
 
   useEffect(() => {
     syncUserLocationRef.current = sync;

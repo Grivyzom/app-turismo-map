@@ -11,12 +11,15 @@ import {
   Animated,
   Easing,
   Dimensions,
+  Modal,
+  TextInput,
+  Alert,
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useCollections } from '../../context/CollectionsContext';
-import { Collection, CollectionItem } from '../../types/collections';
+import { Collection, CollectionItem, COLLECTION_COLORS, COLLECTION_ICONS } from '../../types/collections';
 
 interface CollectionsFloatingIslandProps {
   visible: boolean;
@@ -39,12 +42,78 @@ export const CollectionsFloatingIsland = React.memo(function CollectionsFloating
   onClose,
   mapComponent,
 }: CollectionsFloatingIslandProps) {
-  const { collections, selectedCollectionId, setSelectedCollection } = useCollections();
+  const {
+    collections,
+    selectedCollectionId,
+    setSelectedCollection,
+    createCollection,
+    deleteCollection,
+    renameCollection,
+    reorderCollections,
+  } = useCollections();
+
   const [showNewCollectionModal, setShowNewCollectionModal] = useState(false);
   const [newCollectionName, setNewCollectionName] = useState('');
+  const [selectedColor, setSelectedColor] = useState(COLLECTION_COLORS[0]);
+  const [selectedIcon, setSelectedIcon] = useState(COLLECTION_ICONS[0]);
+  const [editingCollectionId, setEditingCollectionId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
+  const [draggedItem, setDraggedItem] = useState<string | null>(null);
 
   const selectedCollection = collections.find(c => c.id === selectedCollectionId);
   const items = selectedCollection?.items || [];
+
+  const handleCreateCollection = useCallback(async () => {
+    if (!newCollectionName.trim()) {
+      Alert.alert('Error', 'Nombre de colección requerido');
+      return;
+    }
+    try {
+      await createCollection(newCollectionName, selectedIcon, selectedColor);
+      setNewCollectionName('');
+      setSelectedColor(COLLECTION_COLORS[0]);
+      setSelectedIcon(COLLECTION_ICONS[0]);
+      setShowNewCollectionModal(false);
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo crear la colección');
+    }
+  }, [newCollectionName, selectedIcon, selectedColor, createCollection]);
+
+  const handleDeleteCollection = useCallback(async (id: string) => {
+    if (id === 'all') return;
+    Alert.alert('Eliminar colección', '¿Estás seguro?', [
+      { text: 'Cancelar', onPress: () => {} },
+      {
+        text: 'Eliminar',
+        onPress: async () => {
+          await deleteCollection(id);
+        },
+        style: 'destructive',
+      },
+    ]);
+  }, [deleteCollection]);
+
+  const handleStartRename = useCallback((id: string, currentName: string) => {
+    setEditingCollectionId(id);
+    setEditingName(currentName);
+  }, []);
+
+  const handleSaveRename = useCallback(async () => {
+    if (!editingCollectionId || !editingName.trim()) return;
+    await renameCollection(editingCollectionId, editingName);
+    setEditingCollectionId(null);
+    setEditingName('');
+  }, [editingCollectionId, editingName, renameCollection]);
+
+  const handleReorder = useCallback(
+    async (fromIndex: number, toIndex: number) => {
+      const newOrder = [...collections];
+      const [movedItem] = newOrder.splice(fromIndex, 1);
+      newOrder.splice(toIndex, 0, movedItem);
+      await reorderCollections(newOrder);
+    },
+    [collections, reorderCollections]
+  );
 
   if (!visible) return null;
 
@@ -66,33 +135,18 @@ export const CollectionsFloatingIsland = React.memo(function CollectionsFloating
           style={styles.tabsContainer}
           contentContainerStyle={styles.tabsContent}
         >
-          {collections.map(collection => (
-            <TouchableOpacity
+          {collections.map((collection, index) => (
+            <CollectionTab
               key={collection.id}
+              collection={collection}
+              isActive={selectedCollectionId === collection.id}
               onPress={() => setSelectedCollection(collection.id)}
-              style={[
-                styles.tab,
-                selectedCollectionId === collection.id && styles.tabActive,
-              ]}
-            >
-              {collection.icon && (
-                <MaterialIcons
-                  name={collection.icon as any}
-                  size={14}
-                  color={selectedCollectionId === collection.id ? COLORS.accent : COLORS.textMuted}
-                  style={{ marginRight: 6 }}
-                />
-              )}
-              <Text
-                style={[
-                  styles.tabText,
-                  selectedCollectionId === collection.id && styles.tabTextActive,
-                ]}
-              >
-                {collection.name}
-                {collection.id !== 'all' && ` (${collection.items.length})`}
-              </Text>
-            </TouchableOpacity>
+              onDelete={() => handleDeleteCollection(collection.id)}
+              onRename={() => handleStartRename(collection.id, collection.name)}
+              isDragging={draggedItem === collection.id}
+              onDragStart={() => setDraggedItem(collection.id)}
+              onDragEnd={() => setDraggedItem(null)}
+            />
           ))}
 
           <TouchableOpacity
@@ -103,6 +157,105 @@ export const CollectionsFloatingIsland = React.memo(function CollectionsFloating
             <Text style={styles.tabNewText}>Nueva</Text>
           </TouchableOpacity>
         </ScrollView>
+
+        {/* Rename Modal */}
+        {editingCollectionId && (
+          <Modal transparent animationType="fade" visible={!!editingCollectionId}>
+            <Pressable style={styles.modalOverlay} onPress={() => setEditingCollectionId(null)}>
+              <Pressable style={styles.renameModal} onPress={e => e.stopPropagation()}>
+                <Text style={styles.modalTitle}>Renombrar Colección</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="Nuevo nombre..."
+                  placeholderTextColor={COLORS.textMuted}
+                  value={editingName}
+                  onChangeText={setEditingName}
+                  autoFocus
+                />
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={styles.modalBtnCancel}
+                    onPress={() => setEditingCollectionId(null)}
+                  >
+                    <Text style={styles.modalBtnText}>Cancelar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.modalBtnSave} onPress={handleSaveRename}>
+                    <Text style={[styles.modalBtnText, { color: COLORS.text }]}>Guardar</Text>
+                  </TouchableOpacity>
+                </View>
+              </Pressable>
+            </Pressable>
+          </Modal>
+        )}
+
+        {/* Create Collection Modal */}
+        <Modal transparent animationType="fade" visible={showNewCollectionModal}>
+          <Pressable style={styles.modalOverlay} onPress={() => setShowNewCollectionModal(false)}>
+            <Pressable style={styles.createModal} onPress={e => e.stopPropagation()}>
+              <Text style={styles.modalTitle}>Crear Colección</Text>
+
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Nombre de colección..."
+                placeholderTextColor={COLORS.textMuted}
+                value={newCollectionName}
+                onChangeText={setNewCollectionName}
+                autoFocus
+              />
+
+              <Text style={styles.colorLabel}>Color</Text>
+              <View style={styles.colorPicker}>
+                {COLLECTION_COLORS.map(color => (
+                  <TouchableOpacity
+                    key={color}
+                    style={[
+                      styles.colorOption,
+                      { backgroundColor: color },
+                      selectedColor === color && styles.colorOptionSelected,
+                    ]}
+                    onPress={() => setSelectedColor(color)}
+                  >
+                    {selectedColor === color && (
+                      <Ionicons name="checkmark" size={16} color="#FFF" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.colorLabel}>Icono</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.iconPicker}>
+                {COLLECTION_ICONS.map(icon => (
+                  <TouchableOpacity
+                    key={icon}
+                    style={[
+                      styles.iconOption,
+                      selectedIcon === icon && styles.iconOptionSelected,
+                    ]}
+                    onPress={() => setSelectedIcon(icon)}
+                  >
+                    <MaterialIcons
+                      name={icon as any}
+                      size={20}
+                      color={selectedIcon === icon ? COLORS.accent : COLORS.textMuted}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={styles.modalBtnCancel}
+                  onPress={() => setShowNewCollectionModal(false)}
+                >
+                  <Text style={styles.modalBtnText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.modalBtnSave} onPress={handleCreateCollection}>
+                  <Text style={[styles.modalBtnText, { color: COLORS.text }]}>Crear</Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
 
         {/* Content Split: Map + List */}
         <View style={styles.contentWrapper}>
@@ -162,6 +315,94 @@ export const CollectionsFloatingIsland = React.memo(function CollectionsFloating
   );
 });
 
+const CollectionTab = React.memo(function CollectionTab({
+  collection,
+  isActive,
+  onPress,
+  onDelete,
+  onRename,
+  isDragging,
+  onDragStart,
+  onDragEnd,
+}: {
+  collection: Collection;
+  isActive: boolean;
+  onPress: () => void;
+  onDelete: () => void;
+  onRename: () => void;
+  isDragging?: boolean;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
+}) {
+  const [showActions, setShowActions] = React.useState(false);
+
+  if (collection.id === 'all') {
+    return (
+      <TouchableOpacity
+        onPress={onPress}
+        style={[styles.tab, isActive && styles.tabActive]}
+      >
+        {collection.icon && (
+          <MaterialIcons
+            name={collection.icon as any}
+            size={14}
+            color={isActive ? COLORS.accent : COLORS.textMuted}
+            style={{ marginRight: 6 }}
+          />
+        )}
+        <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
+          {collection.name} ({collection.items.length})
+        </Text>
+      </TouchableOpacity>
+    );
+  }
+
+  return (
+    <View
+      onMouseEnter={() => Platform.OS === 'web' && setShowActions(true)}
+      onMouseLeave={() => Platform.OS === 'web' && setShowActions(false)}
+      //@ts-ignore
+      style={[styles.tabWrapper, isDragging && styles.tabWrapperDragging]}
+    >
+      <TouchableOpacity
+        onPress={onPress}
+        style={[styles.tab, isActive && styles.tabActive]}
+      >
+        {collection.color && (
+          <View
+            style={[
+              styles.tabColorBadge,
+              { backgroundColor: collection.color },
+            ]}
+          />
+        )}
+        {collection.icon && (
+          <MaterialIcons
+            name={collection.icon as any}
+            size={14}
+            color={isActive ? COLORS.accent : COLORS.textMuted}
+            style={{ marginRight: 6 }}
+          />
+        )}
+        <Text style={[styles.tabText, isActive && styles.tabTextActive]} numberOfLines={1}>
+          {collection.name} ({collection.items.length})
+        </Text>
+      </TouchableOpacity>
+
+      {showActions && (
+        <View style={styles.tabActions}>
+          <TouchableOpacity onPress={onRename} style={styles.tabActionBtn}>
+            <MaterialIcons name="edit" size={12} color={COLORS.textMuted} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={onDelete} style={styles.tabActionBtn}>
+            <MaterialIcons name="delete" size={12} color={COLORS.accent} />
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+});
+
 const CollectionItemRow = React.memo(function CollectionItemRow({
   item,
   onPress,
@@ -205,6 +446,148 @@ const CollectionItemRow = React.memo(function CollectionItemRow({
 });
 
 const styles = StyleSheet.create({
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  renameModal: {
+    width: '90%',
+    maxWidth: 400,
+    backgroundColor: COLORS.bg,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 20,
+    gap: 16,
+  },
+  createModal: {
+    width: '90%',
+    maxWidth: 400,
+    backgroundColor: COLORS.bg,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 20,
+    gap: 16,
+    maxHeight: '80%',
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  modalInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: COLORS.text,
+    fontSize: 14,
+  },
+  colorLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  colorPicker: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  colorOption: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  colorOptionSelected: {
+    borderColor: COLORS.text,
+  },
+  iconPicker: {
+    marginHorizontal: -20,
+    paddingHorizontal: 20,
+  },
+  iconOption: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'transparent',
+    marginRight: 8,
+  },
+  iconOptionSelected: {
+    backgroundColor: 'rgba(52, 211, 153, 0.1)',
+    borderColor: COLORS.accent,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 8,
+  },
+  modalBtnCancel: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+  },
+  modalBtnSave: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: COLORS.accent,
+    alignItems: 'center',
+  },
+  modalBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.textMuted,
+  },
+
+  // Tab wrapper for actions
+  tabWrapper: {
+    position: 'relative',
+  },
+  tabWrapperDragging: {
+    opacity: 0.5,
+  },
+  tabColorBadge: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  tabActions: {
+    position: 'absolute',
+    right: 4,
+    top: '50%',
+    transform: [{ translateY: -16 }],
+    flexDirection: 'row',
+    gap: 2,
+  },
+  tabActionBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
   overlay: {
     ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
