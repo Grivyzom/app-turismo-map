@@ -1,4 +1,12 @@
-export type TabType = 'map' | 'feed' | 'saved' | 'forum' | 'settings' | 'profile';
+export type TabType =
+  | 'map'
+  | 'feed'
+  | 'eventos'
+  | 'saved'
+  | 'historial'
+  | 'forum'
+  | 'settings'
+  | 'profile';
 
 export interface TopAppBarProps {
   currentTab?: TabType;

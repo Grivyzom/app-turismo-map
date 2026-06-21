@@ -13,6 +13,7 @@ import FeedScreen from '../../screens/FeedScreen';
 import PassportScreen from '../../screens/PassportScreen';
 import ForumScreen from '../../screens/ForumScreen';
 import UserProfileScreen from '../../screens/UserProfileScreen';
+import EventsScreen from '../../screens/EventsScreen';
 import { TabType } from '../MapUI/types';
 
 export interface FloatingIslandItem {
@@ -50,6 +51,22 @@ const DEFAULT_ITEMS: FloatingIslandItem[] = [
     iconFamily: 'Ionicons',
     render: () => <PassportScreen />,
     headerTitle: 'Pasaporte Turístico',
+  },
+  {
+    id: 'eventos',
+    label: 'Eventos',
+    iconName: 'event',
+    iconFamily: 'MaterialIcons',
+    render: () => <EventsScreen />,
+    headerTitle: 'Eventos en Valdivia',
+  },
+  {
+    id: 'historial',
+    label: 'Recientes',
+    iconName: 'history',
+    iconFamily: 'MaterialIcons',
+    render: () => <PassportScreen />,
+    headerTitle: 'Historial de Lugares Visitados',
   },
   {
     id: 'forum',

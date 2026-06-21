@@ -26,7 +26,7 @@ export const getCategoryColor = (category: string, musicStyle?: string) => {
     case 'parque':
       return '#10B981'; // Emerald
     case 'humedal':
-      return '#059669'; // Teal
+      return '#8B6F47'; // Café natural (juncos)
     case 'agua':
       return '#3B82F6'; // Blue
     case 'universidad':

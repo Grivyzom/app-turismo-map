@@ -59,10 +59,10 @@ func main() {
 	}
 
 	for _, biz := range businesses {
-		// Create user
+		// Create or get user
 		var userID int
 		err := db.QueryRow(
-			"INSERT INTO users (email, name, password_hash, user_type, status) VALUES ($1, $2, $3, 'partner_owner', 'active') RETURNING id",
+			"INSERT INTO users (email, name, password_hash, user_type, status) VALUES ($1, $2, $3, 'partner_owner', 'active') ON CONFLICT (email) DO UPDATE SET password_hash = $3 RETURNING id",
 			biz.email, biz.name, string(hashedPwd),
 		).Scan(&userID)
 		if err != nil {
@@ -70,20 +70,31 @@ func main() {
 			continue
 		}
 
-		// Create company
+		// Get or create company
 		var companyID int
 		err = db.QueryRow(
-			"INSERT INTO companies (business_name, entity_type, verification_status, phone) VALUES ($1, $2, 'verified', $3) RETURNING id",
-			biz.name, biz.entityType, biz.phone,
+			"SELECT id FROM companies WHERE business_name = $1 AND entity_type = $2",
+			biz.name, biz.entityType,
 		).Scan(&companyID)
-		if err != nil {
-			log.Printf("Error creating company for %s: %v", biz.email, err)
+
+		if err == sql.ErrNoRows {
+			// Create new company
+			err = db.QueryRow(
+				"INSERT INTO companies (business_name, entity_type, verification_status, phone) VALUES ($1, $2, 'verified', $3) RETURNING id",
+				biz.name, biz.entityType, biz.phone,
+			).Scan(&companyID)
+			if err != nil {
+				log.Printf("Error creating company for %s: %v", biz.email, err)
+				continue
+			}
+		} else if err != nil {
+			log.Printf("Error checking company for %s: %v", biz.email, err)
 			continue
 		}
 
-		// Link user to company
+		// Link user to company (or update if exists)
 		_, err = db.Exec(
-			"INSERT INTO company_members (user_id, company_id, role) VALUES ($1, $2, 'owner')",
+			"INSERT INTO company_members (user_id, company_id, role_id) VALUES ($1, $2, 1) ON CONFLICT (user_id, company_id) DO UPDATE SET role_id = 1",
 			userID, companyID,
 		)
 		if err != nil {

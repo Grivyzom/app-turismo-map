@@ -1037,8 +1037,8 @@ function MapContainerInner({
               key={`poly-${event.id}`}
               coordinates={event.polygon!}
               fillColor={`${getCategoryColor(event.category, event.musicStyle)}40`}
-              strokeColor={getCategoryColor(event.category, event.musicStyle)}
-              strokeWidth={2}
+              strokeColor="transparent"
+              strokeWidth={0}
               onPress={() => handleSelectEvent(event)}
             />
           ))}
@@ -1065,8 +1065,8 @@ function MapContainerInner({
                   <Polygon
                     coordinates={event.polygon}
                     fillColor={`${getCategoryColor(event.category, event.musicStyle)}40`}
-                    strokeColor={getCategoryColor(event.category, event.musicStyle)}
-                    strokeWidth={2}
+                    strokeColor="transparent"
+                    strokeWidth={0}
                     onPress={() => handleSelectEvent(event)}
                   />
                 )}
@@ -1183,18 +1183,18 @@ function MapContainerInner({
                   <React.Fragment key={`cycleway-${c.id}`}>
                     <Polyline
                       coordinates={coords}
-                      strokeColor="#072030"
-                      strokeWidth={6}
+                      strokeColor="#1e3a4a"
+                      strokeWidth={5}
                       lineJoin="round"
                       lineCap="round"
                     />
                     <Polyline
                       coordinates={coords}
-                      strokeColor="#00d2ff"
-                      strokeWidth={3}
+                      strokeColor="#06b6d4"
+                      strokeWidth={2.5}
                       lineJoin="round"
                       lineCap="round"
-                      lineDashPattern={[6, 6]}
+                      lineDashPattern={[4, 4]}
                       tappable={true}
                       onPress={() => {
                         let msg = '';
@@ -1217,18 +1217,18 @@ function MapContainerInner({
                   <React.Fragment key={`cycleway-${feature.id || props.IDENTIFICA}`}>
                     <Polyline
                       coordinates={coords}
-                      strokeColor="#072030"
-                      strokeWidth={6}
+                      strokeColor="#1e3a4a"
+                      strokeWidth={5}
                       lineJoin="round"
                       lineCap="round"
                     />
                     <Polyline
                       coordinates={coords}
-                      strokeColor="#00d2ff"
-                      strokeWidth={3}
+                      strokeColor="#06b6d4"
+                      strokeWidth={2.5}
                       lineJoin="round"
                       lineCap="round"
-                      lineDashPattern={[6, 6]}
+                      lineDashPattern={[4, 4]}
                       tappable={true}
                       onPress={() => {
                         let msg = '';

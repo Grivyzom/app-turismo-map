@@ -70,13 +70,23 @@ const styles = StyleSheet.create({
   sidebarWrapper: {
     flex: 1,
     flexDirection: 'column',
-    gap: 8,
-    alignItems: 'flex-start', // Prevent stretching when search bar expands
-    // Add safety margin to the right so shadows/borders don't peek out when translated
-    paddingRight: 20,
+    ...Platform.select({
+      web: {
+        transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      } as any,
+    }),
   },
 
-  // ── Search floating island ────────────────────────────────────────────────
+  // ── Search floating island (rendered to the RIGHT of the rail) ───────────
+  searchFloating: {
+    position: 'absolute',
+    top: 0,
+    ...Platform.select({
+      web: {
+        transition: 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      } as any,
+    }),
+  },
   searchIsland: {
     height: 48, // Match sidebar width
     borderRadius: 24,
@@ -132,17 +142,17 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
 
-  // ── Nav sidebar floating island ───────────────────────────────────────────
+  // ── Nav rail (full height, collapsed or expanded) ─────────────────────────
   sidebarIsland: {
     flex: 1,
-    width: 48,
+    width: '100%',
     borderRadius: 24,
     backgroundColor: C.bg,
     borderWidth: 1,
     borderColor: C.border,
     paddingVertical: 8,
-    paddingHorizontal: 0,
-    alignItems: 'center',
+    paddingHorizontal: 8,
+    alignItems: 'stretch',
     flexDirection: 'column',
     justifyContent: 'space-between',
     overflow: 'visible',
@@ -150,11 +160,18 @@ const styles = StyleSheet.create({
     ...Platform.select({ web: { backgroundColor: C.bgGlass } as any }),
   },
 
+  // ── Collapse/expand toggle + top notifications row ────────────────────────
+  railHeaderSection: {
+    flexDirection: 'column',
+    gap: 4,
+    width: '100%',
+  },
+
   navSection: {
     flexDirection: 'column',
     gap: 4,
     width: '100%',
-    alignItems: 'center',
+    alignItems: 'stretch',
     overflow: 'visible',
   },
 
@@ -162,14 +179,14 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: C.divider,
     marginVertical: 8,
-    width: 24,
+    marginHorizontal: 4,
   },
 
   actionsSection: {
     flexDirection: 'column',
     gap: 6,
     width: '100%',
-    alignItems: 'center',
+    alignItems: 'stretch',
     overflow: 'visible',
   },
 
@@ -190,6 +207,15 @@ const styles = StyleSheet.create({
         transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
       },
     }),
+  },
+  sidebarItemExpanded: {
+    width: '100%',
+    height: 40,
+    borderRadius: 12,
+    justifyContent: 'flex-start',
+    paddingHorizontal: 10,
+    gap: 10,
+    alignSelf: 'stretch',
   },
   sidebarItemActive: {
     backgroundColor: C.borderMid,
@@ -258,6 +284,48 @@ const styles = StyleSheet.create({
     letterSpacing: 0.1,
     flex: 1,
   },
+  avatarButtonExpanded: {
+    width: '100%',
+    height: 40,
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    paddingHorizontal: 8,
+    gap: 10,
+    borderRadius: 12,
+  },
+
+  // ── Collapse / expand toggle ───────────────────────────────────────────────
+  collapseButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.bgDeep,
+    ...Platform.select({
+      web: {
+        cursor: 'pointer',
+        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+      },
+    }),
+  },
+  collapseButtonExpanded: {
+    width: '100%',
+    height: 36,
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    paddingHorizontal: 10,
+    gap: 10,
+    borderRadius: 12,
+  },
+  railLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: C.textMuted,
+    letterSpacing: 0.2,
+  },
 
   // ── Notification button ───────────────────────────────────────────────────
   notificationButton: {
@@ -276,6 +344,15 @@ const styles = StyleSheet.create({
         transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
       },
     }),
+  },
+  notificationButtonExpanded: {
+    width: '100%',
+    height: 40,
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    paddingHorizontal: 8,
+    gap: 10,
+    borderRadius: 12,
   },
   notificationButtonHovered: {
     backgroundColor: C.borderMid,
@@ -517,6 +594,7 @@ const SidebarItem = React.memo(function SidebarItem({
   label,
   active,
   isMarked,
+  expanded,
   onClick,
   onHover,
 }: {
@@ -524,6 +602,7 @@ const SidebarItem = React.memo(function SidebarItem({
   label?: string;
   active: boolean;
   isMarked?: boolean;
+  expanded?: boolean;
   onClick?: () => void;
   onHover?: () => void;
 }) {
@@ -541,7 +620,7 @@ const SidebarItem = React.memo(function SidebarItem({
       onMouseLeave={() => setIsHovered(false)}
       style={[
         styles.sidebarItem,
-        styles.sidebarItemIconOnly,
+        expanded ? styles.sidebarItemExpanded : styles.sidebarItemIconOnly,
         active && styles.sidebarItemActive,
         isMarked && styles.sidebarItemMarked,
         isHovered &&
@@ -562,10 +641,21 @@ const SidebarItem = React.memo(function SidebarItem({
         size={20}
         color={active || isMarked ? C.accent : C.textInactive}
       />
+      {expanded && label && (
+        <Text
+          style={[
+            styles.sidebarItemLabel,
+            { color: active || isMarked ? C.accent : C.textInactive, flex: 1 },
+          ]}
+          numberOfLines={1}
+        >
+          {label}
+        </Text>
+      )}
       {/* Red dot for marked items */}
       {isMarked && <View style={styles.markedDot} />}
-      {/* Web-only tooltip */}
-      {Platform.OS === 'web' && isHovered && label && (
+      {/* Web-only tooltip (collapsed mode only) */}
+      {!expanded && Platform.OS === 'web' && isHovered && label && (
         <View style={styles.tooltip} pointerEvents="none">
           <Text style={styles.tooltipText}>{label}</Text>
         </View>
@@ -662,9 +752,14 @@ const RecentSearchRow = React.memo(function RecentSearchRow({
 const TABS: { id: TabType; icon: string; label: string }[] = [
   { id: 'map', icon: 'map', label: 'Mapa' },
   { id: 'feed', icon: 'dynamic-feed', label: 'Feed' },
-  { id: 'saved', icon: 'collections', label: 'Colección' },
-  { id: 'forum', icon: 'forum', label: 'Foro' },
+  { id: 'eventos', icon: 'event', label: 'Eventos' },
+  { id: 'saved', icon: 'collections', label: 'Guardados' },
+  { id: 'historial', icon: 'history', label: 'Recientes' },
 ];
+
+const RAIL_WIDTH_COLLAPSED = 64;
+const RAIL_WIDTH_EXPANDED = 220;
+const RAIL_WIDTH_EXPANDED_COMPACT = 200; // Mobile/tablet — leave more room for the map
 
 // ─── Main export ─────────────────────────────────────────────────────────────
 export const TopAppBar: React.FC<
@@ -693,11 +788,19 @@ export const TopAppBar: React.FC<
 
   const { signOut, isAuthenticated } = useAuth();
   const router = useRouter();
-  const { height: windowHeight } = useWindowDimensions();
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
+  const isCompact = windowWidth < 768;
 
   // ── Core navigation state ─────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<TabType>(currentTab);
   const [isSearchActive, setIsSearchActive] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const railWidth = isExpanded
+    ? isCompact
+      ? RAIL_WIDTH_EXPANDED_COMPACT
+      : RAIL_WIDTH_EXPANDED
+    : RAIL_WIDTH_COLLAPSED;
 
   // ── Profile state ─────────────────────────────────────────────────────────
   const [profile, setProfile] = useState<NormalUserProfile | null>(null);
@@ -887,26 +990,27 @@ export const TopAppBar: React.FC<
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <Animated.View
-      style={[
-        styles.sidebarWrapper,
-        {
-          opacity: sidebarAnim,
-          transform: [
-            {
-              translateX: sidebarAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [-200, 0], // Smooth slide from left completely off-screen
-              }),
-            },
-          ],
-          // Completely ignore interactions if hidden
-          pointerEvents: isHidden ? 'none' : 'auto',
-        },
-      ]}
-    >
-      {/* ━━━ ISLAND 1: Search Bar ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <View style={{ zIndex: 100 }}>
+    <>
+      {/* ━━━ FLOATING SEARCH BAR — to the RIGHT of the rail ━━━━━━━━━━━━━━━━━ */}
+      <Animated.View
+        style={[
+          styles.searchFloating,
+          {
+            left: railWidth + 12,
+            zIndex: 100,
+            opacity: sidebarAnim,
+            transform: [
+              {
+                translateX: sidebarAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-40, 0],
+                }),
+              },
+            ],
+            pointerEvents: isHidden ? 'none' : 'auto',
+          },
+        ]}
+      >
         <View
           style={[
             styles.searchIsland,
@@ -967,45 +1071,124 @@ export const TopAppBar: React.FC<
             ))}
           </View>
         )}
-      </View>
+      </Animated.View>
 
-      {/* ━━━ ISLAND 2: Navigation Sidebar ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <View style={styles.sidebarIsland}>
-        {/* ── Top: Nav Tabs ───────────────────────────────────────────────── */}
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={styles.navSection}
-          showsVerticalScrollIndicator={false}
-        >
-          {TABS.map((tab) => (
-            <SidebarItem
-              key={tab.id}
-              icon={tab.icon}
-              label={tab.label}
-              active={activeTab === tab.id}
-              onClick={() => handleTabChange(tab.id)}
-              onHover={onTabHover ? () => onTabHover(tab.id) : undefined}
-            />
-          ))}
+      {/* ━━━ VERTICAL RAIL — collapsible sidebar, full height ━━━━━━━━━━━━━━━ */}
+      <Animated.View
+        style={[
+          styles.sidebarWrapper,
+          {
+            width: railWidth,
+            opacity: sidebarAnim,
+            transform: [
+              {
+                translateX: sidebarAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-200, 0], // Smooth slide from left completely off-screen
+                }),
+              },
+            ],
+            // Completely ignore interactions if hidden
+            pointerEvents: isHidden ? 'none' : 'auto',
+          },
+        ]}
+      >
+        <View style={styles.sidebarIsland}>
+          {/* ── Top: Collapse toggle + Notifications ──────────────────────── */}
+          <View style={styles.railHeaderSection}>
+            <TouchableOpacity
+              onPress={() => setIsExpanded((prev) => !prev)}
+              activeOpacity={0.7}
+              style={[styles.collapseButton, isExpanded && styles.collapseButtonExpanded]}
+            >
+              <MaterialIcons
+                name={isExpanded ? 'chevron-left' : 'chevron-right'}
+                size={20}
+                color={C.textMuted}
+              />
+              {isExpanded && <Text style={styles.railLabel}>Colapsar</Text>}
+            </TouchableOpacity>
 
-          {!personalizationCompleted && (
+            <TouchableOpacity
+              onPress={onNotificationClick}
+              activeOpacity={0.7}
+              //@ts-ignore
+              onMouseEnter={() => setIsNotifHovered(true)}
+              onMouseLeave={() => setIsNotifHovered(false)}
+              style={[
+                styles.notificationButton,
+                isExpanded && styles.notificationButtonExpanded,
+                isNotifHovered && styles.notificationButtonHovered,
+              ]}
+            >
+              <Ionicons name="notifications-outline" size={18} color={C.textPrimary} />
+              {isExpanded && (
+                <Text
+                  style={[styles.sidebarItemLabel, { color: C.textPrimary, flex: 1 }]}
+                  numberOfLines={1}
+                >
+                  Notificaciones
+                </Text>
+              )}
+              {notificationsCount > 0 && <View style={styles.notificationBadge} />}
+              {/* Web-only tooltip (collapsed mode only) */}
+              {!isExpanded && Platform.OS === 'web' && isNotifHovered && (
+                <View style={styles.tooltip} pointerEvents="none">
+                  <Text style={styles.tooltipText}>
+                    {notificationsCount > 0
+                      ? `${notificationsCount} notificaciones`
+                      : 'Notificaciones'}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.sidebarDivider} />
+
+          {/* ── Middle: Nav Tabs ───────────────────────────────────────────── */}
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={styles.navSection}
+            showsVerticalScrollIndicator={false}
+          >
+            {TABS.map((tab) => (
+              <SidebarItem
+                key={tab.id}
+                icon={tab.icon}
+                label={tab.label}
+                active={activeTab === tab.id}
+                expanded={isExpanded}
+                onClick={() => handleTabChange(tab.id)}
+                onHover={onTabHover ? () => onTabHover(tab.id) : undefined}
+              />
+            ))}
+
+            {!personalizationCompleted && (
+              <SidebarItem
+                icon="gift"
+                label="Personalizar"
+                active={false}
+                isMarked={true}
+                expanded={isExpanded}
+                onClick={() => router.push('/onboarding')}
+              />
+            )}
+          </ScrollView>
+
+          <View style={styles.sidebarDivider} />
+
+          {/* ── Bottom: Sugerencias + Perfil ────────────────────────────────── */}
+          <View style={styles.actionsSection}>
             <SidebarItem
-              icon="gift"
-              label="Personalizar"
+              icon="lightbulb"
+              label="Sugerencias"
               active={false}
-              isMarked={true}
+              expanded={isExpanded}
               onClick={() => router.push('/onboarding')}
             />
-          )}
-        </ScrollView>
 
-        <View style={styles.sidebarDivider} />
-
-        {/* ── Bottom: Actions (Avatar + Notifications) ─────────────────────── */}
-        <View style={styles.actionsSection}>
-          {isAuthenticated ? (
-            <>
-              {/* Avatar / Profile button */}
+            {isAuthenticated ? (
               <TouchableOpacity
                 ref={avatarRef}
                 onPress={handleToggleDropdown}
@@ -1015,7 +1198,7 @@ export const TopAppBar: React.FC<
                 onMouseLeave={() => setIsAvatarHovered(false)}
                 style={[
                   styles.avatarButton,
-                  styles.sidebarItemIconOnly,
+                  isExpanded ? styles.avatarButtonExpanded : styles.sidebarItemIconOnly,
                   isAvatarActive && styles.avatarButtonActive,
                   isAvatarHovered &&
                     !isAvatarActive && {
@@ -1031,52 +1214,38 @@ export const TopAppBar: React.FC<
                     color={isAvatarActive ? C.accent : C.textPrimary}
                   />
                 </View>
-                {/* Web-only avatar tooltip */}
-                {Platform.OS === 'web' && isAvatarHovered && !isDropdownOpen && (
+                {isExpanded && (
+                  <Text
+                    style={[
+                      styles.avatarLabel,
+                      { color: isAvatarActive ? C.accent : C.textPrimary },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {firstName}
+                  </Text>
+                )}
+                {/* Web-only avatar tooltip (collapsed mode only) */}
+                {!isExpanded && Platform.OS === 'web' && isAvatarHovered && !isDropdownOpen && (
                   <View style={styles.tooltip} pointerEvents="none">
                     <Text style={styles.tooltipText}>{firstName}</Text>
                   </View>
                 )}
               </TouchableOpacity>
+            ) : (
+              <SidebarItem
+                icon="login"
+                label="Ingresar"
+                active={false}
+                expanded={isExpanded}
+                onClick={() => router.push('/ingresar')}
+              />
+            )}
+          </View>
 
-              {/* Notifications button */}
-              <TouchableOpacity
-                onPress={onNotificationClick}
-                activeOpacity={0.7}
-                //@ts-ignore
-                onMouseEnter={() => setIsNotifHovered(true)}
-                onMouseLeave={() => setIsNotifHovered(false)}
-                style={[
-                  styles.notificationButton,
-                  isNotifHovered && styles.notificationButtonHovered,
-                ]}
-              >
-                <Ionicons name="notifications-outline" size={18} color={C.textPrimary} />
-                {notificationsCount > 0 && <View style={styles.notificationBadge} />}
-                {/* Web-only tooltip */}
-                {Platform.OS === 'web' && isNotifHovered && (
-                  <View style={styles.tooltip} pointerEvents="none">
-                    <Text style={styles.tooltipText}>
-                      {notificationsCount > 0
-                        ? `${notificationsCount} notificaciones`
-                        : 'Notificaciones'}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            </>
-          ) : (
-            <SidebarItem
-              icon="login"
-              label="Ingresar"
-              active={false}
-              onClick={() => router.push('/ingresar')}
-            />
-          )}
+          <ContextualSurveyWidget isSearchActive={isSearchActive} />
         </View>
-
-        <ContextualSurveyWidget isSearchActive={isSearchActive} />
-      </View>
+      </Animated.View>
 
       {/* ━━━ DROPDOWN MODAL (opens to the right of the sidebar) ━━━━━━━━━━━━ */}
       <SidebarSubmenu
@@ -1257,6 +1426,6 @@ export const TopAppBar: React.FC<
           </View>
         </View>
       </Modal>
-    </Animated.View>
+    </>
   );
 };

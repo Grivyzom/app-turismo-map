@@ -306,7 +306,7 @@ export function useHomeScreenState(token: string | null) {
 
   const handleSetTab = useCallback(
     (tab: TabType) => {
-      if (!token && ['profile', 'feed', 'saved', 'forum'].includes(tab)) {
+      if (!token && ['profile', 'feed', 'saved', 'forum', 'historial'].includes(tab)) {
         showNotification('Inicia sesión para usar esta sección', 'warning');
         router.push('/ingresar');
         return;

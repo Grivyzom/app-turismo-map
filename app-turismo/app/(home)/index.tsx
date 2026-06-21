@@ -67,12 +67,15 @@ const UserProfileScreen = lazyWithRetry(() => import('../../src/screens/UserProf
 const FeedScreen = lazyWithRetry(() => import('../../src/screens/FeedScreen'));
 const PassportScreen = lazyWithRetry(() => import('../../src/screens/PassportScreen'));
 const ForumScreen = lazyWithRetry(() => import('../../src/screens/ForumScreen'));
+const EventsScreen = lazyWithRetry(() => import('../../src/screens/EventsScreen'));
 
 // Prefetch helpers
 const prefetchFeed = () => import('../../src/screens/FeedScreen');
 const prefetchSaved = () => import('../../src/screens/PassportScreen');
 const prefetchForum = () => import('../../src/screens/ForumScreen');
 const prefetchProfile = () => import('../../src/screens/UserProfileScreen');
+const prefetchEventos = () => import('../../src/screens/EventsScreen');
+const prefetchHistorial = () => import('../../src/screens/PassportScreen');
 
 // @ts-ignore - Safety fallback for legacy build references
 const isEmergency = false;
@@ -503,6 +506,58 @@ export default function HomeScreen() {
         <View style={styles.profileContainer}>
           <Suspense fallback={<LoadingFallback />}>
             <FeedScreen />
+          </Suspense>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!isDesktop && activeTab === 'eventos') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+
+        <View style={styles.topBarWrapper}>
+          <TopAppBar
+            currentTab={activeTab}
+            onTabChange={setActiveTab}
+            onVoiceSearch={handleVoiceSearch}
+            onVoicePartialSearch={handleVoicePartialSearch}
+            notificationsCount={notifications.filter((n) => !n.isRead).length}
+            onNotificationClick={() => setShowNotificationTray(!showNotificationTray)}
+            onTabHover={prefetchEventos}
+          />
+        </View>
+
+        <View style={styles.profileContainer}>
+          <Suspense fallback={<LoadingFallback />}>
+            <EventsScreen />
+          </Suspense>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!isDesktop && activeTab === 'historial') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+
+        <View style={styles.topBarWrapper}>
+          <TopAppBar
+            currentTab={activeTab}
+            onTabChange={setActiveTab}
+            onVoiceSearch={handleVoiceSearch}
+            onVoicePartialSearch={handleVoicePartialSearch}
+            notificationsCount={notifications.filter((n) => !n.isRead).length}
+            onNotificationClick={() => setShowNotificationTray(!showNotificationTray)}
+            onTabHover={prefetchHistorial}
+          />
+        </View>
+
+        <View style={styles.profileContainer}>
+          <Suspense fallback={<LoadingFallback />}>
+            <PassportScreen />
           </Suspense>
         </View>
       </SafeAreaView>

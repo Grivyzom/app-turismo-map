@@ -3797,7 +3797,7 @@ export function MapLibreContainer({
           filter: ['==', ['get', 'category'], 'humedal'],
           paint: {
             'fill-pattern': 'humedal-pattern',
-            'fill-opacity': 0.8,
+            'fill-opacity': 0.9,
           },
         },
         beforeId,
@@ -3827,13 +3827,13 @@ export function MapLibreContainer({
           filter: ['==', ['get', 'category'], 'agua'],
           paint: {
             'fill-pattern': 'agua-pattern',
-            'fill-opacity': 0.8,
+            'fill-opacity': 0.9,
           },
         },
         beforeId,
       );
 
-      // Borde exterior
+      // Borde exterior (solo para eventos seleccionados que no sean agua/humedal)
       map.addLayer(
         {
           id: 'event-polygons-outline',
@@ -3846,7 +3846,7 @@ export function MapLibreContainer({
               'match',
               ['get', 'category'],
               ['agua', 'humedal'],
-              0.8,
+              0,
               ['case', ['==', ['get', 'id'], selectedEventRef.current?.id ?? ''], 0.8, 0],
             ],
           },
@@ -4583,7 +4583,6 @@ export function MapLibreContainer({
     const SOURCE_ID = 'cycleways-source';
     const LAYER_BG = 'cycleways-layer-bg';
     const LAYER_LINE = 'cycleways-layer-line';
-    const LAYER_GLOW = 'cycleways-layer-glow';
 
     const geoJSONData =
       cyclewaysData && cyclewaysData.length > 0
@@ -4618,30 +4617,16 @@ export function MapLibreContainer({
       } else {
         (map.getSource(SOURCE_ID) as any).setData(geoJSONData as any);
       }
-      if (!map.getLayer(LAYER_GLOW)) {
-        map.addLayer({
-          id: LAYER_GLOW,
-          type: 'line',
-          source: SOURCE_ID,
-          layout: { 'line-join': 'round', 'line-cap': 'round' },
-          paint: {
-            'line-color': '#00d2ff',
-            'line-width': 12,
-            'line-opacity': 0.22,
-            'line-blur': 5,
-          },
-        });
-      }
       if (!map.getLayer(LAYER_BG)) {
         map.addLayer({
           id: LAYER_BG,
           type: 'line',
           source: SOURCE_ID,
-          layout: { 'line-join': 'round', 'line-cap': 'butt' },
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
           paint: {
-            'line-color': '#072030',
-            'line-width': 7,
-            'line-opacity': 0.6,
+            'line-color': '#1e3a4a',
+            'line-width': 5,
+            'line-opacity': 0.8,
           },
         });
       }
@@ -4652,10 +4637,10 @@ export function MapLibreContainer({
           source: SOURCE_ID,
           layout: { 'line-join': 'round', 'line-cap': 'round' },
           paint: {
-            'line-color': '#00d2ff',
-            'line-width': 4,
+            'line-color': '#06b6d4',
+            'line-width': 3,
             'line-opacity': 1,
-            'line-dasharray': [1, 2],
+            'line-dasharray': [3, 3],
           },
         });
       }
@@ -4697,7 +4682,7 @@ export function MapLibreContainer({
     };
 
     const removeLayers = () => {
-      for (const id of [LAYER_LINE, LAYER_BG, LAYER_GLOW]) {
+      for (const id of [LAYER_LINE, LAYER_BG]) {
         if (map.getLayer(id)) map.removeLayer(id);
       }
       if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
