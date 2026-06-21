@@ -1768,11 +1768,18 @@ function getBeforeRoadsOrLabelsLayerId(map: any): string | undefined {
   const style = map.getStyle();
   if (!style || !style.layers) return undefined;
 
-  // Buscar primera capa de etiquetas
-  const symbolLayer = style.layers.find((l: any) => l.type === 'symbol');
-  if (symbolLayer) return symbolLayer.id;
+  // Insertar polígonos antes del bloque final de etiquetas, no antes del primer
+  // symbol que aparezca: algunos estilos CARTO (positron/voyager) intercalan
+  // un symbol (waterway_label) muy temprano, antes de calles y edificios,
+  // mientras que dark-matter lo deja al final. Buscar el último layer no-symbol
+  // evita que los polígonos queden debajo de calles/edificios en day themes.
+  let lastNonSymbolIndex = -1;
+  for (let i = 0; i < style.layers.length; i++) {
+    if (style.layers[i].type !== 'symbol') lastNonSymbolIndex = i;
+  }
 
-  return undefined;
+  const nextLayer = style.layers[lastNonSymbolIndex + 1];
+  return nextLayer ? nextLayer.id : undefined;
 }
 
 function updateMarkerDomRefs(markerObj: any) {
