@@ -88,6 +88,22 @@ export interface TurismoEvent {
   };
 }
 
+/** Sector/Zona delimitada (polígono) creada en el backend, p.ej. Parques/Reservas, Edificios */
+export interface Zone {
+  id: number;
+  name: string;
+  description?: string;
+  category?: string;
+  color?: string;
+  isActive: boolean;
+  geojson?: any;
+  eventsCount: number;
+  rating?: number | null;
+  images?: string[];
+  openingHours?: string;
+  parkType?: string;
+}
+
 export type MapLayer = 'dark' | 'streets' | 'light' | 'satellite' | 'terrain';
 
 export type UserLocation = {

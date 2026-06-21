@@ -10,6 +10,7 @@ import {
   RouteType,
   RoutePoint,
   RoutePointType,
+  Zone,
 } from '../../src/components/Map/types';
 import { CheckInRecord } from '../../src/utils/checkInStorage';
 import { ParsedSearch } from '../../src/utils/aiSearchParser';
@@ -56,7 +57,7 @@ export function useHomeScreenState(token: string | null) {
 
   // ── Nested Zones State ─────────────────────────────────────────────────
   const [activeNestedZone, setActiveNestedZone] = useState<any>(null);
-  const [selectedSector, setSelectedSector] = useState<any>(null);
+  const [selectedSector, setSelectedSector] = useState<Zone | null>(null);
 
   // ── Magic Wand (Zone Creation) State ───────────────────────────────────
   const [isMagicWandActive, setIsMagicWandActive] = useState<boolean>(false);

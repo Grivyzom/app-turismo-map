@@ -186,14 +186,18 @@ type SaveLocationRequest struct {
 // ── Models para Delimitación de Zonas (Polígonos) ──────────────────────────
 
 type Zone struct {
-	ID          int             `json:"id"`
-	Name        string          `json:"name"`
-	Description string          `json:"description,omitempty"`
-	Category    string          `json:"category,omitempty"`
-	Color       string          `json:"color,omitempty"`
-	IsActive    bool            `json:"isActive"`
-	GeoJSON     json.RawMessage `json:"geojson"` // Geometría en formato GeoJSON
-	EventsCount int             `json:"eventsCount"`
+	ID           int             `json:"id"`
+	Name         string          `json:"name"`
+	Description  string          `json:"description,omitempty"`
+	Category     string          `json:"category,omitempty"`
+	Color        string          `json:"color,omitempty"`
+	IsActive     bool            `json:"isActive"`
+	GeoJSON      json.RawMessage `json:"geojson"` // Geometría en formato GeoJSON
+	EventsCount  int             `json:"eventsCount"`
+	Rating       *float64        `json:"rating,omitempty"`
+	Images       []string        `json:"images,omitempty"`
+	OpeningHours string          `json:"openingHours,omitempty"`
+	ParkType     string          `json:"parkType,omitempty"`
 }
 
 // ── Models para Sistema de Rutas (Geo-Router) ──────────────────────────

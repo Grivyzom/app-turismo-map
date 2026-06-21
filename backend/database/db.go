@@ -256,6 +256,10 @@ func InitDB() {
 		);`,
 		`CREATE INDEX IF NOT EXISTS zones_geom_idx ON zones USING GIST (geom);`,
 		`ALTER TABLE zones ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;`,
+		`ALTER TABLE zones ADD COLUMN IF NOT EXISTS rating DECIMAL(2,1);`,
+		`ALTER TABLE zones ADD COLUMN IF NOT EXISTS images TEXT[] DEFAULT '{}';`,
+		`ALTER TABLE zones ADD COLUMN IF NOT EXISTS opening_hours VARCHAR(255);`,
+		`ALTER TABLE zones ADD COLUMN IF NOT EXISTS park_type VARCHAR(100);`,
 
 		// ── Tablas para Sistema de Rutas (Geo-Router) ──────────────────────────
 		`CREATE TABLE IF NOT EXISTS routes (

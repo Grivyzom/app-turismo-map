@@ -8,6 +8,8 @@ import (
 
 	"backend/database"
 	"backend/models"
+
+	"github.com/lib/pq"
 )
 
 // GetZonesHandler devuelve todas las zonas delimitadas en formato GeoJSON adaptado.
@@ -30,31 +32,39 @@ func GetZonesHandler(w http.ResponseWriter, r *http.Request) {
 				z.name, 
 				COALESCE(z.description, ''), 
 				COALESCE(z.category, 'Sector'), 
-				COALESCE(z.color, '#10B981'), 
+				COALESCE(z.color, '#10B981'),
 				z.is_active,
 				ST_AsGeoJSON(z.geom)::jsonb as geojson,
-				COALESCE((SELECT COUNT(*) FROM events e WHERE z.id = ANY(e.containing_zone_ids)), 0) as events_count
+				COALESCE((SELECT COUNT(*) FROM events e WHERE z.id = ANY(e.containing_zone_ids)), 0) as events_count,
+				z.rating,
+				COALESCE(z.images, '{}'),
+				COALESCE(z.opening_hours, ''),
+				COALESCE(z.park_type, '')
 			FROM zones z
 			WHERE z.is_active = true
 			AND z.id != $1
 			AND EXISTS (
-				SELECT 1 FROM zones parent 
-				WHERE parent.id = $1 
+				SELECT 1 FROM zones parent
+				WHERE parent.id = $1
 				AND ST_Covers(parent.geom, z.geom)
 			)
 		`
 		args = append(args, zoneIdParam)
 	} else {
 		query = `
-			SELECT 
-				z.id, 
-				z.name, 
-				COALESCE(z.description, ''), 
-				COALESCE(z.category, 'Sector'), 
-				COALESCE(z.color, '#10B981'), 
+			SELECT
+				z.id,
+				z.name,
+				COALESCE(z.description, ''),
+				COALESCE(z.category, 'Sector'),
+				COALESCE(z.color, '#10B981'),
 				z.is_active,
 				ST_AsGeoJSON(z.geom)::jsonb as geojson,
-				COALESCE((SELECT COUNT(*) FROM events e WHERE z.id = ANY(e.containing_zone_ids)), 0) as events_count
+				COALESCE((SELECT COUNT(*) FROM events e WHERE z.id = ANY(e.containing_zone_ids)), 0) as events_count,
+				z.rating,
+				COALESCE(z.images, '{}'),
+				COALESCE(z.opening_hours, ''),
+				COALESCE(z.park_type, '')
 			FROM zones z
 			WHERE z.is_active = true
 			AND NOT EXISTS (
@@ -86,6 +96,10 @@ func GetZonesHandler(w http.ResponseWriter, r *http.Request) {
 			&z.IsActive,
 			&z.GeoJSON,
 			&z.EventsCount,
+			&z.Rating,
+			pq.Array(&z.Images),
+			&z.OpeningHours,
+			&z.ParkType,
 		)
 		if err != nil {
 			log.Printf("Error al escanear zona: %v", err)
@@ -108,15 +122,19 @@ func AdminListZonesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	query := `
-		SELECT 
-			z.id, 
-			z.name, 
-			COALESCE(z.description, ''), 
-			COALESCE(z.category, 'Sector'), 
-			COALESCE(z.color, '#10B981'), 
+		SELECT
+			z.id,
+			z.name,
+			COALESCE(z.description, ''),
+			COALESCE(z.category, 'Sector'),
+			COALESCE(z.color, '#10B981'),
 			z.is_active,
 			ST_AsGeoJSON(z.geom)::jsonb as geojson,
-			COALESCE((SELECT COUNT(*) FROM events e WHERE z.id = ANY(e.containing_zone_ids)), 0) as events_count
+			COALESCE((SELECT COUNT(*) FROM events e WHERE z.id = ANY(e.containing_zone_ids)), 0) as events_count,
+			z.rating,
+			COALESCE(z.images, '{}'),
+			COALESCE(z.opening_hours, ''),
+			COALESCE(z.park_type, '')
 		FROM zones z
 		ORDER BY z.id ASC;
 	`
@@ -132,7 +150,10 @@ func AdminListZonesHandler(w http.ResponseWriter, r *http.Request) {
 	zones := []models.Zone{}
 	for rows.Next() {
 		var z models.Zone
-		err := rows.Scan(&z.ID, &z.Name, &z.Description, &z.Category, &z.Color, &z.IsActive, &z.GeoJSON, &z.EventsCount)
+		err := rows.Scan(
+			&z.ID, &z.Name, &z.Description, &z.Category, &z.Color, &z.IsActive, &z.GeoJSON, &z.EventsCount,
+			&z.Rating, pq.Array(&z.Images), &z.OpeningHours, &z.ParkType,
+		)
 		if err != nil {
 			continue
 		}
@@ -182,12 +203,16 @@ func AdminToggleZoneHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 type CreateZoneRequest struct {
-	Name        string              `json:"name"`
-	Description string              `json:"description,omitempty"`
-	Category    string              `json:"category,omitempty"`
-	Color       string              `json:"color,omitempty"`
-	Points      []models.RoutePoint `json:"points,omitempty"`
-	GeoJSON     interface{}         `json:"geojson,omitempty"`
+	Name         string              `json:"name"`
+	Description  string              `json:"description,omitempty"`
+	Category     string              `json:"category,omitempty"`
+	Color        string              `json:"color,omitempty"`
+	Points       []models.RoutePoint `json:"points,omitempty"`
+	GeoJSON      interface{}         `json:"geojson,omitempty"`
+	Rating       *float64            `json:"rating,omitempty"`
+	Images       []string            `json:"images,omitempty"`
+	OpeningHours string              `json:"openingHours,omitempty"`
+	ParkType     string              `json:"parkType,omitempty"`
 }
 
 // CreateZoneHandler crea un nuevo sector (zona) en la base de datos a partir de puntos
@@ -221,9 +246,10 @@ func CreateZoneHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		err = database.DB.QueryRow(
-			`INSERT INTO zones (name, description, category, color, is_active, geom) 
-			 VALUES ($1, $2, $3, $4, true, ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON($5), 4326))) RETURNING id`,
+			`INSERT INTO zones (name, description, category, color, is_active, geom, rating, images, opening_hours, park_type)
+			 VALUES ($1, $2, $3, $4, true, ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON($5), 4326)), $6, $7, $8, $9) RETURNING id`,
 			req.Name, req.Description, req.Category, req.Color, string(geoJSONBytes),
+			req.Rating, pq.Array(req.Images), req.OpeningHours, req.ParkType,
 		).Scan(&newID)
 	} else {
 		if len(req.Points) < 3 {
@@ -248,9 +274,10 @@ func CreateZoneHandler(w http.ResponseWriter, r *http.Request) {
 		polygonWKT += "))"
 
 		err = database.DB.QueryRow(
-			`INSERT INTO zones (name, description, category, color, is_active, geom) 
-			 VALUES ($1, $2, $3, $4, true, ST_Multi(ST_GeomFromText($5, 4326))) RETURNING id`,
+			`INSERT INTO zones (name, description, category, color, is_active, geom, rating, images, opening_hours, park_type)
+			 VALUES ($1, $2, $3, $4, true, ST_Multi(ST_GeomFromText($5, 4326)), $6, $7, $8, $9) RETURNING id`,
 			req.Name, req.Description, req.Category, req.Color, polygonWKT,
+			req.Rating, pq.Array(req.Images), req.OpeningHours, req.ParkType,
 		).Scan(&newID)
 	}
 

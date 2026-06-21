@@ -28,6 +28,10 @@ export const CreateSectorModal: React.FC<CreateSectorModalProps> = ({
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formCategory, setFormCategory] = useState('edificio');
+  const [formRating, setFormRating] = useState('');
+  const [formOpeningHours, setFormOpeningHours] = useState('');
+  const [formParkType, setFormParkType] = useState('');
+  const [formImages, setFormImages] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const categoryOptions = [
@@ -56,6 +60,14 @@ export const CreateSectorModal: React.FC<CreateSectorModalProps> = ({
         category: formCategory,
         color: formCategory === 'edificio' ? '#6366F1' : formCategory === 'reserva' ? '#22C55E' : '#EAB308',
       };
+
+      if (formCategory === 'reserva') {
+        if (formRating.trim()) payload.rating = parseFloat(formRating);
+        if (formOpeningHours.trim()) payload.openingHours = formOpeningHours.trim();
+        if (formParkType.trim()) payload.parkType = formParkType.trim();
+        const imagesList = formImages.split('\n').map((url) => url.trim()).filter(Boolean);
+        if (imagesList.length > 0) payload.images = imagesList;
+      }
 
       if (extractedGeometry) {
         payload.geojson = extractedGeometry;
@@ -142,6 +154,48 @@ export const CreateSectorModal: React.FC<CreateSectorModalProps> = ({
             placeholderTextColor="#475569"
             multiline
           />
+
+          {formCategory === 'reserva' && (
+            <>
+              <Text style={styles.label}>Calificación (0 a 5)</Text>
+              <TextInput
+                style={styles.input}
+                value={formRating}
+                onChangeText={setFormRating}
+                placeholder="Ej. 4.5"
+                placeholderTextColor="#475569"
+                keyboardType="decimal-pad"
+              />
+
+              <Text style={styles.label}>Horario de Apertura</Text>
+              <TextInput
+                style={styles.input}
+                value={formOpeningHours}
+                onChangeText={setFormOpeningHours}
+                placeholder="Ej. Lu-Do 08:00-20:00"
+                placeholderTextColor="#475569"
+              />
+
+              <Text style={styles.label}>Tipo de Parque</Text>
+              <TextInput
+                style={styles.input}
+                value={formParkType}
+                onChangeText={setFormParkType}
+                placeholder="Ej. Parque Urbano, Reserva Natural, Humedal Protegido"
+                placeholderTextColor="#475569"
+              />
+
+              <Text style={styles.label}>Imágenes (una URL por línea)</Text>
+              <TextInput
+                style={[styles.input, { height: 100, textAlignVertical: 'top' }]}
+                value={formImages}
+                onChangeText={setFormImages}
+                placeholder={'https://...\nhttps://...'}
+                placeholderTextColor="#475569"
+                multiline
+              />
+            </>
+          )}
 
           {!extractedGeometry && (!draftRoutePoints || draftRoutePoints.length === 0) ? (
             <TouchableOpacity 

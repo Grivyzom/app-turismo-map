@@ -632,7 +632,7 @@ const RecentSearchRow = React.memo(function RecentSearchRow({
 const TABS: { id: TabType; icon: string; label: string }[] = [
   { id: 'map', icon: 'map', label: 'Mapa' },
   { id: 'feed', icon: 'dynamic-feed', label: 'Feed' },
-  { id: 'saved', icon: 'bookmark', label: 'Pasaporte' },
+  { id: 'saved', icon: 'collections', label: 'Colección' },
   { id: 'forum', icon: 'forum', label: 'Foro' },
 ];
 
@@ -644,6 +644,7 @@ export const TopAppBar: React.FC<
     onVoiceSearch?: (res: ParsedSearch) => void;
     onVoicePartialSearch?: (text: string) => void;
     onTabHover?: (tab: TabType) => void;
+    onCollectionsClick?: () => void;
   }
 > = (props) => {
   const {
@@ -657,6 +658,7 @@ export const TopAppBar: React.FC<
     isModalOpen = false,
     forceSidebarVisible = false,
     onSearchFocus,
+    onCollectionsClick,
   } = props;
 
   const { signOut, isAuthenticated } = useAuth();
@@ -768,9 +770,13 @@ export const TopAppBar: React.FC<
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleTabChange = useCallback((tab: TabType) => {
+    if (tab === 'saved') {
+      onCollectionsClick?.();
+      return;
+    }
     setActiveTab(tab);
     onTabChange?.(tab);
-  }, [onTabChange]);
+  }, [onTabChange, onCollectionsClick]);
 
   const handleToggleSearch = useCallback((active: boolean) => {
     // Elegant expansion animation

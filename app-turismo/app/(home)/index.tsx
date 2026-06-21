@@ -33,6 +33,7 @@ import {
 } from '../../src/components/MapUI';
 import { TelemetryHUD } from '../../src/components/MapUI/TelemetryHUD';
 import { BuildingGallery } from '../../src/components/MapUI/BuildingGallery';
+import { ParkImageSlider } from '../../src/components/MapUI/ParkImageSlider';
 import { MyLocationButton } from '../../src/components/MapUI/MyLocationButton';
 import {
   EventCheckInSection,
@@ -42,12 +43,14 @@ import {
 import { MapContainer } from '../../src/components/Map/MapContainer';
 import { getCategoryColor, getCategoryIcon } from '../../src/utils/mapUtils';
 import { CHECKIN_EXCLUDED_CATEGORIES } from '../../src/utils/checkInStorage';
+import { getZoneCentroid } from '../../src/utils/locationUtils';
 import FloatingIsland from '../../src/components/ui/FloatingIsland';
 import { ContextualRadialMenu, SearchableSelect } from '../../src/components/ui';
 import { SaveToCollectionModal } from '../../src/components/ui/SaveToCollectionModal';
 import { NearbyEventsPanel } from '../../src/components/MapUI/NearbyEventsPanel';
 import { LoadingFallback } from '../../src/components/ui/LoadingFallback';
 import { CheckInModal } from '../../src/components/ui/CheckInModal';
+import { CollectionsFloatingIsland } from '../../src/components/ui/CollectionsFloatingIsland';
 import { CreatePointModal } from '../../src/components/MapUI/CreatePointModal';
 import { CreateSectorModal } from '../../src/components/MapUI/CreateSectorModal';
 import { CoordsEditorHUD } from '../../src/components/MapUI/CoordsEditorHUD';
@@ -121,6 +124,7 @@ export default function HomeScreen() {
   const [collectionModalVisible, setCollectionModalVisible] = useState(false);
   const [locationToSave, setLocationToSave] = useState<any>(null);
   const [showCoordsEditor, setShowCoordsEditor] = useState(false);
+  const [showCollectionsIsland, setShowCollectionsIsland] = useState(false);
 
   const {
     events,
@@ -304,6 +308,31 @@ export default function HomeScreen() {
     setCollectionModalVisible(true);
   }, [token, showNotification]);
 
+  const handleSaveSector = useCallback(() => {
+    if (!selectedSector) return;
+    const center = getZoneCentroid(selectedSector.geojson);
+    if (!center) return;
+    handleSaveLocation({
+      locationType: 'custom_pin',
+      refId: String(selectedSector.id),
+      latitude: center.latitude,
+      longitude: center.longitude,
+      title: selectedSector.name,
+    });
+  }, [selectedSector, handleSaveLocation]);
+
+  const handleSectorDirections = useCallback(() => {
+    if (!selectedSector) return;
+    const center = getZoneCentroid(selectedSector.geojson);
+    if (!center) return;
+    const url = Platform.select({
+      ios: `maps:0,0?q=${center.latitude},${center.longitude}`,
+      android: `geo:0,0?q=${center.latitude},${center.longitude}`,
+      web: `https://www.google.com/maps/search/?api=1&query=${center.latitude},${center.longitude}`,
+    });
+    if (url) Linking.openURL(url);
+  }, [selectedSector]);
+
   const handleToggleSector = useCallback(
     (sectorId: number) => {
       setVisibleSectorIds((prev) =>
@@ -357,6 +386,25 @@ export default function HomeScreen() {
     },
     [showNotification],
   );
+
+  const handleSectorShare = React.useCallback(async () => {
+    if (!selectedSector) return;
+    const center = getZoneCentroid(selectedSector.geojson);
+    const mapsUrl = center
+      ? `https://www.google.com/maps/search/?api=1&query=${center.latitude},${center.longitude}`
+      : undefined;
+    const message = `${selectedSector.name} - Descúbrelo en el mapa turístico de Valdivia${mapsUrl ? `\n${mapsUrl}` : ''}`;
+
+    try {
+      await Share.share({
+        message,
+        url: mapsUrl,
+        title: selectedSector.name,
+      });
+    } catch (error) {
+      console.warn('No se pudo compartir el sector:', error);
+    }
+  }, [selectedSector]);
 
   const handleSharePincho = React.useCallback(async () => {
     if (!mapPincho) return;
@@ -763,6 +811,7 @@ export default function HomeScreen() {
               if (selectedEvent) handleSelectEvent(null);
               if (mapPincho) clearMapPincho();
             }}
+            onCollectionsClick={() => setShowCollectionsIsland(true)}
           />
         </View>
       </View>
@@ -1760,60 +1809,141 @@ export default function HomeScreen() {
       )}
 
       {/* --- Sector Info Card (Before Exploring) --- */}
-      {showMainUI && selectedSector && !activeNestedZone && (
-        <Animated.View
-          style={[
-            styles.miniModalContainer,
-            {
-              width: isDesktop ? 380 : '90%',
-              left: isDesktop ? 100 : '5%', // Sidebar width + offset on desktop
-              bottom: isDesktop ? 32 : 40,
-            },
-          ]}
-        >
-          {/* Header/Banner Section */}
-          <View style={[styles.miniBannerContainer, { height: 100, backgroundColor: '#1E293B' }]}>
-            <View style={styles.miniBannerOverlay} />
-            <TouchableOpacity
-              onPress={closeSectorPanel}
-              style={styles.miniCloseButton}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="close" size={18} color="#FFFFFF" />
-            </TouchableOpacity>
-            
-            <View style={styles.miniBadgeContainer}>
-              <View style={[styles.miniBadge, { backgroundColor: 'rgba(56, 189, 248, 0.2)' }]}>
-                <Ionicons name="business" size={12} color="#38BDF8" />
-                <Text style={[styles.miniBadgeText, { color: '#38BDF8' }]}>{selectedSector.category.toUpperCase()}</Text>
+      {showMainUI && selectedSector && !activeNestedZone && (() => {
+        const isParkSector = selectedSector.category === 'reserva';
+        const heroImage = selectedSector.images && selectedSector.images.length > 0 ? selectedSector.images[0] : undefined;
+        const hasRatingOrBadges = isParkSector && (
+          selectedSector.rating != null || !!selectedSector.openingHours || !!selectedSector.parkType
+        );
+
+        return (
+          <Animated.View
+            style={[
+              styles.miniModalContainer,
+              {
+                width: isDesktop ? 380 : '90%',
+                left: isDesktop ? 100 : '5%', // Sidebar width + offset on desktop
+                bottom: isDesktop ? 32 : 40,
+              },
+            ]}
+          >
+            {/* Header/Banner Section */}
+            <View style={[styles.miniBannerContainer, { height: 100, backgroundColor: '#1E293B' }]}>
+              {heroImage && <Image source={{ uri: heroImage }} style={styles.miniBannerImage} />}
+              <View style={styles.miniBannerOverlay} />
+              <TouchableOpacity
+                onPress={closeSectorPanel}
+                style={styles.miniCloseButton}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="close" size={18} color="#FFFFFF" />
+              </TouchableOpacity>
+
+              <View style={styles.miniBadgeContainer}>
+                <View style={[styles.miniBadge, { backgroundColor: 'rgba(56, 189, 248, 0.2)' }]}>
+                  <Ionicons name="business" size={12} color="#38BDF8" />
+                  <Text style={[styles.miniBadgeText, { color: '#38BDF8' }]}>{selectedSector.category.toUpperCase()}</Text>
+                </View>
               </View>
             </View>
-          </View>
 
-          {/* Info Section */}
-          <View style={styles.miniContent}>
-            <Text style={styles.miniTitle}>{selectedSector.name}</Text>
-            
-            <Text style={styles.miniDescription} numberOfLines={3}>
-              {selectedSector.description || 'Sector delimitado de la ciudad. Haz clic en explorar para ver su interior.'}
-            </Text>
+            <ScrollView
+              style={isParkSector ? [styles.sectorScroll, { maxHeight: isDesktop ? 380 : 320 }] : styles.sectorScroll}
+              showsVerticalScrollIndicator={false}
+            >
+              {/* Info Section */}
+              <View style={styles.miniContent}>
+                {hasRatingOrBadges && (
+                  <View style={styles.sectorRatingBadgeRow}>
+                    {selectedSector.rating != null && (
+                      <View style={styles.sectorRatingPill}>
+                        <Ionicons name="star" size={12} color="#FBBF24" />
+                        <Text style={styles.sectorRatingText}>{selectedSector.rating.toFixed(1)}</Text>
+                      </View>
+                    )}
+                    {selectedSector.openingHours && (
+                      <View style={styles.sectorBadgePill}>
+                        <Ionicons name="time-outline" size={12} color="#A0AEC0" />
+                        <Text style={styles.sectorBadgePillText} numberOfLines={1}>{selectedSector.openingHours}</Text>
+                      </View>
+                    )}
+                    {selectedSector.parkType && (
+                      <View style={styles.sectorBadgePill}>
+                        <Ionicons name="leaf-outline" size={12} color="#34D399" />
+                        <Text style={styles.sectorBadgePillText} numberOfLines={1}>{selectedSector.parkType}</Text>
+                      </View>
+                    )}
+                  </View>
+                )}
 
-            {/* Action Buttons Section */}
-            <View style={styles.miniActionRow}>
-              <TouchableOpacity
-                style={[styles.miniPrimaryBtn, { backgroundColor: '#38BDF8', flex: 1, marginRight: 0 }]}
-                activeOpacity={0.8}
-                onPress={handleExploreSector}
-              >
-                <Ionicons name="enter-outline" size={18} color="#0F172A" />
-                <Text style={[styles.miniPrimaryBtnText, { color: '#0F172A', fontWeight: 'bold', fontSize: 14 }]}>
-                  Explorar Interior
+                <Text style={styles.miniTitle}>{selectedSector.name}</Text>
+
+                <Text style={styles.miniDescription} numberOfLines={isParkSector ? undefined : 3}>
+                  {selectedSector.description || 'Sector delimitado de la ciudad. Haz clic en explorar para ver su interior.'}
                 </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Animated.View>
-      )}
+
+                {isParkSector && selectedSector.images && selectedSector.images.length > 0 && (
+                  <ParkImageSlider images={selectedSector.images} />
+                )}
+
+                {isParkSector && (
+                  <>
+                    <View style={styles.sectorPlaceholderSection}>
+                      <Text style={styles.sectorPlaceholderTitle}>Actividades recientes</Text>
+                      <View style={styles.sectorPlaceholderBox}>
+                        <Ionicons name="time-outline" size={16} color="#64748B" />
+                        <Text style={styles.sectorPlaceholderText}>Sin actividades recientes</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.sectorPlaceholderSection}>
+                      <Text style={styles.sectorPlaceholderTitle}>Próximamente</Text>
+                      <View style={styles.sectorPlaceholderBox}>
+                        <Ionicons name="sparkles-outline" size={16} color="#64748B" />
+                        <Text style={styles.sectorPlaceholderText}>Próximamente disponible</Text>
+                      </View>
+                    </View>
+                  </>
+                )}
+
+                {/* Action Buttons Section */}
+                <View style={[styles.miniActionRow, { marginTop: isParkSector ? 14 : 0 }]}>
+                  <TouchableOpacity
+                    style={[styles.miniPrimaryBtn, { backgroundColor: '#38BDF8', flex: 1, marginRight: 0 }]}
+                    activeOpacity={0.8}
+                    onPress={handleExploreSector}
+                  >
+                    <Ionicons name="enter-outline" size={18} color="#0F172A" />
+                    <Text style={[styles.miniPrimaryBtnText, { color: '#0F172A', fontWeight: 'bold', fontSize: 14 }]}>
+                      Explorar Interior
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </ScrollView>
+
+            {isParkSector && (
+              <View style={styles.sectorFooterRow}>
+                <TouchableOpacity style={styles.sectorFooterBtn} activeOpacity={0.8} onPress={handleSaveSector}>
+                  <Ionicons name="bookmark-outline" size={16} color="#FFFFFF" />
+                  <Text style={styles.sectorFooterBtnText}>Guardar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.sectorFooterBtn, { backgroundColor: '#38BDF8' }]}
+                  activeOpacity={0.8}
+                  onPress={handleSectorDirections}
+                >
+                  <Ionicons name="navigate-outline" size={16} color="#0F172A" />
+                  <Text style={[styles.sectorFooterBtnText, { color: '#0F172A' }]}>Como llegar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.sectorFooterIconBtn} activeOpacity={0.8} onPress={handleSectorShare}>
+                  <Ionicons name="share-social-outline" size={18} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+            )}
+          </Animated.View>
+        );
+      })()}
 
       {/* Modal de Check-in Exitoso */}
       {showCheckInModal && (
@@ -1989,6 +2119,48 @@ export default function HomeScreen() {
           </View>
         </View>
       )}
+
+      {/* Collections Floating Island */}
+      <CollectionsFloatingIsland
+        visible={showCollectionsIsland}
+        onClose={() => setShowCollectionsIsland(false)}
+        mapComponent={
+          <MapContainer
+            events={filteredEvents}
+            selectedEvent={null}
+            onSelectEvent={() => {}}
+            mapLayer={mapLayer}
+            centerTrigger={centerTrigger}
+            tacticalMode={false}
+            onTacticalLocationChange={() => {}}
+            onMapPincho={() => {}}
+            mapPincho={null}
+            zoom={zoom}
+            onZoomChange={setZoom}
+            onBoundsChange={setMapBounds}
+            activeFloor={activeFloor}
+            showTraffic={showTraffic}
+            showCycleways={showCycleways}
+            cyclewaysData={cycleways}
+            showSectors={showSectors}
+            sectorsData={sectors}
+            visibleSectorIds={visibleSectorIds}
+            onSectorPress={() => {}}
+            showWeather={showWeather}
+            weatherType={weatherType}
+            isFrozen={false}
+            onSaveLocation={() => {}}
+            isRoutingActive={false}
+            routingType="single_target"
+            draftRoutePoints={[]}
+            onMapClickForRouting={() => {}}
+            isRouteFinished={false}
+            savedRoutes={[]}
+            onRateRoute={() => {}}
+            activeNestedZone={null}
+          />
+        }
+      />
     </SafeAreaView>
   );
 }

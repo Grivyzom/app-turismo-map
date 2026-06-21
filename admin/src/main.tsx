@@ -4,6 +4,8 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import { AuthProvider } from './context/AuthContext'
 import './index.css'
+import '@smastrom/react-rating/style.css'
+
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

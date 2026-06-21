@@ -348,30 +348,50 @@ export const ArtisticMarker = ({
   const [dynamicSvg, setDynamicSvg] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    if (type !== 'fauna') return;
+    setDynamicSvg(null);
+    if (type !== 'fauna' && type !== 'universidad') return;
 
-    const getSanitizedName = (text: string) => {
-      return text
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-z0-9]/g, '_')
-        .replace(/_+/g, '_')
-        .replace(/(^_|_$)/g, '');
-    };
+    let filename = '';
+    if (type === 'fauna') {
+      const getSanitizedName = (text: string) => {
+        return text
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-z0-9]/g, '_')
+          .replace(/_+/g, '_')
+          .replace(/(^_|_$)/g, '');
+      };
+      const name = getSanitizedName(title || 'lobo_marino');
+      const suffix = !isLightMode ? '_blanca' : '';
+      filename = `${name}${suffix}.svg`;
+    } else if (type === 'universidad') {
+      const lowerTitle = (title || '').toLowerCase();
+      if (lowerTitle.includes('sebastián') || lowerTitle.includes('sebastian') || lowerTitle.includes('uss')) {
+        filename = 'logo_uss.svg';
+      } else if (lowerTitle.includes('tomas') || lowerTitle.includes('tomás') || lowerTitle.includes('ust')) {
+        filename = 'logo_santo_tomas.svg';
+      } else if (lowerTitle.includes('inacap')) {
+        filename = 'logo_inacap.svg';
+      }
+    }
 
-    const name = getSanitizedName(title || 'lobo_marino');
-    const suffix = !isLightMode ? '_blanca' : '';
-    const filename = `${name}${suffix}.svg`;
+    if (!filename) return;
+
     const apiBaseUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8080';
     const primaryUrl = `${apiBaseUrl}/assets/svg/${filename}`;
-    const fallbackUrl = `${apiBaseUrl}/assets/svg/lobo_marino${suffix}.svg`;
+    const fallbackUrl = type === 'fauna'
+      ? `${apiBaseUrl}/assets/svg/lobo_marino${!isLightMode ? '_blanca' : ''}.svg`
+      : '';
 
     let active = true;
     fetch(primaryUrl)
       .then(res => {
         if (res.ok) return res.text();
-        return fetch(fallbackUrl).then(res2 => res2.ok ? res2.text() : '');
+        if (fallbackUrl) {
+          return fetch(fallbackUrl).then(res2 => res2.ok ? res2.text() : '');
+        }
+        return '';
       })
       .then(text => {
         if (active && text) {
@@ -379,7 +399,7 @@ export const ArtisticMarker = ({
         }
       })
       .catch(err => {
-        console.warn("Error loading dynamic fauna SVG on mobile:", err);
+        console.warn(`Error loading dynamic ${type} SVG on mobile:`, err);
       });
 
     return () => {
@@ -434,6 +454,40 @@ export const ArtisticMarker = ({
       case 'hospital':
         return <HospitalIcon size={size} isLightMode={isLightMode} />;
       case 'universidad':
+        if (dynamicSvg) {
+          return (
+            <View style={{
+              width: size,
+              height: size,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              {/* Base Shadow */}
+              <Svg width={size} height={size} viewBox="0 0 64 64" style={StyleSheet.absoluteFill}>
+                <Ellipse cx="32" cy="54" rx="20" ry="6" fill={isLightMode ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.2)'} />
+                
+                {/* Pin shape with white background */}
+                <Path 
+                  d="M32 6 C21 6 12 15 12 26 C12 40 32 58 32 58 C32 58 52 40 52 26 C52 15 43 6 32 6 Z" 
+                  fill="#FFFFFF" 
+                  stroke="#CBD5E0" 
+                  strokeWidth="1.5" 
+                />
+              </Svg>
+              <View style={{
+                position: 'absolute',
+                top: size * 0.19,
+                left: size * 0.28,
+                width: size * 0.44,
+                height: size * 0.44,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <SvgXml xml={dynamicSvg} width="100%" height="100%" />
+              </View>
+            </View>
+          );
+        }
         return <UniversityIcon size={size} isLightMode={isLightMode} />;
       case 'bombero':
         return <BomberoIcon size={size} isLightMode={isLightMode} />;

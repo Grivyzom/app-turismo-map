@@ -57,3 +57,19 @@ export function getPolygonCenter(points: { latitude: number; longitude: number }
     longitude: sumLng / limit,
   };
 }
+
+// Calcula el centroide de una geometría GeoJSON Polygon o MultiPolygon (formato ST_AsGeoJSON)
+export function getZoneCentroid(geojson: any): { latitude: number; longitude: number } | null {
+  if (!geojson || !geojson.coordinates) return null;
+
+  // Polygon: coordinates[ringIndex][pointIndex] = [lng, lat]
+  // MultiPolygon: coordinates[polyIndex][ringIndex][pointIndex] = [lng, lat]
+  const ring = geojson.type === 'MultiPolygon'
+    ? geojson.coordinates[0]?.[0]
+    : geojson.coordinates[0];
+
+  if (!Array.isArray(ring) || ring.length === 0) return null;
+
+  const points = ring.map(([lng, lat]: [number, number]) => ({ latitude: lat, longitude: lng }));
+  return getPolygonCenter(points);
+}

@@ -8,6 +8,7 @@ import { Platform } from 'react-native';
 
 import { AuthProvider } from '../src/context/AuthContext';
 import { UserLocationProvider } from '../src/context/UserLocationContext';
+import { CollectionsProvider } from '../src/context/CollectionsContext';
 import { GlobalErrorBoundary } from '../src/components/ui/GlobalErrorBoundary';
 import '../global.css';
 
@@ -46,20 +47,22 @@ export default function RootLayout() {
     <GlobalErrorBoundary>
       <AuthProvider>
         <UserLocationProvider>
-          <Stack
-            screenOptions={{
-              headerShown: false,
-            }}
-          >
-            <Stack.Screen name="index" options={{}} />
-            <Stack.Screen name="login" options={{}} />
-            <Stack.Screen name="registro" options={{}} />
-            <Stack.Screen name="(home)" options={{}} />
-            <Stack.Screen name="business" options={{ headerShown: false }} />
-            <Stack.Screen name="admin/login/index" options={{}} />
-            <Stack.Screen name="admin/dashboard/index" options={{}} />
-            <Stack.Screen name="admin/logout/index" options={{}} />
-          </Stack>
+          <CollectionsProvider>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+              }}
+            >
+              <Stack.Screen name="index" options={{}} />
+              <Stack.Screen name="login" options={{}} />
+              <Stack.Screen name="registro" options={{}} />
+              <Stack.Screen name="(home)" options={{}} />
+              <Stack.Screen name="business" options={{ headerShown: false }} />
+              <Stack.Screen name="admin/login/index" options={{}} />
+              <Stack.Screen name="admin/dashboard/index" options={{}} />
+              <Stack.Screen name="admin/logout/index" options={{}} />
+            </Stack>
+          </CollectionsProvider>
         </UserLocationProvider>
       </AuthProvider>
       {/* sileo Toaster: renders via Portal into document.body, outside any overflow:hidden container */}

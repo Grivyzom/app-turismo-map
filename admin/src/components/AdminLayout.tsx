@@ -13,6 +13,7 @@ import {
   Pin,
   Settings,
   Sparkles,
+  Star,
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { Tooltip } from 'react-tooltip'
@@ -58,6 +59,7 @@ export default function AdminLayout() {
     { to: '/empresas', icon: Building2, label: 'Empresas Suscritas' },
     { to: '/audit-log', icon: ScrollText, label: 'Log de Auditoría' },
     { to: '/sileo', icon: Sparkles, label: 'Sileo Toasts' },
+    { to: '/ratings', icon: Star, label: 'Valoraciones' },
   ]
 
   return (

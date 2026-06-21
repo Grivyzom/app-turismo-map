@@ -8,10 +8,12 @@ import MapPage from './pages/MapPage'
 import CompanyPage from './pages/CompanyPage'
 import SettingsPage from './pages/SettingsPage'
 import SileoPage from './pages/SileoPage'
+import RatingShowcasePage from './pages/RatingShowcasePage'
 import AdminLayout from './components/AdminLayout'
 import { Toaster } from 'sileo'
 import 'sileo/styles.css'
 import 'react-tooltip/dist/react-tooltip.css'
+
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { token, isLoading } = useAuth()
@@ -46,6 +48,7 @@ export default function App() {
           <Route path="/empresas" element={<CompanyPage />} />
           <Route path="/audit-log" element={<AuditLogPage />} />
           <Route path="/sileo" element={<SileoPage />} />
+          <Route path="/ratings" element={<RatingShowcasePage />} />
           <Route path="/configuracion" element={<SettingsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
