@@ -24,7 +24,8 @@ import { Collection, CollectionItem, COLLECTION_COLORS, COLLECTION_ICONS } from 
 interface CollectionsFloatingIslandProps {
   visible: boolean;
   onClose: () => void;
-  mapComponent: React.ReactNode; // Componente mapa a renderizar
+  mapComponent: React.ReactNode;
+  onCollectionItemSelect?: (item: CollectionItem) => void;
 }
 
 const COLORS = {
@@ -41,6 +42,7 @@ export const CollectionsFloatingIsland = React.memo(function CollectionsFloating
   visible,
   onClose,
   mapComponent,
+  onCollectionItemSelect,
 }: CollectionsFloatingIslandProps) {
   const {
     collections,
@@ -262,6 +264,12 @@ export const CollectionsFloatingIsland = React.memo(function CollectionsFloating
           {/* Map */}
           <View style={styles.mapSection}>
             {mapComponent}
+            {/* Collection Items Overlay Pins */}
+            <CollectionMapPins
+              items={items}
+              collectionColor={selectedCollection?.color}
+              onItemPress={onCollectionItemSelect}
+            />
           </View>
 
           {/* Items List */}
@@ -312,6 +320,47 @@ export const CollectionsFloatingIsland = React.memo(function CollectionsFloating
         )}
       </Pressable>
     </Pressable>
+  );
+});
+
+const CollectionMapPins = React.memo(function CollectionMapPins({
+  items,
+  collectionColor,
+  onItemPress,
+}: {
+  items: CollectionItem[];
+  collectionColor?: string;
+  onItemPress?: (item: CollectionItem) => void;
+}) {
+  return (
+    <View style={styles.mapPinsContainer} pointerEvents="box-none">
+      {items.map(item => (
+        <TouchableOpacity
+          key={item.id}
+          style={[
+            styles.mapPin,
+            {
+              left: `${((item.longitude + 180) / 360) * 100}%`,
+              top: `${((90 - item.latitude) / 180) * 100}%`,
+            },
+          ]}
+          onPress={() => onItemPress?.(item)}
+          activeOpacity={0.7}
+        >
+          <View
+            style={[
+              styles.mapPinInner,
+              { backgroundColor: collectionColor || COLORS.accent },
+            ]}
+          />
+          <View style={styles.mapPinTooltip}>
+            <Text style={styles.mapPinTooltipText} numberOfLines={1}>
+              {item.title}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      ))}
+    </View>
   );
 });
 
@@ -684,6 +733,51 @@ const styles = StyleSheet.create({
   mapSection: {
     flex: 1.5,
     backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  mapPinsContainer: {
+    ...StyleSheet.absoluteFill,
+    pointerEvents: 'box-none',
+  },
+  mapPin: {
+    position: 'absolute',
+    width: 32,
+    height: 32,
+    marginLeft: -16,
+    marginTop: -40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mapPinInner: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: COLORS.bg,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  mapPinTooltip: {
+    position: 'absolute',
+    top: -32,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    minWidth: 80,
+    maxWidth: 150,
+  },
+  mapPinTooltipText: {
+    fontSize: 11,
+    color: COLORS.text,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   listSection: {
     flex: 1,

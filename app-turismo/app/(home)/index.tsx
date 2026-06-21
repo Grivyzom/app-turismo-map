@@ -2160,6 +2160,9 @@ export default function HomeScreen() {
             activeNestedZone={null}
           />
         }
+        onCollectionItemSelect={(item) => {
+          setCenterTrigger(prev => prev + 1);
+        }}
       />
     </SafeAreaView>
   );
