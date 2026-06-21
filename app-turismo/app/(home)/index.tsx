@@ -2124,45 +2124,6 @@ export default function HomeScreen() {
       <CollectionsFloatingIsland
         visible={showCollectionsIsland}
         onClose={() => setShowCollectionsIsland(false)}
-        mapComponent={
-          <MapContainer
-            events={filteredEvents}
-            selectedEvent={null}
-            onSelectEvent={() => {}}
-            mapLayer={mapLayer}
-            centerTrigger={centerTrigger}
-            tacticalMode={false}
-            onTacticalLocationChange={() => {}}
-            onMapPincho={() => {}}
-            mapPincho={null}
-            zoom={zoom}
-            onZoomChange={setZoom}
-            onBoundsChange={setMapBounds}
-            activeFloor={activeFloor}
-            showTraffic={showTraffic}
-            showCycleways={showCycleways}
-            cyclewaysData={cycleways}
-            showSectors={showSectors}
-            sectorsData={sectors}
-            visibleSectorIds={visibleSectorIds}
-            onSectorPress={() => {}}
-            showWeather={showWeather}
-            weatherType={weatherType}
-            isFrozen={false}
-            onSaveLocation={() => {}}
-            isRoutingActive={false}
-            routingType="single_target"
-            draftRoutePoints={[]}
-            onMapClickForRouting={() => {}}
-            isRouteFinished={false}
-            savedRoutes={[]}
-            onRateRoute={() => {}}
-            activeNestedZone={null}
-          />
-        }
-        onCollectionItemSelect={(item) => {
-          setCenterTrigger(prev => prev + 1);
-        }}
       />
     </SafeAreaView>
   );
