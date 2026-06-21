@@ -103,16 +103,18 @@ export function useHomeScreenState(token: string | null) {
       if (response.ok) {
         const data = await response.json();
         const safeData = Array.isArray(data) ? data : [];
-        setSectors(prev => {
+        setSectors((prev) => {
           // If this is the first time we're setting sectors, initialize visibility
           if (prev.length === 0 && safeData.length > 0) {
             setVisibleSectorIds(safeData.map((s: any) => s.id));
           } else {
             // Check for new sectors added since last poll and make them visible by default
             const existingIds = new Set(prev.map((s: any) => s.id));
-            const newIds = safeData.filter((s: any) => !existingIds.has(s.id)).map((s: any) => s.id);
+            const newIds = safeData
+              .filter((s: any) => !existingIds.has(s.id))
+              .map((s: any) => s.id);
             if (newIds.length > 0) {
-              setVisibleSectorIds(currentIds => [...currentIds, ...newIds]);
+              setVisibleSectorIds((currentIds) => [...currentIds, ...newIds]);
             }
           }
           return safeData;
@@ -126,11 +128,11 @@ export function useHomeScreenState(token: string | null) {
   useEffect(() => {
     // Initial fetch
     fetchSectors();
-    
+
     // Auto-refresh every 15 seconds
     const interval = setInterval(() => {
       fetchSectors();
-      
+
       const fetchCycleways = async () => {
         try {
           const baseUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8080';
@@ -145,7 +147,7 @@ export function useHomeScreenState(token: string | null) {
       };
       fetchCycleways();
     }, 15000);
-    
+
     return () => clearInterval(interval);
   }, [fetchSectors]);
   const [weatherType, setWeatherType] = useState<
@@ -201,7 +203,7 @@ export function useHomeScreenState(token: string | null) {
     loadUserProfile().then((profile) => {
       setUserProfile(profile);
       setSelectedCategory('todos');
-      
+
       let initialViewMode: 'local' | 'tourist' = 'local';
       if (profile) {
         const castProfile = profile as any;
@@ -258,7 +260,10 @@ export function useHomeScreenState(token: string | null) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [showNotificationTray, setShowNotificationTray] = useState(false);
   // activeToast: used only on native. On web, sileo handles display via DOM portal.
-  const [activeToast, setActiveToast] = useState<{ message: string; type: AppNotification['type'] } | null>(null);
+  const [activeToast, setActiveToast] = useState<{
+    message: string;
+    type: AppNotification['type'];
+  } | null>(null);
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const showNotification = useCallback(
@@ -299,14 +304,17 @@ export function useHomeScreenState(token: string | null) {
     [],
   );
 
-  const handleSetTab = useCallback((tab: TabType) => {
-    if (!token && ['profile', 'feed', 'saved', 'forum'].includes(tab)) {
-      showNotification('Inicia sesión para usar esta sección', 'warning');
-      router.push('/ingresar');
-      return;
-    }
-    setRawActiveTab(tab);
-  }, [token, showNotification]);
+  const handleSetTab = useCallback(
+    (tab: TabType) => {
+      if (!token && ['profile', 'feed', 'saved', 'forum'].includes(tab)) {
+        showNotification('Inicia sesión para usar esta sección', 'warning');
+        router.push('/ingresar');
+        return;
+      }
+      setRawActiveTab(tab);
+    },
+    [token, showNotification],
+  );
   const [panelSlide] = useState(() => new Animated.Value(0));
   const [showRightSheet, setShowRightSheet] = useState(false);
   const [rightSheetSlide] = useState(() => new Animated.Value(0));
@@ -340,7 +348,7 @@ export function useHomeScreenState(token: string | null) {
           const joinChar = url.includes('?') ? '&' : '?';
           url += `${joinChar}minLat=${bounds.minLat}&maxLat=${bounds.maxLat}&minLng=${bounds.minLng}&maxLng=${bounds.maxLng}`;
         }
-        
+
         if (activeNestedZone) {
           const joinChar = url.includes('?') ? '&' : '?';
           url += `${joinChar}zoneId=${activeNestedZone.id}`;
@@ -574,7 +582,8 @@ export function useHomeScreenState(token: string | null) {
         time,
         address,
         attendeesCount: Math.floor(Math.random() * 30),
-        imageUrl: imageUrl ||
+        imageUrl:
+          imageUrl ||
           'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&q=80&w=800',
         isRealTime: true,
         status: 'agendado',
@@ -627,12 +636,9 @@ export function useHomeScreenState(token: string | null) {
     [showNotification],
   );
 
-  const handleVoicePartialSearch = useCallback(
-    (text: string) => {
-      setSearchQuery(text);
-    },
-    [],
-  );
+  const handleVoicePartialSearch = useCallback((text: string) => {
+    setSearchQuery(text);
+  }, []);
 
   const injectSimulationEvent = useCallback((type: 'embarcacion' | 'accidente' | 'incendio') => {
     let title = 'Evento simulado';
@@ -655,27 +661,29 @@ export function useHomeScreenState(token: string | null) {
       boatHeading: type === 'embarcacion' ? 0 : undefined,
     };
 
-    setEvents(prev => [...prev, newEvent]);
+    setEvents((prev) => [...prev, newEvent]);
     showNotificationRef.current(`${title} inyectado`, 'success');
   }, []);
 
   const moveSimulationEvent = useCallback((id: string, deltaLat: number, deltaLng: number) => {
-    setEvents(prev => prev.map(e => {
-      if (e.id === id) {
-        let newHeading = e.boatHeading;
-        if (e.category === 'embarcacion') {
-          const angle = Math.atan2(deltaLng, deltaLat) * (180 / Math.PI);
-          newHeading = angle;
+    setEvents((prev) =>
+      prev.map((e) => {
+        if (e.id === id) {
+          let newHeading = e.boatHeading;
+          if (e.category === 'embarcacion') {
+            const angle = Math.atan2(deltaLng, deltaLat) * (180 / Math.PI);
+            newHeading = angle;
+          }
+          return {
+            ...e,
+            latitude: e.latitude + deltaLat,
+            longitude: e.longitude + deltaLng,
+            boatHeading: newHeading,
+          };
         }
-        return {
-          ...e,
-          latitude: e.latitude + deltaLat,
-          longitude: e.longitude + deltaLng,
-          boatHeading: newHeading,
-        };
-      }
-      return e;
-    }));
+        return e;
+      }),
+    );
   }, []);
 
   const triggerWebSocketEvent = useCallback(() => {
@@ -891,7 +899,12 @@ export function useHomeScreenState(token: string | null) {
   };
 
   useEffect(() => {
-    if (isRoutingActive && (routingType === 'single_target' || routingType === 'ciclovia' || routingType === 'sector') && draftRoutePoints.length === 0 && userLocation) {
+    if (
+      isRoutingActive &&
+      (routingType === 'single_target' || routingType === 'ciclovia' || routingType === 'sector') &&
+      draftRoutePoints.length === 0 &&
+      userLocation
+    ) {
       setDraftRoutePoints([
         {
           latitude: userLocation.latitude,
@@ -925,18 +938,23 @@ export function useHomeScreenState(token: string | null) {
           setIsRouteFinished(true);
           showNotification('Ruta directa completada', 'success');
         }
-      } else if (routingType === 'single_target' || routingType === 'ciclovia' || routingType === 'sector' || routingType === 'measure') {
+      } else if (
+        routingType === 'single_target' ||
+        routingType === 'ciclovia' ||
+        routingType === 'sector' ||
+        routingType === 'measure'
+      ) {
         // En Objetivo Único, el origen es dinámico (podríamos pedirlo o usar GPS)
-        // Por simplicidad del brief, el primer clic si no hay nada es el destino? 
+        // Por simplicidad del brief, el primer clic si no hay nada es el destino?
         // No, el brief dice "Origen Dinámico: El sistema toma la ubicación GPS actual".
         // Pero si no hay GPS, permitamos el primer clic como origen.
         if (draftRoutePoints.length === 0) {
           newPoint.type = 'origin';
           setDraftRoutePoints([newPoint]);
         } else {
-          // Clics intermedios son waypoints (giros). 
+          // Clics intermedios son waypoints (giros).
           // El usuario debe "Finalizar" manualmente o el último clic es destino?
-          // El brief dice "El último clic define el punto final". 
+          // El brief dice "El último clic define el punto final".
           // Así que seguimos agregando waypoints hasta que el usuario decida que el último es destino.
           setDraftRoutePoints((prev) => [...prev, newPoint]);
         }
@@ -978,7 +996,11 @@ export function useHomeScreenState(token: string | null) {
       setDraftRoutePoints([]);
       return;
     }
-    if ((routingType !== 'single_target' && routingType !== 'ciclovia' && routingType !== 'sector') || draftRoutePoints.length < (routingType === 'sector' ? 3 : 2)) return;
+    if (
+      (routingType !== 'single_target' && routingType !== 'ciclovia' && routingType !== 'sector') ||
+      draftRoutePoints.length < (routingType === 'sector' ? 3 : 2)
+    )
+      return;
     setDraftRoutePoints((prev) => {
       const last = prev[prev.length - 1];
       const newPoints = [...prev];
@@ -986,44 +1008,65 @@ export function useHomeScreenState(token: string | null) {
       return newPoints;
     });
     setIsRouteFinished(true);
-    showNotification(routingType === 'ciclovia' ? 'Ciclovía trazada exitosamente' : routingType === 'sector' ? 'Polígono cerrado exitosamente' : 'Ruta de objetivo único finalizada', 'success');
+    showNotification(
+      routingType === 'ciclovia'
+        ? 'Ciclovía trazada exitosamente'
+        : routingType === 'sector'
+          ? 'Polígono cerrado exitosamente'
+          : 'Ruta de objetivo único finalizada',
+      'success',
+    );
   }, [routingType, draftRoutePoints, showNotification]);
 
   const saveRoute = useCallback(async () => {
     if (!draftRouteName) {
-      showNotification(routingType === 'sector' ? 'Debes asignar un nombre al sector' : 'Debes asignar un nombre a la ruta', 'warning');
+      showNotification(
+        routingType === 'sector'
+          ? 'Debes asignar un nombre al sector'
+          : 'Debes asignar un nombre a la ruta',
+        'warning',
+      );
       return;
     }
 
     try {
       const baseUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8080';
-      const endpoint = routingType === 'sector' ? `${baseUrl}/api/v1/zones` : `${baseUrl}/api/v1/routes`;
-      const bodyPayload = routingType === 'sector'
-        ? {
-            name: draftRouteName,
-            description: "Sector creado desde el mapa",
-            category: routeCategory || 'edificio',
-            color: routeCategory === 'edificio' ? '#6366F1' : routeCategory === 'reserva' ? '#22C55E' : routeCategory === 'subzona' ? '#A855F7' : '#EAB308',
-            points: draftRoutePoints.map((p, i) => ({
-              latitude: p.latitude,
-              longitude: p.longitude,
-              orderIndex: i,
-              pointType: p.type,
-            })),
-          }
-        : {
-            name: draftRouteName,
-            type: routingType,
-            category: routeCategory,
-            targetAudience: 'all',
-            points: draftRoutePoints.map((p, i) => ({
-              latitude: p.latitude,
-              longitude: p.longitude,
-              orderIndex: i,
-              pointType: p.type,
-              name: p.name || '',
-            })),
-          };
+      const endpoint =
+        routingType === 'sector' ? `${baseUrl}/api/v1/zones` : `${baseUrl}/api/v1/routes`;
+      const bodyPayload =
+        routingType === 'sector'
+          ? {
+              name: draftRouteName,
+              description: 'Sector creado desde el mapa',
+              category: routeCategory || 'edificio',
+              color:
+                routeCategory === 'edificio'
+                  ? '#6366F1'
+                  : routeCategory === 'reserva'
+                    ? '#22C55E'
+                    : routeCategory === 'subzona'
+                      ? '#A855F7'
+                      : '#EAB308',
+              points: draftRoutePoints.map((p, i) => ({
+                latitude: p.latitude,
+                longitude: p.longitude,
+                orderIndex: i,
+                pointType: p.type,
+              })),
+            }
+          : {
+              name: draftRouteName,
+              type: routingType,
+              category: routeCategory,
+              targetAudience: 'all',
+              points: draftRoutePoints.map((p, i) => ({
+                latitude: p.latitude,
+                longitude: p.longitude,
+                orderIndex: i,
+                pointType: p.type,
+                name: p.name || '',
+              })),
+            };
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -1035,7 +1078,10 @@ export function useHomeScreenState(token: string | null) {
       });
 
       if (response.ok) {
-        showNotification(routingType === 'sector' ? 'Sector guardado exitosamente' : 'Ruta guardada exitosamente', 'success');
+        showNotification(
+          routingType === 'sector' ? 'Sector guardado exitosamente' : 'Ruta guardada exitosamente',
+          'success',
+        );
         setIsRoutingActive(false);
         setDraftRoutePoints([]);
         setDraftRouteName('');
@@ -1046,7 +1092,10 @@ export function useHomeScreenState(token: string | null) {
           fetchSavedRoutes();
         }
       } else {
-        showNotification(routingType === 'sector' ? 'Error al guardar el sector' : 'Error al guardar la ruta', 'error');
+        showNotification(
+          routingType === 'sector' ? 'Error al guardar el sector' : 'Error al guardar la ruta',
+          'error',
+        );
       }
     } catch (error) {
       console.error('Error saving:', error);
@@ -1062,49 +1111,55 @@ export function useHomeScreenState(token: string | null) {
     showNotification('Trazado de ruta cancelado');
   }, [showNotification]);
 
-  const rateRoute = useCallback(async (routeId: string, rating: number, comment?: string) => {
-    if (!token) {
-      showNotification('Inicia sesión para calificar rutas', 'warning');
-      router.push('/ingresar');
-      return;
-    }
-
-    try {
-      const baseUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8080';
-      const response = await fetch(`${baseUrl}/api/v1/routes/${routeId}/rate`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ rating, comment }),
-      });
-
-      if (response.ok) {
-        showNotification('¡Gracias por calificar la ruta!', 'success');
-        fetchSavedRoutes(); // Refrescar promedio en el mapa
-      } else {
-        showNotification('Error al enviar calificación', 'error');
+  const rateRoute = useCallback(
+    async (routeId: string, rating: number, comment?: string) => {
+      if (!token) {
+        showNotification('Inicia sesión para calificar rutas', 'warning');
+        router.push('/ingresar');
+        return;
       }
-    } catch (error) {
-      console.error('Error rating route:', error);
-      showNotification('Error de conexión', 'error');
-    }
-  }, [token, showNotification, fetchSavedRoutes]);
 
-  const handleSelectEvent = useCallback((event: TurismoEvent | null) => {
-    // If routing is active, clicking an event adds it as a waypoint/target
-    if (isRoutingActive) {
-      if (event && !isRouteFinished) {
-        handleMapClickForRouting({ latitude: event.latitude, longitude: event.longitude });
+      try {
+        const baseUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8080';
+        const response = await fetch(`${baseUrl}/api/v1/routes/${routeId}/rate`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ rating, comment }),
+        });
+
+        if (response.ok) {
+          showNotification('¡Gracias por calificar la ruta!', 'success');
+          fetchSavedRoutes(); // Refrescar promedio en el mapa
+        } else {
+          showNotification('Error al enviar calificación', 'error');
+        }
+      } catch (error) {
+        console.error('Error rating route:', error);
+        showNotification('Error de conexión', 'error');
       }
-      return;
-    }
-    if (event) {
-      setMapPincho(null);
-    }
-    setSelectedEvent(event);
-  }, [isRoutingActive, isRouteFinished, handleMapClickForRouting]);
+    },
+    [token, showNotification, fetchSavedRoutes],
+  );
+
+  const handleSelectEvent = useCallback(
+    (event: TurismoEvent | null) => {
+      // If routing is active, clicking an event adds it as a waypoint/target
+      if (isRoutingActive) {
+        if (event && !isRouteFinished) {
+          handleMapClickForRouting({ latitude: event.latitude, longitude: event.longitude });
+        }
+        return;
+      }
+      if (event) {
+        setMapPincho(null);
+      }
+      setSelectedEvent(event);
+    },
+    [isRoutingActive, isRouteFinished, handleMapClickForRouting],
+  );
 
   return {
     events,
@@ -1146,7 +1201,7 @@ export function useHomeScreenState(token: string | null) {
     isTacticalModeActive,
     setIsTacticalModeActive,
     showZoomSlider,
-            setShowZoomSlider,
+    setShowZoomSlider,
     activeNestedZone,
     setActiveNestedZone,
     selectedSector,

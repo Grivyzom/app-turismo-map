@@ -274,17 +274,14 @@ export default function Onboarding() {
 
       // 4. Sincronizar con el perfil del usuario si está autenticado
       if (token) {
-        const response = await fetch(
-          `${getBackendUrl()}/api/v1/profile/preferences`,
-          {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(preferencesPayload),
+        const response = await fetch(`${getBackendUrl()}/api/v1/profile/preferences`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
           },
-        );
+          body: JSON.stringify(preferencesPayload),
+        });
 
         if (!response.ok) {
           console.warn('Backend sync failed, saving only locally');
@@ -314,8 +311,11 @@ export default function Onboarding() {
 
       <ScrollView
         contentContainerStyle={[
-          styles.scrollContent, 
-          { paddingTop: Math.max(insets.top, 20) + 40, paddingBottom: Math.max(insets.bottom, 20) + 80 }
+          styles.scrollContent,
+          {
+            paddingTop: Math.max(insets.top, 20) + 40,
+            paddingBottom: Math.max(insets.bottom, 20) + 80,
+          },
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"

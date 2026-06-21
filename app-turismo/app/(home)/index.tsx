@@ -57,10 +57,10 @@ import { CoordsEditorHUD } from '../../src/components/MapUI/CoordsEditorHUD';
 import { CategoryFilter, CATEGORY_ICONS, MAP_LAYER_OPTIONS } from '../../src/data/mockEvents';
 import { ContextualSurveyWidget } from '../../src/components/ui/ContextualSurveyWidget';
 import { useAuth } from '../../src/context/AuthContext';
+import { lazyWithRetry } from '../../src/utils/lazyWithRetry';
 
 import { useHomeScreenState } from './useHomeScreenState';
 import { styles } from './styles';
-import { lazyWithRetry } from '../../src/utils/lazyWithRetry';
 
 // --- Lazy-loaded screens ---
 const UserProfileScreen = lazyWithRetry(() => import('../../src/screens/UserProfileScreen'));
@@ -86,7 +86,14 @@ interface MapLayerMenuProps {
 const MapLayerMenu: React.FC<MapLayerMenuProps> = ({ currentLayer, onSelectLayer, isReady }) => {
   return (
     <View style={{ marginTop: 16, paddingHorizontal: 16 }}>
-      <Text style={[styles.filterSectionTitle, { paddingHorizontal: 0, marginBottom: 8, color: '#94A3B8' }]}>Capa del Mapa</Text>
+      <Text
+        style={[
+          styles.filterSectionTitle,
+          { paddingHorizontal: 0, marginBottom: 8, color: '#94A3B8' },
+        ]}
+      >
+        Capa del Mapa
+      </Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
         {MAP_LAYER_OPTIONS.map((layer) => {
           const IconComponent = layer.iconFamily === 'Ionicons' ? Ionicons : MaterialIcons;
@@ -94,7 +101,11 @@ const MapLayerMenu: React.FC<MapLayerMenuProps> = ({ currentLayer, onSelectLayer
           return (
             <TouchableOpacity
               key={layer.key}
-              style={[styles.layerChip, isActive && styles.activeLayerChip, { flex: 1, minWidth: 80 }]}
+              style={[
+                styles.layerChip,
+                isActive && styles.activeLayerChip,
+                { flex: 1, minWidth: 80 },
+              ]}
               onPress={() => onSelectLayer(layer.key)}
               disabled={!isReady}
             >
@@ -261,31 +272,45 @@ export default function HomeScreen() {
 
   const isInformative = selectedEvent?.category?.toLowerCase() === 'fauna';
 
-  const handleSectorPress = useCallback((zone: any) => {
-    // Verificar si hay un evento con minimodal en esta misma ubicación (ej: Carabinero)
-    const minimodalCategories = ['hospital', 'universidad', 'bombero', 'carabinero', 'camara', 'fauna'];
-    const matchingEvent = filteredEvents.find((ev) => {
-      if (!minimodalCategories.includes(ev.category?.toLowerCase() || '')) return false;
-      
-      const zoneLat = zone.latitude || (zone.geojson && zone.geojson.coordinates ? zone.geojson.coordinates[0][0][1] : 0);
-      const zoneLng = zone.longitude || (zone.geojson && zone.geojson.coordinates ? zone.geojson.coordinates[0][0][0] : 0);
-      
-      const latDiff = Math.abs((ev.latitude || 0) - zoneLat);
-      const lngDiff = Math.abs((ev.longitude || 0) - zoneLng);
-      
-      // Si están a menos de ~100 metros de distancia, asumimos que es el mismo edificio
-      return latDiff < 0.001 && lngDiff < 0.001;
-    });
+  const handleSectorPress = useCallback(
+    (zone: any) => {
+      // Verificar si hay un evento con minimodal en esta misma ubicación (ej: Carabinero)
+      const minimodalCategories = [
+        'hospital',
+        'universidad',
+        'bombero',
+        'carabinero',
+        'camara',
+        'fauna',
+      ];
+      const matchingEvent = filteredEvents.find((ev) => {
+        if (!minimodalCategories.includes(ev.category?.toLowerCase() || '')) return false;
 
-    if (matchingEvent) {
-      handleSelectEvent(matchingEvent);
-      return;
-    }
+        const zoneLat =
+          zone.latitude ||
+          (zone.geojson && zone.geojson.coordinates ? zone.geojson.coordinates[0][0][1] : 0);
+        const zoneLng =
+          zone.longitude ||
+          (zone.geojson && zone.geojson.coordinates ? zone.geojson.coordinates[0][0][0] : 0);
 
-    if (zone.category === 'edificio' || zone.category === 'reserva') {
-      setSelectedSector(zone);
-    }
-  }, [setSelectedSector, filteredEvents, handleSelectEvent]);
+        const latDiff = Math.abs((ev.latitude || 0) - zoneLat);
+        const lngDiff = Math.abs((ev.longitude || 0) - zoneLng);
+
+        // Si están a menos de ~100 metros de distancia, asumimos que es el mismo edificio
+        return latDiff < 0.001 && lngDiff < 0.001;
+      });
+
+      if (matchingEvent) {
+        handleSelectEvent(matchingEvent);
+        return;
+      }
+
+      if (zone.category === 'edificio' || zone.category === 'reserva') {
+        setSelectedSector(zone);
+      }
+    },
+    [setSelectedSector, filteredEvents, handleSelectEvent],
+  );
 
   const handleExploreSector = useCallback(() => {
     if (selectedSector) {
@@ -298,15 +323,18 @@ export default function HomeScreen() {
     setSelectedSector(null);
   }, []);
 
-  const handleSaveLocation = useCallback((data: any) => {
-    if (!token) {
-      showNotification('Inicia sesión para guardar ubicaciones', 'warning');
-      router.push('/ingresar');
-      return;
-    }
-    setLocationToSave(data);
-    setCollectionModalVisible(true);
-  }, [token, showNotification]);
+  const handleSaveLocation = useCallback(
+    (data: any) => {
+      if (!token) {
+        showNotification('Inicia sesión para guardar ubicaciones', 'warning');
+        router.push('/ingresar');
+        return;
+      }
+      setLocationToSave(data);
+      setCollectionModalVisible(true);
+    },
+    [token, showNotification],
+  );
 
   const handleSaveSector = useCallback(() => {
     if (!selectedSector) return;
@@ -343,7 +371,10 @@ export default function HomeScreen() {
   );
 
   const showMainUI = activeTab === 'map';
-  const isModalOpen = (!!selectedEvent && selectedEvent.category?.toLowerCase() !== 'camara') || !!mapPincho || (isDesktop && activeTab !== 'map');
+  const isModalOpen =
+    (!!selectedEvent && selectedEvent.category?.toLowerCase() !== 'camara') ||
+    !!mapPincho ||
+    (isDesktop && activeTab !== 'map');
 
   const [isSidebarHovered, setIsSidebarHovered] = React.useState(false);
   const [isSidebarPinned, setIsSidebarPinned] = React.useState(true);
@@ -738,7 +769,7 @@ export default function HomeScreen() {
             right: 16,
             left: modalShiftAnim.interpolate({
               inputRange: [0, 1],
-              outputRange: [16, 104] // 104px avoids the 88px expanded sidebar + 16px gap
+              outputRange: [16, 104], // 104px avoids the 88px expanded sidebar + 16px gap
             }),
             zIndex: 4000,
           }}
@@ -757,7 +788,7 @@ export default function HomeScreen() {
         style={[
           styles.topBarWrapper,
           isDesktop && isModalOpen && { left: 0, paddingLeft: 16 },
-          { zIndex: 6000 } // Elevate TopAppBar above FloatingIsland to keep navigation accessible
+          { zIndex: 6000 }, // Elevate TopAppBar above FloatingIsland to keep navigation accessible
         ]}
         pointerEvents="box-none"
       >
@@ -766,33 +797,38 @@ export default function HomeScreen() {
             //@ts-ignore
             onMouseEnter={() => isDesktop && isModalOpen && setIsSidebarHovered(true)}
             onMouseLeave={() => isDesktop && isModalOpen && setIsSidebarHovered(false)}
-            style={[{
-              position: 'absolute',
-              top: 0,
-              bottom: 0,
-              left: 0,
-              width: isSidebarVisible ? 120 : 24, // 24px invisible edge. When open, cover sidebar area to keep it hovered.
-              zIndex: 1, // Just behind TopAppBar
-              backgroundColor: isSidebarVisible ? 'transparent' : 'rgba(30,30,30,0.4)', // Subtle hint when hidden
-              borderRightWidth: isSidebarVisible ? 0 : 1,
-              borderRightColor: 'rgba(255,255,255,0.08)',
-              borderTopRightRadius: isSidebarVisible ? 0 : 16,
-              borderBottomRightRadius: isSidebarVisible ? 0 : 16,
-            }, { cursor: isSidebarPinned ? 'default' : 'pointer' } as any]}
+            style={[
+              {
+                position: 'absolute',
+                top: 0,
+                bottom: 0,
+                left: 0,
+                width: isSidebarVisible ? 120 : 24, // 24px invisible edge. When open, cover sidebar area to keep it hovered.
+                zIndex: 1, // Just behind TopAppBar
+                backgroundColor: isSidebarVisible ? 'transparent' : 'rgba(30,30,30,0.4)', // Subtle hint when hidden
+                borderRightWidth: isSidebarVisible ? 0 : 1,
+                borderRightColor: 'rgba(255,255,255,0.08)',
+                borderTopRightRadius: isSidebarVisible ? 0 : 16,
+                borderBottomRightRadius: isSidebarVisible ? 0 : 16,
+              },
+              { cursor: isSidebarPinned ? 'default' : 'pointer' } as any,
+            ]}
             onPress={() => setIsSidebarPinned(!isSidebarPinned)}
           >
             {/* Visual cue indicator */}
             {!isSidebarVisible && (
-              <View style={{
-                position: 'absolute',
-                top: '50%',
-                marginTop: -20,
-                left: 8,
-                width: 4,
-                height: 40,
-                borderRadius: 2,
-                backgroundColor: 'rgba(255,255,255,0.3)',
-              }} />
+              <View
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  marginTop: -20,
+                  left: 8,
+                  width: 4,
+                  height: 40,
+                  borderRadius: 2,
+                  backgroundColor: 'rgba(255,255,255,0.3)',
+                }}
+              />
             )}
           </Pressable>
         )}
@@ -895,13 +931,15 @@ export default function HomeScreen() {
             onPress={() => {
               handleToggleViewMode();
               showNotification(
-                viewMode === 'local' ? 'Modo Explorador (Turismo) activado.' : 'Modo Ciudadano (Local) activado.',
-                'info'
+                viewMode === 'local'
+                  ? 'Modo Explorador (Turismo) activado.'
+                  : 'Modo Ciudadano (Local) activado.',
+                'info',
               );
             }}
             activeOpacity={0.7}
             accessibilityRole="button"
-            accessibilityLabel={viewMode === 'local' ? "Modo Local activo" : "Modo Turista activo"}
+            accessibilityLabel={viewMode === 'local' ? 'Modo Local activo' : 'Modo Turista activo'}
           >
             <MaterialIcons
               name={viewMode === 'tourist' ? 'explore' : 'home'}
@@ -909,7 +947,6 @@ export default function HomeScreen() {
               color={viewMode === 'tourist' ? '#F59E0B' : '#10B981'}
             />
           </TouchableOpacity>
-
         </View>
       )}
 
@@ -980,47 +1017,69 @@ export default function HomeScreen() {
       {/* Menú de Herramientas Flotante (State-based) */}
       {showMainUI && !activeNestedZone && <WeatherForecastWidget isDark={mapLayer === 'dark'} />}
 
-
-      
       {/* HUD for Nested Zone Exit with Vertical Floor Selector */}
       {activeNestedZone && (
-        <View style={{
-          position: 'absolute',
-          top: insets.top + (isDesktop ? 20 : 70), // On desktop, keep it high up; mobile needs space for notch
-          left: isDesktop ? 104 : 20, // Prevents overlap with the sidebar
-          right: 20,
-          zIndex: 999,
-        }}>
-          <View style={{
-            backgroundColor: 'rgba(15, 23, 42, 0.85)', // Glassmorphism base
-            borderRadius: 16,
-            padding: 16,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            borderWidth: 1,
-            borderColor: 'rgba(255, 255, 255, 0.1)', // Subtle border matching sidebar
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 10 },
-            shadowOpacity: 0.4,
-            shadowRadius: 20,
-            elevation: 10,
-            ...Platform.select({ web: { backdropFilter: 'blur(12px)' } as any }) // Glassmorphism blur
-          }}>
+        <View
+          style={{
+            position: 'absolute',
+            top: insets.top + (isDesktop ? 20 : 70), // On desktop, keep it high up; mobile needs space for notch
+            left: isDesktop ? 104 : 20, // Prevents overlap with the sidebar
+            right: 20,
+            zIndex: 999,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: 'rgba(15, 23, 42, 0.85)', // Glassmorphism base
+              borderRadius: 16,
+              padding: 16,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              borderWidth: 1,
+              borderColor: 'rgba(255, 255, 255, 0.1)', // Subtle border matching sidebar
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 10 },
+              shadowOpacity: 0.4,
+              shadowRadius: 20,
+              elevation: 10,
+              ...Platform.select({ web: { backdropFilter: 'blur(12px)' } as any }), // Glassmorphism blur
+            }}
+          >
             <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <View style={{ 
-                width: 4, 
-                height: 30, 
-                backgroundColor: '#38BDF8', 
-                borderRadius: 2,
-              }} />
+              <View
+                style={{
+                  width: 4,
+                  height: 30,
+                  backgroundColor: '#38BDF8',
+                  borderRadius: 2,
+                }}
+              />
               <View>
-                <Text style={{ color: '#9CA3AF', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: '600', marginBottom: 2 }}>Estás viendo</Text>
-                <Text style={{ color: '#F8FAFC', fontSize: 18, fontWeight: '800', letterSpacing: 0.5 }}>{activeNestedZone.name}</Text>
+                <Text
+                  style={{
+                    color: '#9CA3AF',
+                    fontSize: 10,
+                    textTransform: 'uppercase',
+                    letterSpacing: 1.5,
+                    fontWeight: '600',
+                    marginBottom: 2,
+                  }}
+                >
+                  Estás viendo
+                </Text>
+                <Text
+                  style={{ color: '#F8FAFC', fontSize: 18, fontWeight: '800', letterSpacing: 0.5 }}
+                >
+                  {activeNestedZone.name}
+                </Text>
               </View>
             </View>
-            <TouchableOpacity 
-              onPress={() => { setActiveNestedZone(null); setActiveFloor(null); }}
+            <TouchableOpacity
+              onPress={() => {
+                setActiveNestedZone(null);
+                setActiveFloor(null);
+              }}
               style={{
                 backgroundColor: 'rgba(239, 68, 68, 0.15)',
                 paddingHorizontal: 20,
@@ -1030,28 +1089,42 @@ export default function HomeScreen() {
                 borderColor: 'rgba(239, 68, 68, 0.5)',
                 flexDirection: 'row',
                 alignItems: 'center',
-                gap: 8
+                gap: 8,
               }}
             >
-              <Text style={{ color: '#EF4444', fontWeight: '700', letterSpacing: 0.5 }}>Salir del Edificio</Text>
+              <Text style={{ color: '#EF4444', fontWeight: '700', letterSpacing: 0.5 }}>
+                Salir del Edificio
+              </Text>
             </TouchableOpacity>
           </View>
 
           {/* Selector Vertical de Pisos */}
-          <View style={{
-            position: 'absolute',
-            top: 80, // Below the HUD
-            right: 0,
-            backgroundColor: 'rgba(15, 23, 42, 0.85)',
-            borderRadius: 12,
-            borderWidth: 1,
-            borderColor: 'rgba(255, 255, 255, 0.1)',
-            paddingVertical: 8,
-            alignItems: 'center',
-            ...Platform.select({ web: { backdropFilter: 'blur(10px)' } as any })
-          }}>
-            <Text style={{ color: '#9CA3AF', fontSize: 9, fontWeight: 'bold', marginBottom: 4, textTransform: 'uppercase' }}>Pisos</Text>
-            {[4, 3, 2, 1, 0].map(floor => {
+          <View
+            style={{
+              position: 'absolute',
+              top: 80, // Below the HUD
+              right: 0,
+              backgroundColor: 'rgba(15, 23, 42, 0.85)',
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: 'rgba(255, 255, 255, 0.1)',
+              paddingVertical: 8,
+              alignItems: 'center',
+              ...Platform.select({ web: { backdropFilter: 'blur(10px)' } as any }),
+            }}
+          >
+            <Text
+              style={{
+                color: '#9CA3AF',
+                fontSize: 9,
+                fontWeight: 'bold',
+                marginBottom: 4,
+                textTransform: 'uppercase',
+              }}
+            >
+              Pisos
+            </Text>
+            {[4, 3, 2, 1, 0].map((floor) => {
               const isActive = activeFloor === floor;
               return (
                 <TouchableOpacity
@@ -1063,15 +1136,21 @@ export default function HomeScreen() {
                     borderLeftWidth: 3,
                     borderLeftColor: isActive ? '#38BDF8' : 'transparent',
                     width: 50,
-                    alignItems: 'center'
+                    alignItems: 'center',
                   }}
                   activeOpacity={0.7}
                 >
-                  <Text style={{ color: isActive ? '#38BDF8' : '#D1D5DB', fontWeight: isActive ? 'bold' : '600', fontSize: 13 }}>
+                  <Text
+                    style={{
+                      color: isActive ? '#38BDF8' : '#D1D5DB',
+                      fontWeight: isActive ? 'bold' : '600',
+                      fontSize: 13,
+                    }}
+                  >
                     {floor === 0 ? 'PB' : `P${floor}`}
                   </Text>
                 </TouchableOpacity>
-              )
+              );
             })}
           </View>
 
@@ -1190,119 +1269,194 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               )}
             </View>
-            
-            <ScrollView 
+
+            <ScrollView
               style={{ flexShrink: 1, maxHeight: isDesktop ? 600 : '70%' }}
               contentContainerStyle={{ paddingBottom: 20 }}
               showsVerticalScrollIndicator={false}
               bounces={false}
             >
               <Text style={[styles.filterSectionTitle, { marginTop: 0 }]}>Categorías</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, marginBottom: 8 }}>
-              {(
-                [
-                  'todos',
-                  'ninguno',
-                  'gastronomia',
-                  'cultura',
-                  'naturaleza',
-                  'musica',
-                  'deportes',
-                  'publico',
-                  'emergencia',
-                  'embarcacion',
-                  'tienda',
-                ] as CategoryFilter[]
-              ).map((cat) => {
-                const iconData = CATEGORY_ICONS[cat];
-                const IconComponent = iconData.family === 'Ionicons' ? Ionicons : MaterialIcons;
-                const isActive = selectedCategory === cat;
-                return (
-                  <TouchableOpacity
-                    key={cat}
-                    style={[styles.categoryChip, isActive && styles.activeCategoryChip]}
-                    onPress={() => setSelectedCategory(cat)}
-                  >
-                    <IconComponent
-                      name={iconData.name}
-                      size={14}
-                      color={isActive ? '#FFFFFF' : '#CBD5E0'}
-                      style={{ marginRight: 6 }}
-                    />
-                    <Text style={[styles.categoryText, isActive && styles.activeCategoryText]}>
-                      {cat === 'ninguno'
-                        ? 'Ocultar Pines'
-                        : cat === 'embarcacion'
-                        ? 'Embarcaciones'
-                        : cat === 'emergencia'
-                          ? 'Emergencias'
-                          : cat.charAt(0).toUpperCase() + cat.slice(1)}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  paddingHorizontal: 16,
+                  marginBottom: 8,
+                }}
+              >
+                {(
+                  [
+                    'todos',
+                    'ninguno',
+                    'gastronomia',
+                    'cultura',
+                    'naturaleza',
+                    'musica',
+                    'deportes',
+                    'publico',
+                    'emergencia',
+                    'embarcacion',
+                    'tienda',
+                  ] as CategoryFilter[]
+                ).map((cat) => {
+                  const iconData = CATEGORY_ICONS[cat];
+                  const IconComponent = iconData.family === 'Ionicons' ? Ionicons : MaterialIcons;
+                  const isActive = selectedCategory === cat;
+                  return (
+                    <TouchableOpacity
+                      key={cat}
+                      style={[styles.categoryChip, isActive && styles.activeCategoryChip]}
+                      onPress={() => setSelectedCategory(cat)}
+                    >
+                      <IconComponent
+                        name={iconData.name}
+                        size={14}
+                        color={isActive ? '#FFFFFF' : '#CBD5E0'}
+                        style={{ marginRight: 6 }}
+                      />
+                      <Text style={[styles.categoryText, isActive && styles.activeCategoryText]}>
+                        {cat === 'ninguno'
+                          ? 'Ocultar Pines'
+                          : cat === 'embarcacion'
+                            ? 'Embarcaciones'
+                            : cat === 'emergencia'
+                              ? 'Emergencias'
+                              : cat.charAt(0).toUpperCase() + cat.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
 
               <Text style={styles.filterSectionTitle}>Herramientas</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, marginBottom: 8 }}>
-              <TouchableOpacity
-                style={[styles.toolChip, showNearbyEvents && styles.activeToolChip, { paddingHorizontal: 12 }]}
-                onPress={() => {
-                  setShowNearbyEvents(!showNearbyEvents);
-                  showNotification(!showNearbyEvents ? 'Calendario activado' : 'Calendario desactivado');
+              <View
+                style={{
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  paddingHorizontal: 16,
+                  marginBottom: 8,
                 }}
               >
-                <MaterialIcons name="calendar-today" size={16} color={showNearbyEvents ? '#34D399' : '#9CA3AF'} />
-                <Text style={[styles.toolChipText, showNearbyEvents && styles.activeToolChipText]}>Eventos</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[styles.toolChip, showTraffic && styles.activeToolChip, { paddingHorizontal: 12 }]}
-                onPress={() => {
-                  setShowTraffic(!showTraffic);
-                  showNotification(!showTraffic ? 'Tráfico en vivo activado' : 'Tráfico desactivado');
-                }}
-              >
-                <MaterialIcons name="traffic" size={16} color={showTraffic ? '#34D399' : '#9CA3AF'} />
-                <Text style={[styles.toolChipText, showTraffic && styles.activeToolChipText]}>Tráfico</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.toolChip, showCycleways && styles.activeToolChip, { paddingHorizontal: 12 }]}
-                onPress={() => {
-                  setShowCycleways(!showCycleways);
-                  showNotification(!showCycleways ? '🚲 Ciclovías activadas' : 'Ciclovías desactivadas');
-                }}
-              >
-                <MaterialIcons name="directions-bike" size={16} color={showCycleways ? '#34D399' : '#9CA3AF'} />
-                <Text style={[styles.toolChipText, showCycleways && styles.activeToolChipText]}>Ciclovías</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.toolChip, showSectors && styles.activeToolChip, { paddingHorizontal: 12 }]}
-                onPress={() => {
-                  setShowSectors(true);
-                  setShowSectorsConfig(true);
-                  setShowFilters(false);
-                }}
-              >
-                <MaterialIcons name="layers" size={16} color={showSectors ? '#34D399' : '#9CA3AF'} />
-                <Text style={[styles.toolChipText, showSectors && styles.activeToolChipText]}>Sectores</Text>
-              </TouchableOpacity>
-
-              {userProfile?.userType && ['partner_owner', 'partner_worker'].includes(userProfile.userType) && (
                 <TouchableOpacity
-                  style={[styles.toolChip, isRoutingActive && styles.activeToolChip, { paddingHorizontal: 12 }]}
+                  style={[
+                    styles.toolChip,
+                    showNearbyEvents && styles.activeToolChip,
+                    { paddingHorizontal: 12 },
+                  ]}
                   onPress={() => {
-                    setIsRoutingActive(!isRoutingActive);
-                    setShowFilters(false);
-                    if (!isRoutingActive) showNotification('Modo Geo-Router activado.');
+                    setShowNearbyEvents(!showNearbyEvents);
+                    showNotification(
+                      !showNearbyEvents ? 'Calendario activado' : 'Calendario desactivado',
+                    );
                   }}
                 >
-                  <MaterialIcons name="route" size={16} color={isRoutingActive ? '#34D399' : '#9CA3AF'} />
-                  <Text style={[styles.toolChipText, isRoutingActive && styles.activeToolChipText]}>Geo-Router</Text>
+                  <MaterialIcons
+                    name="calendar-today"
+                    size={16}
+                    color={showNearbyEvents ? '#34D399' : '#9CA3AF'}
+                  />
+                  <Text
+                    style={[styles.toolChipText, showNearbyEvents && styles.activeToolChipText]}
+                  >
+                    Eventos
+                  </Text>
                 </TouchableOpacity>
-              )}
+
+                <TouchableOpacity
+                  style={[
+                    styles.toolChip,
+                    showTraffic && styles.activeToolChip,
+                    { paddingHorizontal: 12 },
+                  ]}
+                  onPress={() => {
+                    setShowTraffic(!showTraffic);
+                    showNotification(
+                      !showTraffic ? 'Tráfico en vivo activado' : 'Tráfico desactivado',
+                    );
+                  }}
+                >
+                  <MaterialIcons
+                    name="traffic"
+                    size={16}
+                    color={showTraffic ? '#34D399' : '#9CA3AF'}
+                  />
+                  <Text style={[styles.toolChipText, showTraffic && styles.activeToolChipText]}>
+                    Tráfico
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.toolChip,
+                    showCycleways && styles.activeToolChip,
+                    { paddingHorizontal: 12 },
+                  ]}
+                  onPress={() => {
+                    setShowCycleways(!showCycleways);
+                    showNotification(
+                      !showCycleways ? '🚲 Ciclovías activadas' : 'Ciclovías desactivadas',
+                    );
+                  }}
+                >
+                  <MaterialIcons
+                    name="directions-bike"
+                    size={16}
+                    color={showCycleways ? '#34D399' : '#9CA3AF'}
+                  />
+                  <Text style={[styles.toolChipText, showCycleways && styles.activeToolChipText]}>
+                    Ciclovías
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.toolChip,
+                    showSectors && styles.activeToolChip,
+                    { paddingHorizontal: 12 },
+                  ]}
+                  onPress={() => {
+                    setShowSectors(true);
+                    setShowSectorsConfig(true);
+                    setShowFilters(false);
+                  }}
+                >
+                  <MaterialIcons
+                    name="layers"
+                    size={16}
+                    color={showSectors ? '#34D399' : '#9CA3AF'}
+                  />
+                  <Text style={[styles.toolChipText, showSectors && styles.activeToolChipText]}>
+                    Sectores
+                  </Text>
+                </TouchableOpacity>
+
+                {userProfile?.userType &&
+                  ['partner_owner', 'partner_worker'].includes(userProfile.userType) && (
+                    <TouchableOpacity
+                      style={[
+                        styles.toolChip,
+                        isRoutingActive && styles.activeToolChip,
+                        { paddingHorizontal: 12 },
+                      ]}
+                      onPress={() => {
+                        setIsRoutingActive(!isRoutingActive);
+                        setShowFilters(false);
+                        if (!isRoutingActive) showNotification('Modo Geo-Router activado.');
+                      }}
+                    >
+                      <MaterialIcons
+                        name="route"
+                        size={16}
+                        color={isRoutingActive ? '#34D399' : '#9CA3AF'}
+                      />
+                      <Text
+                        style={[styles.toolChipText, isRoutingActive && styles.activeToolChipText]}
+                      >
+                        Geo-Router
+                      </Text>
+                    </TouchableOpacity>
+                  )}
               </View>
 
               <MapLayerMenu
@@ -1755,7 +1909,7 @@ export default function HomeScreen() {
             >
               <Ionicons name="close" size={18} color="#FFFFFF" />
             </TouchableOpacity>
-            
+
             <View style={styles.miniBadgeContainer}>
               <View style={[styles.miniBadge, { backgroundColor: 'rgba(18, 22, 30, 0.8)' }]}>
                 <MaterialIcons name="pets" size={12} color="#A0AEC0" />
@@ -1768,7 +1922,7 @@ export default function HomeScreen() {
           <View style={styles.miniContent}>
             <Text style={styles.miniTitle}>{selectedEvent.title}</Text>
             <Text style={styles.miniOrganizer}>📍 {selectedEvent.organizer}</Text>
-            
+
             <Text style={styles.miniDescription} numberOfLines={4}>
               {selectedEvent.description}
             </Text>
@@ -1782,14 +1936,19 @@ export default function HomeScreen() {
               <View style={styles.miniMetaDivider} />
               <View style={styles.miniMetaItem}>
                 <Ionicons name="location-outline" size={14} color="#A0AEC0" />
-                <Text style={styles.miniMetaText} numberOfLines={1}>Feria Fluvial</Text>
+                <Text style={styles.miniMetaText} numberOfLines={1}>
+                  Feria Fluvial
+                </Text>
               </View>
             </View>
 
             {/* Action Buttons Section */}
             <View style={styles.miniActionRow}>
               <TouchableOpacity
-                style={[styles.miniPrimaryBtn, { backgroundColor: getCategoryColor(selectedEvent.category) }]}
+                style={[
+                  styles.miniPrimaryBtn,
+                  { backgroundColor: getCategoryColor(selectedEvent.category) },
+                ]}
                 activeOpacity={0.8}
                 onPress={() => {
                   const url = `https://www.google.com/maps/dir/?api=1&destination=${selectedEvent.latitude},${selectedEvent.longitude}`;
@@ -1799,7 +1958,7 @@ export default function HomeScreen() {
                 <Ionicons name="navigate" size={16} color="#FFFFFF" />
                 <Text style={styles.miniPrimaryBtnText}>Cómo llegar</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity style={styles.miniIconBtn} activeOpacity={0.7}>
                 <Ionicons name="share-social-outline" size={20} color="#FFFFFF" />
               </TouchableOpacity>
@@ -1809,141 +1968,184 @@ export default function HomeScreen() {
       )}
 
       {/* --- Sector Info Card (Before Exploring) --- */}
-      {showMainUI && selectedSector && !activeNestedZone && (() => {
-        const isParkSector = selectedSector.category === 'reserva';
-        const heroImage = selectedSector.images && selectedSector.images.length > 0 ? selectedSector.images[0] : undefined;
-        const hasRatingOrBadges = isParkSector && (
-          selectedSector.rating != null || !!selectedSector.openingHours || !!selectedSector.parkType
-        );
+      {showMainUI &&
+        selectedSector &&
+        !activeNestedZone &&
+        (() => {
+          const isParkSector = selectedSector.category === 'reserva';
+          const heroImage =
+            selectedSector.images && selectedSector.images.length > 0
+              ? selectedSector.images[0]
+              : undefined;
+          const hasRatingOrBadges =
+            isParkSector &&
+            (selectedSector.rating != null ||
+              !!selectedSector.openingHours ||
+              !!selectedSector.parkType);
 
-        return (
-          <Animated.View
-            style={[
-              styles.miniModalContainer,
-              {
-                width: isDesktop ? 380 : '90%',
-                left: isDesktop ? 100 : '5%', // Sidebar width + offset on desktop
-                bottom: isDesktop ? 32 : 40,
-              },
-            ]}
-          >
-            {/* Header/Banner Section */}
-            <View style={[styles.miniBannerContainer, { height: 100, backgroundColor: '#1E293B' }]}>
-              {heroImage && <Image source={{ uri: heroImage }} style={styles.miniBannerImage} />}
-              <View style={styles.miniBannerOverlay} />
-              <TouchableOpacity
-                onPress={closeSectorPanel}
-                style={styles.miniCloseButton}
-                activeOpacity={0.7}
+          return (
+            <Animated.View
+              style={[
+                styles.miniModalContainer,
+                {
+                  width: isDesktop ? 380 : '90%',
+                  left: isDesktop ? 100 : '5%', // Sidebar width + offset on desktop
+                  bottom: isDesktop ? 32 : 40,
+                },
+              ]}
+            >
+              {/* Header/Banner Section */}
+              <View
+                style={[styles.miniBannerContainer, { height: 100, backgroundColor: '#1E293B' }]}
               >
-                <Ionicons name="close" size={18} color="#FFFFFF" />
-              </TouchableOpacity>
+                {heroImage && <Image source={{ uri: heroImage }} style={styles.miniBannerImage} />}
+                <View style={styles.miniBannerOverlay} />
+                <TouchableOpacity
+                  onPress={closeSectorPanel}
+                  style={styles.miniCloseButton}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="close" size={18} color="#FFFFFF" />
+                </TouchableOpacity>
 
-              <View style={styles.miniBadgeContainer}>
-                <View style={[styles.miniBadge, { backgroundColor: 'rgba(56, 189, 248, 0.2)' }]}>
-                  <Ionicons name="business" size={12} color="#38BDF8" />
-                  <Text style={[styles.miniBadgeText, { color: '#38BDF8' }]}>{selectedSector.category.toUpperCase()}</Text>
+                <View style={styles.miniBadgeContainer}>
+                  <View style={[styles.miniBadge, { backgroundColor: 'rgba(56, 189, 248, 0.2)' }]}>
+                    <Ionicons name="business" size={12} color="#38BDF8" />
+                    <Text style={[styles.miniBadgeText, { color: '#38BDF8' }]}>
+                      {selectedSector.category.toUpperCase()}
+                    </Text>
+                  </View>
                 </View>
               </View>
-            </View>
 
-            <ScrollView
-              style={isParkSector ? [styles.sectorScroll, { maxHeight: isDesktop ? 380 : 320 }] : styles.sectorScroll}
-              showsVerticalScrollIndicator={false}
-            >
-              {/* Info Section */}
-              <View style={styles.miniContent}>
-                {hasRatingOrBadges && (
-                  <View style={styles.sectorRatingBadgeRow}>
-                    {selectedSector.rating != null && (
-                      <View style={styles.sectorRatingPill}>
-                        <Ionicons name="star" size={12} color="#FBBF24" />
-                        <Text style={styles.sectorRatingText}>{selectedSector.rating.toFixed(1)}</Text>
+              <ScrollView
+                style={
+                  isParkSector
+                    ? [styles.sectorScroll, { maxHeight: isDesktop ? 380 : 320 }]
+                    : styles.sectorScroll
+                }
+                showsVerticalScrollIndicator={false}
+              >
+                {/* Info Section */}
+                <View style={styles.miniContent}>
+                  {hasRatingOrBadges && (
+                    <View style={styles.sectorRatingBadgeRow}>
+                      {selectedSector.rating != null && (
+                        <View style={styles.sectorRatingPill}>
+                          <Ionicons name="star" size={12} color="#FBBF24" />
+                          <Text style={styles.sectorRatingText}>
+                            {selectedSector.rating.toFixed(1)}
+                          </Text>
+                        </View>
+                      )}
+                      {selectedSector.openingHours && (
+                        <View style={styles.sectorBadgePill}>
+                          <Ionicons name="time-outline" size={12} color="#A0AEC0" />
+                          <Text style={styles.sectorBadgePillText} numberOfLines={1}>
+                            {selectedSector.openingHours}
+                          </Text>
+                        </View>
+                      )}
+                      {selectedSector.parkType && (
+                        <View style={styles.sectorBadgePill}>
+                          <Ionicons name="leaf-outline" size={12} color="#34D399" />
+                          <Text style={styles.sectorBadgePillText} numberOfLines={1}>
+                            {selectedSector.parkType}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+
+                  <Text style={styles.miniTitle}>{selectedSector.name}</Text>
+
+                  <Text style={styles.miniDescription} numberOfLines={isParkSector ? undefined : 3}>
+                    {selectedSector.description ||
+                      'Sector delimitado de la ciudad. Haz clic en explorar para ver su interior.'}
+                  </Text>
+
+                  {isParkSector && selectedSector.images && selectedSector.images.length > 0 && (
+                    <ParkImageSlider images={selectedSector.images} />
+                  )}
+
+                  {isParkSector && (
+                    <>
+                      <View style={styles.sectorPlaceholderSection}>
+                        <Text style={styles.sectorPlaceholderTitle}>Actividades recientes</Text>
+                        <View style={styles.sectorPlaceholderBox}>
+                          <Ionicons name="time-outline" size={16} color="#64748B" />
+                          <Text style={styles.sectorPlaceholderText}>
+                            Sin actividades recientes
+                          </Text>
+                        </View>
                       </View>
-                    )}
-                    {selectedSector.openingHours && (
-                      <View style={styles.sectorBadgePill}>
-                        <Ionicons name="time-outline" size={12} color="#A0AEC0" />
-                        <Text style={styles.sectorBadgePillText} numberOfLines={1}>{selectedSector.openingHours}</Text>
+
+                      <View style={styles.sectorPlaceholderSection}>
+                        <Text style={styles.sectorPlaceholderTitle}>Próximamente</Text>
+                        <View style={styles.sectorPlaceholderBox}>
+                          <Ionicons name="sparkles-outline" size={16} color="#64748B" />
+                          <Text style={styles.sectorPlaceholderText}>Próximamente disponible</Text>
+                        </View>
                       </View>
-                    )}
-                    {selectedSector.parkType && (
-                      <View style={styles.sectorBadgePill}>
-                        <Ionicons name="leaf-outline" size={12} color="#34D399" />
-                        <Text style={styles.sectorBadgePillText} numberOfLines={1}>{selectedSector.parkType}</Text>
-                      </View>
-                    )}
+                    </>
+                  )}
+
+                  {/* Action Buttons Section */}
+                  <View style={[styles.miniActionRow, { marginTop: isParkSector ? 14 : 0 }]}>
+                    <TouchableOpacity
+                      style={[
+                        styles.miniPrimaryBtn,
+                        { backgroundColor: '#38BDF8', flex: 1, marginRight: 0 },
+                      ]}
+                      activeOpacity={0.8}
+                      onPress={handleExploreSector}
+                    >
+                      <Ionicons name="enter-outline" size={18} color="#0F172A" />
+                      <Text
+                        style={[
+                          styles.miniPrimaryBtnText,
+                          { color: '#0F172A', fontWeight: 'bold', fontSize: 14 },
+                        ]}
+                      >
+                        Explorar Interior
+                      </Text>
+                    </TouchableOpacity>
                   </View>
-                )}
+                </View>
+              </ScrollView>
 
-                <Text style={styles.miniTitle}>{selectedSector.name}</Text>
-
-                <Text style={styles.miniDescription} numberOfLines={isParkSector ? undefined : 3}>
-                  {selectedSector.description || 'Sector delimitado de la ciudad. Haz clic en explorar para ver su interior.'}
-                </Text>
-
-                {isParkSector && selectedSector.images && selectedSector.images.length > 0 && (
-                  <ParkImageSlider images={selectedSector.images} />
-                )}
-
-                {isParkSector && (
-                  <>
-                    <View style={styles.sectorPlaceholderSection}>
-                      <Text style={styles.sectorPlaceholderTitle}>Actividades recientes</Text>
-                      <View style={styles.sectorPlaceholderBox}>
-                        <Ionicons name="time-outline" size={16} color="#64748B" />
-                        <Text style={styles.sectorPlaceholderText}>Sin actividades recientes</Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.sectorPlaceholderSection}>
-                      <Text style={styles.sectorPlaceholderTitle}>Próximamente</Text>
-                      <View style={styles.sectorPlaceholderBox}>
-                        <Ionicons name="sparkles-outline" size={16} color="#64748B" />
-                        <Text style={styles.sectorPlaceholderText}>Próximamente disponible</Text>
-                      </View>
-                    </View>
-                  </>
-                )}
-
-                {/* Action Buttons Section */}
-                <View style={[styles.miniActionRow, { marginTop: isParkSector ? 14 : 0 }]}>
+              {isParkSector && (
+                <View style={styles.sectorFooterRow}>
                   <TouchableOpacity
-                    style={[styles.miniPrimaryBtn, { backgroundColor: '#38BDF8', flex: 1, marginRight: 0 }]}
+                    style={styles.sectorFooterBtn}
                     activeOpacity={0.8}
-                    onPress={handleExploreSector}
+                    onPress={handleSaveSector}
                   >
-                    <Ionicons name="enter-outline" size={18} color="#0F172A" />
-                    <Text style={[styles.miniPrimaryBtnText, { color: '#0F172A', fontWeight: 'bold', fontSize: 14 }]}>
-                      Explorar Interior
+                    <Ionicons name="bookmark-outline" size={16} color="#FFFFFF" />
+                    <Text style={styles.sectorFooterBtnText}>Guardar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.sectorFooterBtn, { backgroundColor: '#38BDF8' }]}
+                    activeOpacity={0.8}
+                    onPress={handleSectorDirections}
+                  >
+                    <Ionicons name="navigate-outline" size={16} color="#0F172A" />
+                    <Text style={[styles.sectorFooterBtnText, { color: '#0F172A' }]}>
+                      Como llegar
                     </Text>
                   </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.sectorFooterIconBtn}
+                    activeOpacity={0.8}
+                    onPress={handleSectorShare}
+                  >
+                    <Ionicons name="share-social-outline" size={18} color="#FFFFFF" />
+                  </TouchableOpacity>
                 </View>
-              </View>
-            </ScrollView>
-
-            {isParkSector && (
-              <View style={styles.sectorFooterRow}>
-                <TouchableOpacity style={styles.sectorFooterBtn} activeOpacity={0.8} onPress={handleSaveSector}>
-                  <Ionicons name="bookmark-outline" size={16} color="#FFFFFF" />
-                  <Text style={styles.sectorFooterBtnText}>Guardar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.sectorFooterBtn, { backgroundColor: '#38BDF8' }]}
-                  activeOpacity={0.8}
-                  onPress={handleSectorDirections}
-                >
-                  <Ionicons name="navigate-outline" size={16} color="#0F172A" />
-                  <Text style={[styles.sectorFooterBtnText, { color: '#0F172A' }]}>Como llegar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.sectorFooterIconBtn} activeOpacity={0.8} onPress={handleSectorShare}>
-                  <Ionicons name="share-social-outline" size={18} color="#FFFFFF" />
-                </TouchableOpacity>
-              </View>
-            )}
-          </Animated.View>
-        );
-      })()}
+              )}
+            </Animated.View>
+          );
+        })()}
 
       {/* Modal de Check-in Exitoso */}
       {showCheckInModal && (
@@ -2093,26 +2295,31 @@ export default function HomeScreen() {
       {/* Floating On-Screen Toast Notifier */}
       {activeToast && (
         <View style={styles.toastContainer}>
-          <View style={[styles.toastCard, styles[`toastCard_${activeToast.type}` as keyof typeof styles]]}>
+          <View
+            style={[
+              styles.toastCard,
+              styles[`toastCard_${activeToast.type}` as keyof typeof styles],
+            ]}
+          >
             <MaterialIcons
               name={
                 activeToast.type === 'success'
                   ? 'check-circle'
                   : activeToast.type === 'error'
-                  ? 'error'
-                  : activeToast.type === 'warning'
-                  ? 'warning'
-                  : 'info'
+                    ? 'error'
+                    : activeToast.type === 'warning'
+                      ? 'warning'
+                      : 'info'
               }
               size={20}
               color={
                 activeToast.type === 'success'
                   ? '#34D399'
                   : activeToast.type === 'error'
-                  ? '#EF4444'
-                  : activeToast.type === 'warning'
-                  ? '#F59E0B'
-                  : '#60A5FA'
+                    ? '#EF4444'
+                    : activeToast.type === 'warning'
+                      ? '#F59E0B'
+                      : '#60A5FA'
               }
             />
             <Text style={styles.toastMessage}>{activeToast.message}</Text>

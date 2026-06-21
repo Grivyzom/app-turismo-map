@@ -34,9 +34,10 @@ export class GlobalErrorBoundary extends Component<Props, State> {
 
   public render() {
     if (this.state.hasError) {
-      const isChunkError = this.state.error?.name === 'ChunkLoadError' || 
-                          this.state.error?.message?.includes('Loading chunk') ||
-                          this.state.error?.message?.includes('AsyncRequireError');
+      const isChunkError =
+        this.state.error?.name === 'ChunkLoadError' ||
+        this.state.error?.message?.includes('Loading chunk') ||
+        this.state.error?.message?.includes('AsyncRequireError');
 
       return (
         <View style={styles.container}>
@@ -45,22 +46,18 @@ export class GlobalErrorBoundary extends Component<Props, State> {
               {isChunkError ? 'Error de conexión' : 'Algo salió mal'}
             </Text>
             <Text style={styles.message}>
-              {isChunkError 
+              {isChunkError
                 ? 'No pudimos cargar una parte de la aplicación. Esto puede deberse a una conexión inestable o a una actualización reciente.'
                 : 'Ocurrió un error inesperado al mostrar esta pantalla.'}
             </Text>
-            
+
             <TouchableOpacity style={styles.button} onPress={this.handleReload}>
               <Text style={styles.buttonText}>
                 {Platform.OS === 'web' ? 'Recargar aplicación' : 'Reintentar'}
               </Text>
             </TouchableOpacity>
 
-            {__DEV__ && (
-              <Text style={styles.debugText}>
-                {this.state.error?.toString()}
-              </Text>
-            )}
+            {__DEV__ && <Text style={styles.debugText}>{this.state.error?.toString()}</Text>}
           </View>
         </View>
       );
@@ -118,5 +115,5 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 20,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-  }
+  },
 });

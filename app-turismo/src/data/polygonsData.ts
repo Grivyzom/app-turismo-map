@@ -13,14 +13,15 @@ const parseGeoJSON = (data: any, defaultCategory: TurismoEvent['category']): Tur
     const idStr = (f.properties['@id'] || f.id || i).toString().replace(/\//g, '-');
     const event: TurismoEvent = {
       id: `${defaultCategory}-${idStr}`,
-      title: f.properties.name || defaultCategory.charAt(0).toUpperCase() + defaultCategory.slice(1),
+      title:
+        f.properties.name || defaultCategory.charAt(0).toUpperCase() + defaultCategory.slice(1),
       description: f.properties.description || `Área de ${defaultCategory}`,
       latitude: 0,
       longitude: 0,
       category: defaultCategory,
       organizer: f.properties.operator || 'Público',
       time: f.properties.opening_hours || '24/7',
-      address: f.properties['addr:street'] || f.properties['object:street'] || ''
+      address: f.properties['addr:street'] || f.properties['object:street'] || '',
     };
 
     if (f.geometry && f.geometry.type === 'Point') {
@@ -37,7 +38,10 @@ const parseGeoJSON = (data: any, defaultCategory: TurismoEvent['category']): Tur
     }
 
     if (f.properties.geometry && Array.isArray(f.properties.geometry)) {
-       event.polygon = f.properties.geometry.map((c: any) => ({ latitude: c.lat, longitude: c.lon }));
+      event.polygon = f.properties.geometry.map((c: any) => ({
+        latitude: c.lat,
+        longitude: c.lon,
+      }));
     }
 
     if (event.polygon && event.polygon.length > 0) {
@@ -67,13 +71,25 @@ const parseSeguridadData = (data: any): TurismoEvent[] => {
     const event: TurismoEvent = {
       id: `${cat}-${idStr}`,
       title: f.properties.name || cat.charAt(0).toUpperCase() + cat.slice(1),
-      description: f.properties.description || (cat === 'camara' ? 'Cámara de Seguridad' : cat === 'carabinero' ? 'Comisaría / Retén' : 'Bomberos'),
+      description:
+        f.properties.description ||
+        (cat === 'camara'
+          ? 'Cámara de Seguridad'
+          : cat === 'carabinero'
+            ? 'Comisaría / Retén'
+            : 'Bomberos'),
       latitude: 0,
       longitude: 0,
       category: cat,
-      organizer: f.properties.operator || (cat === 'carabinero' ? 'Carabineros de Chile' : cat === 'bombero' ? 'Bomberos' : 'Público'),
+      organizer:
+        f.properties.operator ||
+        (cat === 'carabinero'
+          ? 'Carabineros de Chile'
+          : cat === 'bombero'
+            ? 'Bomberos'
+            : 'Público'),
       time: f.properties.opening_hours || '24/7',
-      address: f.properties['addr:street'] || f.properties['object:street'] || ''
+      address: f.properties['addr:street'] || f.properties['object:street'] || '',
     };
 
     if (f.geometry && f.geometry.type === 'Point') {
@@ -90,7 +106,10 @@ const parseSeguridadData = (data: any): TurismoEvent[] => {
     }
 
     if (f.properties.geometry && Array.isArray(f.properties.geometry)) {
-       event.polygon = f.properties.geometry.map((c: any) => ({ latitude: c.lat, longitude: c.lon }));
+      event.polygon = f.properties.geometry.map((c: any) => ({
+        latitude: c.lat,
+        longitude: c.lon,
+      }));
     }
 
     if (event.polygon && event.polygon.length > 0) {
@@ -105,23 +124,22 @@ const parseSeguridadData = (data: any): TurismoEvent[] => {
 
 export const SEGURIDAD_EVENTS = parseSeguridadData(seguridadData);
 
-
 export const CASINO_DREAMS_EVENT: TurismoEvent = {
   id: '85b23094-202f-44cd-ab96-86c82a59aec8',
   title: 'Casino Dreams Pedro de Valdivia',
   description: 'Slick quarters in a river-view lodging with a casino & a spa.',
   latitude: -39.811456,
-  longitude: -73.246700,
+  longitude: -73.2467,
   category: 'edificio',
   organizer: 'Mundo Dreams',
   time: '24/7',
   address: 'Carampangue 190, Valdivia',
   polygon: [
-    { latitude: -39.811200, longitude: -73.247000 },
-    { latitude: -39.811200, longitude: -73.246400 },
-    { latitude: -39.811800, longitude: -73.246400 },
-    { latitude: -39.811800, longitude: -73.247000 },
-    { latitude: -39.811200, longitude: -73.247000 }
+    { latitude: -39.8112, longitude: -73.247 },
+    { latitude: -39.8112, longitude: -73.2464 },
+    { latitude: -39.8118, longitude: -73.2464 },
+    { latitude: -39.8118, longitude: -73.247 },
+    { latitude: -39.8112, longitude: -73.247 },
   ],
   indoorMap: {
     defaultFloor: 1,
@@ -130,7 +148,7 @@ export const CASINO_DREAMS_EVENT: TurismoEvent = {
       { level: 3, label: 'Piso 3 (Habitaciones)' },
       { level: 2, label: 'Piso 2 (Restaurante)' },
       { level: 1, label: 'Piso 1 (Casino & Lobby)' },
-      { level: -1, label: 'Subterráneo (Estacionamiento)' }
-    ]
-  }
+      { level: -1, label: 'Subterráneo (Estacionamiento)' },
+    ],
+  },
 };

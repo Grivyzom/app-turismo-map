@@ -15,21 +15,21 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   value,
   onChange,
   placeholder = 'Seleccionar...',
-  label
+  label,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  
-  const filteredOptions = options.filter(opt => 
-    opt.label.toLowerCase().includes(searchQuery.toLowerCase()) || opt.value === 'nuevo +'
+
+  const filteredOptions = options.filter(
+    (opt) => opt.label.toLowerCase().includes(searchQuery.toLowerCase()) || opt.value === 'nuevo +',
   );
 
-  const selectedOption = options.find(opt => opt.value === value);
+  const selectedOption = options.find((opt) => opt.value === value);
 
   return (
     <View style={styles.container}>
       {label && <Text style={styles.label}>{label}</Text>}
-      
+
       <TouchableOpacity
         style={styles.selector}
         activeOpacity={0.7}
@@ -38,7 +38,11 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
         <Text style={[styles.selectorText, !selectedOption && styles.placeholderText]}>
           {selectedOption ? selectedOption.label : placeholder}
         </Text>
-        <MaterialIcons name={isOpen ? "arrow-drop-up" : "arrow-drop-down"} size={24} color="#A0AEC0" />
+        <MaterialIcons
+          name={isOpen ? 'arrow-drop-up' : 'arrow-drop-down'}
+          size={24}
+          color="#A0AEC0"
+        />
       </TouchableOpacity>
 
       {isOpen && (
@@ -60,7 +64,11 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
             )}
           </View>
 
-          <ScrollView style={styles.optionsList} nestedScrollEnabled={true} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            style={styles.optionsList}
+            nestedScrollEnabled={true}
+            keyboardShouldPersistTaps="handled"
+          >
             {filteredOptions.length === 0 ? (
               <Text style={styles.noResultsText}>No se encontraron resultados</Text>
             ) : (
@@ -74,11 +82,13 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
                     setSearchQuery('');
                   }}
                 >
-                  <Text style={[
-                    styles.optionText, 
-                    value === opt.value && styles.optionTextSelected,
-                    opt.color ? { color: opt.color } : null
-                  ]}>
+                  <Text
+                    style={[
+                      styles.optionText,
+                      value === opt.value && styles.optionTextSelected,
+                      opt.color ? { color: opt.color } : null,
+                    ]}
+                  >
                     {opt.label}
                   </Text>
                   {value === opt.value && <MaterialIcons name="check" size={18} color="#34D399" />}
@@ -104,7 +114,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 6,
     letterSpacing: 0.5,
-    textTransform: 'uppercase'
+    textTransform: 'uppercase',
   },
   selector: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
@@ -182,5 +192,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
     paddingVertical: 16,
-  }
+  },
 });

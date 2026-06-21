@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Platform } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+
 import { TurismoEvent } from '../Map/types';
 
 interface DevSimulatorHUDProps {
@@ -16,11 +17,12 @@ export const DevSimulatorHUD: React.FC<DevSimulatorHUDProps> = ({
   onMoveEvent,
   onClose,
 }) => {
-  const dynamicEvents = activeEvents.filter(e => e.id.startsWith('sim-'));
+  const dynamicEvents = activeEvents.filter((e) => e.id.startsWith('sim-'));
 
   const handleMove = (id: string, dir: 'up' | 'down' | 'left' | 'right') => {
     const step = 0.0002; // Aprox 22 metros
-    let dLat = 0, dLng = 0;
+    let dLat = 0,
+      dLng = 0;
     if (dir === 'up') dLat = step;
     if (dir === 'down') dLat = -step;
     if (dir === 'left') dLng = -step;
@@ -41,45 +43,70 @@ export const DevSimulatorHUD: React.FC<DevSimulatorHUDProps> = ({
 
         <Text style={styles.sectionTitle}>Inyectar Entidad</Text>
         <View style={styles.buttonRow}>
-          <TouchableOpacity style={[styles.injectButton, { borderColor: '#3B82F6' }]} onPress={() => onInjectEvent('embarcacion')}>
+          <TouchableOpacity
+            style={[styles.injectButton, { borderColor: '#3B82F6' }]}
+            onPress={() => onInjectEvent('embarcacion')}
+          >
             <MaterialIcons name="directions-boat" size={16} color="#3B82F6" />
             <Text style={[styles.injectText, { color: '#3B82F6' }]}>Lancha</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.injectButton, { borderColor: '#EF4444' }]} onPress={() => onInjectEvent('accidente')}>
+          <TouchableOpacity
+            style={[styles.injectButton, { borderColor: '#EF4444' }]}
+            onPress={() => onInjectEvent('accidente')}
+          >
             <MaterialIcons name="car-crash" size={16} color="#EF4444" />
             <Text style={[styles.injectText, { color: '#EF4444' }]}>Accidente</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.injectButton, { borderColor: '#F59E0B' }]} onPress={() => onInjectEvent('incendio')}>
+          <TouchableOpacity
+            style={[styles.injectButton, { borderColor: '#F59E0B' }]}
+            onPress={() => onInjectEvent('incendio')}
+          >
             <MaterialIcons name="local-fire-department" size={16} color="#F59E0B" />
             <Text style={[styles.injectText, { color: '#F59E0B' }]}>Incendio</Text>
           </TouchableOpacity>
         </View>
 
-        <Text style={[styles.sectionTitle, { marginTop: 16 }]}>Control de Entidades ({dynamicEvents.length})</Text>
+        <Text style={[styles.sectionTitle, { marginTop: 16 }]}>
+          Control de Entidades ({dynamicEvents.length})
+        </Text>
         <ScrollView style={styles.eventsList}>
           {dynamicEvents.length === 0 ? (
             <Text style={styles.emptyText}>No hay entidades simuladas activas</Text>
           ) : (
-            dynamicEvents.map(event => (
+            dynamicEvents.map((event) => (
               <View key={event.id} style={styles.eventCard}>
                 <View style={styles.eventInfo}>
                   <Text style={styles.eventName}>{event.title}</Text>
-                  <Text style={styles.eventCoords}>{event.latitude.toFixed(4)}, {event.longitude.toFixed(4)}</Text>
+                  <Text style={styles.eventCoords}>
+                    {event.latitude.toFixed(4)}, {event.longitude.toFixed(4)}
+                  </Text>
                 </View>
                 <View style={styles.dpad}>
-                  <TouchableOpacity style={styles.dpadBtn} onPress={() => handleMove(event.id, 'up')}>
+                  <TouchableOpacity
+                    style={styles.dpadBtn}
+                    onPress={() => handleMove(event.id, 'up')}
+                  >
                     <MaterialIcons name="arrow-upward" size={16} color="#FFF" />
                   </TouchableOpacity>
                   <View style={styles.dpadMiddle}>
-                    <TouchableOpacity style={styles.dpadBtn} onPress={() => handleMove(event.id, 'left')}>
+                    <TouchableOpacity
+                      style={styles.dpadBtn}
+                      onPress={() => handleMove(event.id, 'left')}
+                    >
                       <MaterialIcons name="arrow-back" size={16} color="#FFF" />
                     </TouchableOpacity>
                     <View style={styles.dpadCenter} />
-                    <TouchableOpacity style={styles.dpadBtn} onPress={() => handleMove(event.id, 'right')}>
+                    <TouchableOpacity
+                      style={styles.dpadBtn}
+                      onPress={() => handleMove(event.id, 'right')}
+                    >
                       <MaterialIcons name="arrow-forward" size={16} color="#FFF" />
                     </TouchableOpacity>
                   </View>
-                  <TouchableOpacity style={styles.dpadBtn} onPress={() => handleMove(event.id, 'down')}>
+                  <TouchableOpacity
+                    style={styles.dpadBtn}
+                    onPress={() => handleMove(event.id, 'down')}
+                  >
                     <MaterialIcons name="arrow-downward" size={16} color="#FFF" />
                   </TouchableOpacity>
                 </View>
@@ -206,5 +233,5 @@ const styles = StyleSheet.create({
   },
   dpadCenter: {
     width: 28,
-  }
+  },
 });

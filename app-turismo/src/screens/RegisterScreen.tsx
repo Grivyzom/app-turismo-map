@@ -13,6 +13,7 @@ import {
   FlatList,
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+
 import { toast } from '../components/ui/ToastNotification';
 
 type RegisterScreenProps = {
@@ -415,7 +416,12 @@ export default function RegisterScreen({ onRegister, onGoToLogin }: RegisterScre
                       }}
                       className="flex-row items-center py-3.5 px-4 border-b border-white/10 active:bg-white/10 rounded-xl"
                     >
-                      <MaterialIcons name="location-on" size={20} color="rgba(255,255,255,0.5)" style={{ marginRight: 12 }} />
+                      <MaterialIcons
+                        name="location-on"
+                        size={20}
+                        color="rgba(255,255,255,0.5)"
+                        style={{ marginRight: 12 }}
+                      />
                       <Text className="text-base font-medium text-white flex-1">{item}</Text>
                       <MaterialIcons name="chevron-right" size={20} color="rgba(255,255,255,0.3)" />
                     </TouchableOpacity>
@@ -446,7 +452,12 @@ export default function RegisterScreen({ onRegister, onGoToLogin }: RegisterScre
                       }}
                       className="flex-row items-center py-3.5 px-4 border-b border-white/10 active:bg-white/10 rounded-xl"
                     >
-                      <MaterialIcons name="public" size={24} color="rgba(255,255,255,0.5)" style={{ marginRight: 12 }} />
+                      <MaterialIcons
+                        name="public"
+                        size={24}
+                        color="rgba(255,255,255,0.5)"
+                        style={{ marginRight: 12 }}
+                      />
                       <Text className="text-base font-medium text-white flex-1">{item.name}</Text>
                       {item.name === 'Chile' ? (
                         <View className="flex-row items-center gap-1">

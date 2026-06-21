@@ -1,13 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { SafeAreaView, View, StyleSheet, TouchableOpacity, Text, Dimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Stack, router } from 'expo-router';
+
 import { useAuth } from '../../src/context/AuthContext';
 import { useHomeScreenState } from '../(home)/useHomeScreenState';
 import { MapContainer } from '../../src/components/Map/MapContainer';
-import { RouterHUD, TacticalHUD, DevSimulatorHUD, CreateSectorModal, DevToolbar, SectorConfigPanel, CoordsEditorHUD } from '../../src/components/MapUI';
+import {
+  RouterHUD,
+  TacticalHUD,
+  DevSimulatorHUD,
+  CreateSectorModal,
+  DevToolbar,
+  SectorConfigPanel,
+  CoordsEditorHUD,
+} from '../../src/components/MapUI';
 import { CreatePointModal } from '../../src/components/MapUI/CreatePointModal';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { Stack, router } from 'expo-router';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -33,12 +42,8 @@ export default function DevMapaScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar style="light" />
 
-
       <View style={styles.mapWrapper}>
-        <TouchableOpacity 
-          style={styles.backButtonOverlay} 
-          onPress={() => router.push('/dev')}
-        >
+        <TouchableOpacity style={styles.backButtonOverlay} onPress={() => router.push('/dev')}>
           <MaterialIcons name="arrow-back" size={24} color="#FFF" />
         </TouchableOpacity>
         <MapContainer
@@ -108,27 +113,30 @@ export default function DevMapaScreen() {
           onCancel={state.cancelRouting}
         />
       )}
-      
-      {!state.isTacticalModeActive && !showSimulatorHUD && (!state.isRoutingActive || state.routingType === 'sector') && (
-        <DevToolbar
-          onSimulatorPress={() => setShowSimulatorHUD(true)}
-          onNewPointPress={() => state.setIsTacticalModeActive(true)}
-          onNewSectorPress={() => {
-            setShowSectorForm(true);
-          }}
-          onConfigSectorsPress={() => setShowSectorConfig(true)}
-          onMagicWandPress={() => {
-            state.setIsMagicWandActive(!state.isMagicWandActive);
-            if (!state.isMagicWandActive) state.showNotification("Varita Mágica activada: Haz clic en un edificio");
-          }}
-          isMagicWandActive={state.isMagicWandActive}
-          onNewRoutePress={() => {
-            state.setIsRoutingActive(true);
-            state.setRoutingType('ciclovia');
-          }}
-          onCoordsEditorPress={() => setShowCoordsEditor(true)}
-        />
-      )}
+
+      {!state.isTacticalModeActive &&
+        !showSimulatorHUD &&
+        (!state.isRoutingActive || state.routingType === 'sector') && (
+          <DevToolbar
+            onSimulatorPress={() => setShowSimulatorHUD(true)}
+            onNewPointPress={() => state.setIsTacticalModeActive(true)}
+            onNewSectorPress={() => {
+              setShowSectorForm(true);
+            }}
+            onConfigSectorsPress={() => setShowSectorConfig(true)}
+            onMagicWandPress={() => {
+              state.setIsMagicWandActive(!state.isMagicWandActive);
+              if (!state.isMagicWandActive)
+                state.showNotification('Varita Mágica activada: Haz clic en un edificio');
+            }}
+            isMagicWandActive={state.isMagicWandActive}
+            onNewRoutePress={() => {
+              state.setIsRoutingActive(true);
+              state.setRoutingType('ciclovia');
+            }}
+            onCoordsEditorPress={() => setShowCoordsEditor(true)}
+          />
+        )}
 
       {showSimulatorHUD && (
         <DevSimulatorHUD
@@ -140,7 +148,7 @@ export default function DevMapaScreen() {
       )}
 
       {showCoordsEditor && (
-        <CoordsEditorHUD 
+        <CoordsEditorHUD
           onClose={() => setShowCoordsEditor(false)}
           crosshairLocation={state.tacticalLocation}
           onRefreshMapData={() => {
@@ -160,7 +168,11 @@ export default function DevMapaScreen() {
       />
 
       <CreateSectorModal
-        visible={showSectorForm || !!state.extractedGeometry || (state.isRoutingActive && state.routingType === 'sector' && state.isRouteFinished)}
+        visible={
+          showSectorForm ||
+          !!state.extractedGeometry ||
+          (state.isRoutingActive && state.routingType === 'sector' && state.isRouteFinished)
+        }
         hidden={isDrawingSector && !state.isRouteFinished}
         onClose={() => {
           setShowSectorForm(false);
@@ -175,7 +187,11 @@ export default function DevMapaScreen() {
           }
         }}
         extractedGeometry={state.extractedGeometry}
-        draftRoutePoints={state.isRoutingActive && state.routingType === 'sector' && state.isRouteFinished ? state.draftRoutePoints : undefined}
+        draftRoutePoints={
+          state.isRoutingActive && state.routingType === 'sector' && state.isRouteFinished
+            ? state.draftRoutePoints
+            : undefined
+        }
         showNotification={state.showNotification}
         onStartDrawing={() => {
           setIsDrawingSector(true);
@@ -199,7 +215,7 @@ export default function DevMapaScreen() {
           visibleSectorIds={state.visibleSectorIds}
           onToggleSector={(sectorId) => {
             state.setVisibleSectorIds((prev) =>
-              prev.includes(sectorId) ? prev.filter((id) => id !== sectorId) : [...prev, sectorId]
+              prev.includes(sectorId) ? prev.filter((id) => id !== sectorId) : [...prev, sectorId],
             );
           }}
           showSectors={state.showSectors}
@@ -266,5 +282,5 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 5,
     elevation: 8,
-  }
+  },
 });

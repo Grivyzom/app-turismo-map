@@ -1,9 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform, Animated, Easing, Dimensions } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+  Animated,
+  Easing,
+  Dimensions,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SparklesIcon, MapIcon, ClockIcon, CheckIcon } from './Icons';
+
 import { useAuth } from '../../context/AuthContext';
+
+import { SparklesIcon, MapIcon, ClockIcon, CheckIcon } from './Icons';
 
 interface ContextualSurveyWidgetProps {
   isSearchActive?: boolean;
@@ -22,7 +33,7 @@ export function ContextualSurveyWidget({ isSearchActive }: ContextualSurveyWidge
   const [isExpanded, setIsExpanded] = useState(false);
   const [stayValue, setStayValue] = useState(1); // Default to weekend
   const [isSaved, setIsSaved] = useState(false);
-  
+
   const slideAnim = React.useRef(new Animated.Value(0)).current;
   const router = useRouter();
 
@@ -51,47 +62,50 @@ export function ContextualSurveyWidget({ isSearchActive }: ContextualSurveyWidge
     }).start();
   }, [isExpanded, slideAnim]);
 
-  const handleSaveStay = useCallback(async (id: string, index: number) => {
-    setStayValue(index);
-    setIsSaved(true);
-    
-    try {
-      // Feed the view mode / algorithm
-      await AsyncStorage.setItem('app-turismo.stay-duration', id);
-      
-      if (token) {
-        const getBackendUrl = () => {
-          if (Platform.OS === 'android') {
-            return 'http://10.0.2.2:8080';
-          }
-          return process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8080';
-        };
+  const handleSaveStay = useCallback(
+    async (id: string, index: number) => {
+      setStayValue(index);
+      setIsSaved(true);
 
-        await fetch(`${getBackendUrl()}/api/v1/profile/preferences`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ stayDuration: id }),
-        });
+      try {
+        // Feed the view mode / algorithm
+        await AsyncStorage.setItem('app-turismo.stay-duration', id);
+
+        if (token) {
+          const getBackendUrl = () => {
+            if (Platform.OS === 'android') {
+              return 'http://10.0.2.2:8080';
+            }
+            return process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8080';
+          };
+
+          await fetch(`${getBackendUrl()}/api/v1/profile/preferences`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ stayDuration: id }),
+          });
+        }
+      } catch (e) {
+        console.warn('Error saving stay duration', e);
       }
-    } catch (e) {
-      console.warn('Error saving stay duration', e);
-    }
 
-    setTimeout(() => {
-      setIsExpanded(false);
-      setIsSaved(false);
-    }, 1500);
-  }, [token]);
+      setTimeout(() => {
+        setIsExpanded(false);
+        setIsSaved(false);
+      }, 1500);
+    },
+    [token],
+  );
 
   if (!isAuthenticated || checking || !isVisible) return null;
   if (isSearchActive && !isExpanded) return null;
 
   return (
     <View style={styles.islandContainer}>
-      <Animated.View 
+      <Animated.View
         style={[
           styles.islandContent,
           {
@@ -103,13 +117,13 @@ export function ContextualSurveyWidget({ isSearchActive }: ContextualSurveyWidge
               inputRange: [0, 1],
               outputRange: [260, 340],
             }),
-          }
+          },
         ]}
       >
         <View style={styles.glowBorderTop} />
         {!isExpanded ? (
-          <TouchableOpacity 
-            style={styles.collapsedRow} 
+          <TouchableOpacity
+            style={styles.collapsedRow}
             onPress={() => setIsExpanded(true)}
             activeOpacity={0.7}
           >
@@ -118,7 +132,9 @@ export function ContextualSurveyWidget({ isSearchActive }: ContextualSurveyWidge
             </View>
             <View style={styles.textContainer}>
               <Text style={styles.islandTitle}>Entrena tu mapa</Text>
-              <Text style={styles.islandSubtitle}>Dinos qué te gusta y armaremos un mapa solo para ti</Text>
+              <Text style={styles.islandSubtitle}>
+                Dinos qué te gusta y armaremos un mapa solo para ti
+              </Text>
             </View>
           </TouchableOpacity>
         ) : (
@@ -151,8 +167,8 @@ export function ContextualSurveyWidget({ isSearchActive }: ContextualSurveyWidge
                 );
               })}
             </View>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={styles.fullOnboardingBtn}
               onPress={() => router.push('/onboarding')}
             >
@@ -314,4 +330,3 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 });
-

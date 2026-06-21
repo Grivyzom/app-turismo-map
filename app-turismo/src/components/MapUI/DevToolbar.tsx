@@ -28,16 +28,27 @@ export const DevToolbar: React.FC<DevToolbarProps> = ({
     <View style={styles.container}>
       <View style={styles.shadowContainer}>
         <BlurView intensity={90} tint="dark" style={styles.blurContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-            
-            <TouchableOpacity style={styles.toolbarBtn} onPress={onSimulatorPress} activeOpacity={0.7}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+          >
+            <TouchableOpacity
+              style={styles.toolbarBtn}
+              onPress={onSimulatorPress}
+              activeOpacity={0.7}
+            >
               <View style={styles.iconWrapper}>
                 <MaterialIcons name="bug-report" size={22} color="#A78BFA" />
               </View>
               <Text style={styles.btnLabel}>Simulador</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.toolbarBtn} onPress={onCoordsEditorPress} activeOpacity={0.7}>
+            <TouchableOpacity
+              style={styles.toolbarBtn}
+              onPress={onCoordsEditorPress}
+              activeOpacity={0.7}
+            >
               <View style={[styles.iconWrapper, { backgroundColor: 'rgba(139, 92, 246, 0.2)' }]}>
                 <MaterialIcons name="edit-location" size={22} color="#8B5CF6" />
               </View>
@@ -46,46 +57,66 @@ export const DevToolbar: React.FC<DevToolbarProps> = ({
 
             <View style={styles.divider} />
 
-            <TouchableOpacity style={styles.toolbarBtn} onPress={onNewPointPress} activeOpacity={0.7}>
+            <TouchableOpacity
+              style={styles.toolbarBtn}
+              onPress={onNewPointPress}
+              activeOpacity={0.7}
+            >
               <View style={styles.iconWrapper}>
                 <MaterialIcons name="add-location-alt" size={22} color="#34D399" />
               </View>
               <Text style={styles.btnLabel}>Punto</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.toolbarBtn} onPress={onNewSectorPress} activeOpacity={0.7}>
+            <TouchableOpacity
+              style={styles.toolbarBtn}
+              onPress={onNewSectorPress}
+              activeOpacity={0.7}
+            >
               <View style={styles.iconWrapper}>
                 <MaterialIcons name="dashboard-customize" size={22} color="#F472B6" />
               </View>
               <Text style={styles.btnLabel}>Crear</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.toolbarBtn} onPress={onConfigSectorsPress} activeOpacity={0.7}>
+            <TouchableOpacity
+              style={styles.toolbarBtn}
+              onPress={onConfigSectorsPress}
+              activeOpacity={0.7}
+            >
               <View style={styles.iconWrapper}>
                 <MaterialIcons name="layers" size={22} color="#6EE7B7" />
               </View>
               <Text style={styles.btnLabel}>Capas</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.toolbarBtn} onPress={onMagicWandPress} activeOpacity={0.7}>
-              <View style={[
-                styles.iconWrapper, 
-                isMagicWandActive && styles.activeIconWrapper
-              ]}>
-                <MaterialIcons name="auto-awesome" size={22} color={isMagicWandActive ? '#FFF' : '#38BDF8'} />
+            <TouchableOpacity
+              style={styles.toolbarBtn}
+              onPress={onMagicWandPress}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.iconWrapper, isMagicWandActive && styles.activeIconWrapper]}>
+                <MaterialIcons
+                  name="auto-awesome"
+                  size={22}
+                  color={isMagicWandActive ? '#FFF' : '#38BDF8'}
+                />
               </View>
               <Text style={[styles.btnLabel, isMagicWandActive && styles.activeLabel]}>Varita</Text>
             </TouchableOpacity>
 
             <View style={styles.divider} />
 
-            <TouchableOpacity style={styles.toolbarBtn} onPress={onNewRoutePress} activeOpacity={0.7}>
+            <TouchableOpacity
+              style={styles.toolbarBtn}
+              onPress={onNewRoutePress}
+              activeOpacity={0.7}
+            >
               <View style={styles.iconWrapper}>
                 <MaterialIcons name="alt-route" size={22} color="#FBBF24" />
               </View>
               <Text style={styles.btnLabel}>Ruta</Text>
             </TouchableOpacity>
-
           </ScrollView>
         </BlurView>
       </View>
@@ -166,5 +197,5 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
     marginHorizontal: 4,
     borderRadius: 1,
-  }
+  },
 });

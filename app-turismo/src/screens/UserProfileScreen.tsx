@@ -210,7 +210,7 @@ export default function UserProfileScreen() {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       if (response.ok) {
@@ -361,9 +361,12 @@ export default function UserProfileScreen() {
             <Text style={styles.typeBadgeText}>{userTypeLabels[profile.userType]}</Text>
           </View>
           <Text style={styles.bioLocation}>
-            <MaterialIcons name="location-on" size={14} color="#9CA3AF" /> {profile.location || 'Sin ubicación'}
+            <MaterialIcons name="location-on" size={14} color="#9CA3AF" />{' '}
+            {profile.location || 'Sin ubicación'}
           </Text>
-          <Text style={styles.bioText}>Explorador de la región de Los Ríos. Amante de la naturaleza y el turismo local.</Text>
+          <Text style={styles.bioText}>
+            Explorador de la región de Los Ríos. Amante de la naturaleza y el turismo local.
+          </Text>
         </View>
 
         <View style={styles.actionButtonsRow}>
@@ -497,7 +500,7 @@ export default function UserProfileScreen() {
                                     style: 'destructive',
                                     onPress: () => void deleteLocation(item.id, item.title),
                                   },
-                                ]
+                                ],
                               );
                             }}
                             style={styles.deleteLocationButton}
@@ -534,7 +537,7 @@ export default function UserProfileScreen() {
                                   },
                                 },
                               ],
-                              'plain-text'
+                              'plain-text',
                             );
                           }}
                           style={{ marginLeft: 12 }}
@@ -580,7 +583,7 @@ export default function UserProfileScreen() {
                                     style: 'destructive',
                                     onPress: () => void deleteCollection(item.id, item.name),
                                   },
-                                ]
+                                ],
                               );
                             }}
                             style={styles.deleteCollectionButton}

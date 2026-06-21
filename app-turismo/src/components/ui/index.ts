@@ -6,3 +6,4 @@ export * from './ContextualRadialMenu.types';
 export * from './ContextualRadialMenu';
 export * from './ActionDropdown';
 export { SearchableSelect } from './SearchableSelect';
+export { Sidebar } from './Sidebar';

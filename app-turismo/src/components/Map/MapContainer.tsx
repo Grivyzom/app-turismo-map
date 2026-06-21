@@ -36,6 +36,7 @@ import { ContextualRadialMenu } from '../ui/ContextualRadialMenu';
 import { getLatestRadarPath } from '../../utils/weatherUtils';
 import { useUserLocationContext } from '../../context/UserLocationContext';
 import { CICLOVIAS_GEOJSON } from '../../data/ciclovias';
+import { furnitureData } from '../../data/mobiliarioData';
 
 import {
   TurismoEvent,
@@ -49,7 +50,6 @@ import { ArtisticMarker, ArtisticMarkerType } from './Markers/ArtisticMarker';
 import { StoreMarker } from './Markers/StoreMarker';
 import { MiniModal } from './Markers/MiniModal';
 import { AuthorityModal } from './Markers/AuthorityModal';
-import { furnitureData } from '../../data/mobiliarioData';
 import { FurnitureMarker } from './Markers/FurnitureMarker';
 
 // ─── UserMarkerAnimated ──────────────────────────────────────────────────────
@@ -351,9 +351,24 @@ const EventMarker = React.memo(
     const color = getCategoryColor(event.category, event.musicStyle);
     const iconName: CategoryIconName = getCategoryIcon(event.category, event.musicStyle);
 
-    const isMiniModalEvent = ['fauna', 'tienda', 'camara', 'universidad'].includes(event.category?.toLowerCase() || '');
-    const isAuthorityEvent = ['hospital', 'bombero', 'carabinero'].includes(event.category?.toLowerCase() || '');
-    const isArtistic = ['museo', 'coliseo', 'puerto', 'teatro', 'fauna', 'hospital', 'universidad', 'bombero', 'carabinero', 'camara'].includes(event.category?.toLowerCase() || '');
+    const isMiniModalEvent = ['fauna', 'tienda', 'camara', 'universidad'].includes(
+      event.category?.toLowerCase() || '',
+    );
+    const isAuthorityEvent = ['hospital', 'bombero', 'carabinero'].includes(
+      event.category?.toLowerCase() || '',
+    );
+    const isArtistic = [
+      'museo',
+      'coliseo',
+      'puerto',
+      'teatro',
+      'fauna',
+      'hospital',
+      'universidad',
+      'bombero',
+      'carabinero',
+      'camara',
+    ].includes(event.category?.toLowerCase() || '');
 
     const handlePress = useCallback(() => {
       onPress(event);
@@ -686,13 +701,13 @@ function MapContainerInner({
         typeof activeNestedZone.geojson === 'string'
           ? JSON.parse(activeNestedZone.geojson)
           : activeNestedZone.geojson;
-          
+
       if (geojson.type === 'Polygon' && geojson.coordinates && geojson.coordinates[0]) {
         const coordinates = geojson.coordinates[0].map((coord: any) => ({
           latitude: coord[1],
           longitude: coord[0],
         }));
-        
+
         mapRef.current.fitToCoordinates(coordinates, {
           edgePadding: { top: 100, right: 100, bottom: 100, left: 100 },
           animated: true,
@@ -711,8 +726,15 @@ function MapContainerInner({
   const handleSelectEvent = useCallback(
     (event: TurismoEvent | null) => {
       setSelectedFurnitureId(null);
-      const isLocalSelection = ['fauna', 'hospital', 'bombero', 'carabinero', 'camara', 'universidad'].includes(event?.category?.toLowerCase() || '');
-      const isAlreadySelected = (selectedEvent?.id === event?.id) || (localLoboMarinoId === event?.id);
+      const isLocalSelection = [
+        'fauna',
+        'hospital',
+        'bombero',
+        'carabinero',
+        'camara',
+        'universidad',
+      ].includes(event?.category?.toLowerCase() || '');
+      const isAlreadySelected = selectedEvent?.id === event?.id || localLoboMarinoId === event?.id;
       const nextEvent = isAlreadySelected ? null : event;
 
       if (nextEvent && isLocalSelection) {
@@ -724,7 +746,7 @@ function MapContainerInner({
         setLocalLoboMarinoId(null);
         onSelectEvent(nextEvent);
       }
-      
+
       skipNextCenter.current = true;
     },
     [onSelectEvent, selectedEvent, localLoboMarinoId],
@@ -936,7 +958,7 @@ function MapContainerInner({
         {showSectors &&
           (sectorsData || []).map((zone) => {
             if (visibleSectorIds && !visibleSectorIds.includes(zone.id)) return null;
-            
+
             // Zoom-based visibility rules for specific types
             if (zone.category === 'reserva' && currentZoom < 11.5) return null;
             if (zone.category === 'edificio' && currentZoom < 14) return null;
@@ -963,7 +985,7 @@ function MapContainerInner({
                 strokeWidth = 1.5;
                 lineDashPattern = [5, 10];
               }
-              const baseColor = (zone.color && zone.color.length === 7) ? zone.color : '#10B981';
+              const baseColor = zone.color && zone.color.length === 7 ? zone.color : '#10B981';
 
               return (
                 <Polygon
@@ -1007,8 +1029,10 @@ function MapContainerInner({
         )}
 
         {events
-          .filter(e => e.polygon && e.polygon.length > 0 && ['agua', 'humedal'].includes(e.category))
-          .map(event => (
+          .filter(
+            (e) => e.polygon && e.polygon.length > 0 && ['agua', 'humedal'].includes(e.category),
+          )
+          .map((event) => (
             <Polygon
               key={`poly-${event.id}`}
               coordinates={event.polygon!}
@@ -1345,14 +1369,15 @@ function MapContainerInner({
         )}
 
         {/* ── Native Mobiliario Layer (Static High-Perf POIs) ── */}
-        {currentZoom >= 15 && currentBounds &&
+        {currentZoom >= 15 &&
+          currentBounds &&
           furnitureData
             .filter(
               (f) =>
                 f.latitude >= currentBounds.minLat &&
                 f.latitude <= currentBounds.maxLat &&
                 f.longitude >= currentBounds.minLng &&
-                f.longitude <= currentBounds.maxLng
+                f.longitude <= currentBounds.maxLng,
             )
             .map((f) => (
               <FurnitureMarker

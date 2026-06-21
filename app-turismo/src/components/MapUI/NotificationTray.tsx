@@ -1,13 +1,8 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { SidebarSubmenu } from '../ui/SidebarSubmenu';
 
+import { SidebarSubmenu } from '../ui/SidebarSubmenu';
 import { AppNotification } from '../../../app/(home)/useHomeScreenState';
 
 interface NotificationTrayProps {
@@ -60,11 +55,7 @@ export function NotificationTray({
           ))
         ) : (
           <View style={styles.emptyState}>
-            <Ionicons
-              name="notifications-off-outline"
-              size={40}
-              color="rgba(255,255,255,0.1)"
-            />
+            <Ionicons name="notifications-off-outline" size={40} color="rgba(255,255,255,0.1)" />
             <Text style={styles.emptyText}>No hay notificaciones</Text>
           </View>
         )}

@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { Collection, CollectionItem } from '../types/collections';
 
 const STORAGE_KEY = 'app-turismo.collections';
@@ -40,7 +41,7 @@ export async function saveCollections(collections: Collection[]): Promise<void> 
 export async function createCollection(
   name: string,
   icon?: string,
-  color?: string
+  color?: string,
 ): Promise<Collection> {
   const collections = await loadCollections();
 
@@ -62,16 +63,13 @@ export async function createCollection(
 
 export async function deleteCollection(collectionId: string): Promise<void> {
   const collections = await loadCollections();
-  const filtered = collections.filter(c => c.id !== collectionId);
+  const filtered = collections.filter((c) => c.id !== collectionId);
   await saveCollections(filtered);
 }
 
-export async function renameCollection(
-  collectionId: string,
-  newName: string
-): Promise<void> {
+export async function renameCollection(collectionId: string, newName: string): Promise<void> {
   const collections = await loadCollections();
-  const idx = collections.findIndex(c => c.id === collectionId);
+  const idx = collections.findIndex((c) => c.id === collectionId);
   if (idx >= 0) {
     collections[idx].name = newName;
     collections[idx].updatedAt = Date.now();
@@ -81,14 +79,14 @@ export async function renameCollection(
 
 export async function addItemToCollection(
   collectionId: string,
-  item: CollectionItem
+  item: CollectionItem,
 ): Promise<void> {
   const collections = await loadCollections();
 
   // Add to specific collection
-  const collIdx = collections.findIndex(c => c.id === collectionId);
+  const collIdx = collections.findIndex((c) => c.id === collectionId);
   if (collIdx >= 0) {
-    const existingIdx = collections[collIdx].items.findIndex(i => i.id === item.id);
+    const existingIdx = collections[collIdx].items.findIndex((i) => i.id === item.id);
     if (existingIdx < 0) {
       collections[collIdx].items.push(item);
       collections[collIdx].updatedAt = Date.now();
@@ -96,9 +94,9 @@ export async function addItemToCollection(
   }
 
   // Always add to "Todos" (all)
-  const allIdx = collections.findIndex(c => c.id === 'all');
+  const allIdx = collections.findIndex((c) => c.id === 'all');
   if (allIdx >= 0) {
-    const existingIdx = collections[allIdx].items.findIndex(i => i.id === item.id);
+    const existingIdx = collections[allIdx].items.findIndex((i) => i.id === item.id);
     if (existingIdx < 0) {
       collections[allIdx].items.push(item);
       collections[allIdx].updatedAt = Date.now();
@@ -110,12 +108,12 @@ export async function addItemToCollection(
 
 export async function removeItemFromCollection(
   collectionId: string,
-  itemId: string
+  itemId: string,
 ): Promise<void> {
   const collections = await loadCollections();
-  const idx = collections.findIndex(c => c.id === collectionId);
+  const idx = collections.findIndex((c) => c.id === collectionId);
   if (idx >= 0) {
-    collections[idx].items = collections[idx].items.filter(i => i.id !== itemId);
+    collections[idx].items = collections[idx].items.filter((i) => i.id !== itemId);
     collections[idx].updatedAt = Date.now();
     await saveCollections(collections);
   }
@@ -123,13 +121,13 @@ export async function removeItemFromCollection(
 
 export async function getCollectionItems(collectionId: string): Promise<CollectionItem[]> {
   const collections = await loadCollections();
-  const collection = collections.find(c => c.id === collectionId);
+  const collection = collections.find((c) => c.id === collectionId);
   return collection?.items || [];
 }
 
 export async function generateShareLink(collectionId: string): Promise<string> {
   const collections = await loadCollections();
-  const idx = collections.findIndex(c => c.id === collectionId);
+  const idx = collections.findIndex((c) => c.id === collectionId);
   if (idx >= 0) {
     const shareLink = `https://app.turismo.local/collections/${collectionId}/share/${Date.now()}`;
     collections[idx].shareLink = shareLink;

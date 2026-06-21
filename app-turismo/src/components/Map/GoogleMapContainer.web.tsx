@@ -274,7 +274,18 @@ function InnerGoogleMap({
           );
         }
 
-        const isArtistic = ['museo', 'coliseo', 'puerto', 'teatro', 'fauna', 'hospital', 'universidad', 'bombero', 'carabinero', 'camara'].includes(event.category?.toLowerCase() || '');
+        const isArtistic = [
+          'museo',
+          'coliseo',
+          'puerto',
+          'teatro',
+          'fauna',
+          'hospital',
+          'universidad',
+          'bombero',
+          'carabinero',
+          'camara',
+        ].includes(event.category?.toLowerCase() || '');
 
         if (isArtistic) {
           const markerContent = (
@@ -296,9 +307,7 @@ function InnerGoogleMap({
                 position={{ lat: event.latitude, lng: event.longitude }}
                 zIndex={1}
               >
-                <div id={`google-pin-${event.id}`}>
-                  {markerContent}
-                </div>
+                <div id={`google-pin-${event.id}`}>{markerContent}</div>
               </AdvancedMarker>
             );
           }

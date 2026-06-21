@@ -41,11 +41,11 @@ interface BuildingGalleryProps {
 const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8081';
 
 const MEDIA_TYPE_CONFIG: Record<MediaType, { iconName: any; label: string; color: string }> = {
-  photo:     { iconName: 'photo-camera', label: 'Foto',   color: '#38BDF8' },
-  video:     { iconName: 'videocam', label: 'Video',  color: '#F472B6' },
-  video360:  { iconName: '360', label: '360°',   color: '#A78BFA' },
-  floorplan: { iconName: 'map', label: 'Plano',  color: '#34D399' },
-  audio:     { iconName: 'volume-up', label: 'Audio',  color: '#FBBF24' },
+  photo: { iconName: 'photo-camera', label: 'Foto', color: '#38BDF8' },
+  video: { iconName: 'videocam', label: 'Video', color: '#F472B6' },
+  video360: { iconName: '360', label: '360°', color: '#A78BFA' },
+  floorplan: { iconName: 'map', label: 'Plano', color: '#34D399' },
+  audio: { iconName: 'volume-up', label: 'Audio', color: '#FBBF24' },
 };
 
 const THUMBNAIL_WIDTH = 160;
@@ -149,7 +149,12 @@ export const BuildingGallery: React.FC<BuildingGalleryProps> = ({
     const config = MEDIA_TYPE_CONFIG[type] || MEDIA_TYPE_CONFIG.photo;
     return (
       <View style={[s.typeBadge, { backgroundColor: `${config.color}22` }]}>
-        <MaterialIcons name={config.iconName} size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
+        <MaterialIcons
+          name={config.iconName}
+          size={14}
+          color="#FFFFFF"
+          style={{ marginRight: 4 }}
+        />
         <Text style={[s.typeBadgeLabel, { color: config.color }]}>{config.label}</Text>
       </View>
     );
@@ -160,27 +165,20 @@ export const BuildingGallery: React.FC<BuildingGalleryProps> = ({
       key={item.id}
       activeOpacity={0.85}
       onPress={() => openLightbox(index)}
-      style={[
-        s.thumbnailCard,
-        Platform.select({ web: { cursor: 'pointer' } as any }),
-      ]}
+      style={[s.thumbnailCard, Platform.select({ web: { cursor: 'pointer' } as any })]}
     >
-      <Image
-        source={{ uri: item.thumbnail_url }}
-        style={s.thumbnailImage}
-        resizeMode="cover"
-      />
+      <Image source={{ uri: item.thumbnail_url }} style={s.thumbnailImage} resizeMode="cover" />
       {/* Gradient overlay */}
       <View style={s.thumbnailGradient} />
 
       {/* Type badge */}
-      <View style={s.thumbnailBadgeContainer}>
-        {renderTypeBadge(item.type)}
-      </View>
+      <View style={s.thumbnailBadgeContainer}>{renderTypeBadge(item.type)}</View>
 
       {/* Title */}
       <View style={s.thumbnailTitleContainer}>
-        <Text style={s.thumbnailTitle} numberOfLines={2}>{item.title}</Text>
+        <Text style={s.thumbnailTitle} numberOfLines={2}>
+          {item.title}
+        </Text>
       </View>
     </TouchableOpacity>
   );
@@ -190,7 +188,9 @@ export const BuildingGallery: React.FC<BuildingGalleryProps> = ({
       <MaterialIcons name="photo-library" size={28} color="#4B5563" />
       <Text style={s.emptyText}>No hay contenido disponible</Text>
       <Text style={s.emptySubtext}>
-        {activeFloor !== null ? `Piso ${activeFloor === 0 ? 'PB' : `P${activeFloor}`} sin multimedia` : 'Este edificio aún no tiene multimedia'}
+        {activeFloor !== null
+          ? `Piso ${activeFloor === 0 ? 'PB' : `P${activeFloor}`} sin multimedia`
+          : 'Este edificio aún no tiene multimedia'}
       </Text>
     </View>
   );
@@ -231,9 +231,16 @@ export const BuildingGallery: React.FC<BuildingGalleryProps> = ({
             <View style={s.lightboxTitleSection}>
               <View style={[s.lightboxTypeIndicator, { backgroundColor: config.color }]} />
               <View style={{ flex: 1 }}>
-                <Text style={s.lightboxTitle} numberOfLines={1}>{currentItem.title}</Text>
+                <Text style={s.lightboxTitle} numberOfLines={1}>
+                  {currentItem.title}
+                </Text>
                 <Text style={s.lightboxSubtitle}>
-                  <MaterialIcons name={config.iconName} size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <MaterialIcons
+                    name={config.iconName}
+                    size={16}
+                    color="#FFFFFF"
+                    style={{ marginRight: 6 }}
+                  />
                   {config.label} · {lightboxIndex + 1} de {media.length}
                 </Text>
               </View>
@@ -293,10 +300,7 @@ export const BuildingGallery: React.FC<BuildingGalleryProps> = ({
               {media.map((_, idx) => (
                 <View
                   key={idx}
-                  style={[
-                    s.lightboxDot,
-                    idx === lightboxIndex && s.lightboxDotActive,
-                  ]}
+                  style={[s.lightboxDot, idx === lightboxIndex && s.lightboxDotActive]}
                 />
               ))}
             </View>

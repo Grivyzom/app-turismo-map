@@ -58,9 +58,7 @@ export const MiniModal = ({ event, isLightMode, isSelected }: MiniModalProps) =>
   const isTienda = event.category?.toLowerCase() === 'tienda';
   const isUniversidad = event.category?.toLowerCase() === 'universidad';
 
-  const [isExpanded, setIsExpanded] = React.useState(
-    isSelected || isTienda
-  );
+  const [isExpanded, setIsExpanded] = React.useState(isSelected || isTienda);
 
   React.useEffect(() => {
     if (isSelected) {
@@ -71,7 +69,8 @@ export const MiniModal = ({ event, isLightMode, isSelected }: MiniModalProps) =>
   }, [isSelected, isTienda]);
   const color = getCategoryColor(event.category);
 
-  const isInformative = isFauna || isTienda || isHospital || isBombero || isCarabinero || isCamara || isUniversidad;
+  const isInformative =
+    isFauna || isTienda || isHospital || isBombero || isCarabinero || isCamara || isUniversidad;
 
   const handleToggleExpand = () => {
     if (isInformative) {
@@ -165,7 +164,7 @@ export const MiniModal = ({ event, isLightMode, isSelected }: MiniModalProps) =>
             zIndex: 99999,
           }}
         />,
-        document.body
+        document.body,
       );
     }
 
@@ -181,9 +180,7 @@ export const MiniModal = ({ event, isLightMode, isSelected }: MiniModalProps) =>
           },
         ]}
       >
-        <Text style={[styles.tooltipText, { color: textColor }]}>
-          {event.title}
-        </Text>
+        <Text style={[styles.tooltipText, { color: textColor }]}>{event.title}</Text>
         <View style={[styles.pointer, { borderTopColor: bgColor }]} />
       </Animated.View>
     );
@@ -216,7 +213,25 @@ export const MiniModal = ({ event, isLightMode, isSelected }: MiniModalProps) =>
           ) : (
             isInformative && (
               <View style={[styles.bannerPlaceholder, { backgroundColor: color }]}>
-                <MaterialIcons name={isFauna ? 'pets' : isHospital ? 'local-hospital' : isBombero ? 'fire-extinguisher' : isCarabinero ? 'local-police' : isCamara ? 'videocam' : isUniversidad ? 'school' : 'storefront'} size={40} color="#FFF" />
+                <MaterialIcons
+                  name={
+                    isFauna
+                      ? 'pets'
+                      : isHospital
+                        ? 'local-hospital'
+                        : isBombero
+                          ? 'fire-extinguisher'
+                          : isCarabinero
+                            ? 'local-police'
+                            : isCamara
+                              ? 'videocam'
+                              : isUniversidad
+                                ? 'school'
+                                : 'storefront'
+                  }
+                  size={40}
+                  color="#FFF"
+                />
               </View>
             )
           ))}
@@ -228,7 +243,21 @@ export const MiniModal = ({ event, isLightMode, isSelected }: MiniModalProps) =>
             ) : (
               <View style={[styles.thumbnailPlaceholder, { backgroundColor: color }]}>
                 <MaterialIcons
-                  name={isFauna ? 'pets' : isHospital ? 'local-hospital' : isBombero ? 'fire-extinguisher' : isCarabinero ? 'local-police' : isCamara ? 'videocam' : isUniversidad ? 'school' : 'storefront'}
+                  name={
+                    isFauna
+                      ? 'pets'
+                      : isHospital
+                        ? 'local-hospital'
+                        : isBombero
+                          ? 'fire-extinguisher'
+                          : isCarabinero
+                            ? 'local-police'
+                            : isCamara
+                              ? 'videocam'
+                              : isUniversidad
+                                ? 'school'
+                                : 'storefront'
+                  }
                   size={20}
                   color="#FFF"
                 />
@@ -320,7 +349,7 @@ export const MiniModal = ({ event, isLightMode, isSelected }: MiniModalProps) =>
                     </Text>
                   </View>
                 )}
-                 {!isFauna && event.contactPhone && (
+                {!isFauna && event.contactPhone && (
                   <View style={styles.extraInfoItem}>
                     <MaterialIcons name="phone" size={14} color={color} />
                     <Text style={[styles.extraInfoText, { color: subtextColor }]}>
@@ -340,7 +369,7 @@ export const MiniModal = ({ event, isLightMode, isSelected }: MiniModalProps) =>
             )}
 
             <View style={styles.actionsRow}>
-               <AnimatedPressable
+              <AnimatedPressable
                 style={[
                   styles.actionButton,
                   { backgroundColor: color },

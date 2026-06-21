@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import Ionicons from '@expo/vector-icons/Ionicons';
+
 import { getAuthTokenAsync } from '../utils/authStorage';
 
 interface FeedItem {

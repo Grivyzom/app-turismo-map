@@ -1,5 +1,13 @@
 import React, { useState, useCallback } from 'react';
-import { View, Image, ScrollView, StyleSheet, NativeSyntheticEvent, NativeScrollEvent, LayoutChangeEvent } from 'react-native';
+import {
+  View,
+  Image,
+  ScrollView,
+  StyleSheet,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+  LayoutChangeEvent,
+} from 'react-native';
 
 interface ParkImageSliderProps {
   images: string[];
@@ -49,10 +57,7 @@ export const ParkImageSlider: React.FC<ParkImageSliderProps> = ({ images, height
       {images.length > 1 && (
         <View style={styles.dotsRow}>
           {images.map((_, index) => (
-            <View
-              key={index}
-              style={[styles.dot, index === activeIndex && styles.dotActive]}
-            />
+            <View key={index} style={[styles.dot, index === activeIndex && styles.dotActive]} />
           ))}
         </View>
       )}

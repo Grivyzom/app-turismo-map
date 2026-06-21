@@ -18,6 +18,7 @@ import { StatusBar } from 'expo-status-bar';
 
 import { TopAppBar } from './src/components/MapUI';
 import { toast } from './src/components/ui/ToastNotification';
+import { Sidebar } from './src/components/ui/Sidebar';
 import './global.css';
 import './src/styles/custom.css';
 import { MapContainer } from './src/components/Map/MapContainer';
@@ -112,6 +113,9 @@ export default function App() {
   // Submenú
   const [isTopBarHovered, setIsTopBarHovered] = useState(false);
   const submenuHeight = useRef(new Animated.Value(0)).current;
+
+  // Sidebar
+  const [sidebarNotifications, setSidebarNotifications] = useState(false);
 
   // Animación del Toast flotante (para WebSockets en tiempo real)
   const showNotification = (message: string) => {
@@ -262,239 +266,263 @@ export default function App() {
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
 
-      {/* Contenedor del Mapa Separado por Plataforma */}
-      <View style={styles.mapContainer}>
-        <MapContainer
-          events={filteredEvents}
-          selectedEvent={selectedEvent}
-          onSelectEvent={setSelectedEvent}
-          mapLayer={mapLayer}
-          showTraffic={showTraffic}
-          showSectors={showSectors}
-        />
-      </View>
-
-      {/* TOAST FLOTANTE: Notificación en tiempo real de WebSocket */}
-      {toastMessage && (
-        <Animated.View style={[styles.toast, { transform: [{ translateY: toastY }] }]}>
-          <Text style={styles.toastText}>{toastMessage}</Text>
-        </Animated.View>
-      )}
-
-      {/* BARRA SUPERIOR NUEVA Y SUBMENÚ */}
-      <View
-        style={styles.topBarWrapper}
-        //@ts-ignore
-        onMouseEnter={() => setIsTopBarHovered(true)}
-        onMouseLeave={() => setIsTopBarHovered(false)}
-      >
-        <TopAppBar
-          currentTab="map"
-          onSearchClick={() => console.log('Search clicked')}
-          onAccountClick={() => console.log('Account clicked')}
+      <View style={styles.mainLayout}>
+        {/* SIDEBAR */}
+        <Sidebar
+          onNavigate={(section) => console.log('Navigate to:', section)}
+          onNotificationsClick={() => setSidebarNotifications(!sidebarNotifications)}
+          onSuggestionsClick={() => console.log('Sugerencias clicked')}
+          onProfileClick={() => console.log('Profile clicked')}
         />
 
-        {/* SUBMENÚ DESPLEGABLE */}
-        <Animated.View
-          style={[
-            styles.submenuContainer,
-            {
-              opacity: submenuHeight,
-              transform: [
-                {
-                  translateY: submenuHeight.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [-20, 0],
-                  }),
-                },
-              ],
-            },
-            !isTopBarHovered && { pointerEvents: 'none' }, // Desactiva clics cuando está oculto
-          ]}
-        >
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.categoriesScroll}
-            contentContainerStyle={styles.categoriesContent}
+        {/* CONTENIDO PRINCIPAL */}
+        <View style={styles.contentContainer}>
+          {/* Contenedor del Mapa */}
+          <View style={styles.mapContainer}>
+            <MapContainer
+              events={filteredEvents}
+              selectedEvent={selectedEvent}
+              onSelectEvent={setSelectedEvent}
+              mapLayer={mapLayer}
+              showTraffic={showTraffic}
+              showSectors={showSectors}
+            />
+          </View>
+
+          {/* TOAST FLOTANTE */}
+          {toastMessage && (
+            <Animated.View style={[styles.toast, { transform: [{ translateY: toastY }] }]}>
+              <Text style={styles.toastText}>{toastMessage}</Text>
+            </Animated.View>
+          )}
+
+          {/* BARRA SUPERIOR Y SUBMENÚ */}
+          <View
+            style={styles.topBarWrapper}
+            //@ts-ignore
+            onMouseEnter={() => setIsTopBarHovered(true)}
+            onMouseLeave={() => setIsTopBarHovered(false)}
           >
-            <TouchableOpacity
+            <TopAppBar
+              currentTab="map"
+              onSearchClick={() => console.log('Search clicked')}
+              onAccountClick={() => console.log('Account clicked')}
+            />
+
+            {/* SUBMENÚ DESPLEGABLE */}
+            <Animated.View
               style={[
-                styles.categoryChip,
-                selectedCategory === 'todos' && styles.activeCategoryChip,
+                styles.submenuContainer,
+                {
+                  opacity: submenuHeight,
+                  transform: [
+                    {
+                      translateY: submenuHeight.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-20, 0],
+                      }),
+                    },
+                  ],
+                },
+                !isTopBarHovered && { pointerEvents: 'none' }, // Desactiva clics cuando está oculto
               ]}
-              onPress={() => setSelectedCategory('todos')}
             >
-              <Text
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.categoriesScroll}
+                contentContainerStyle={styles.categoriesContent}
+              >
+                <TouchableOpacity
+                  style={[
+                    styles.categoryChip,
+                    selectedCategory === 'todos' && styles.activeCategoryChip,
+                  ]}
+                  onPress={() => setSelectedCategory('todos')}
+                >
+                  <Text
+                    style={[
+                      styles.categoryText,
+                      selectedCategory === 'todos' && styles.activeCategoryText,
+                    ]}
+                  >
+                    Todos
+                  </Text>
+                </TouchableOpacity>
+                {[
+                  'gastronomia',
+                  'cultura',
+                  'naturaleza',
+                  'parque',
+                  'agua',
+                  'humedal',
+                  'universidad',
+                  'musica',
+                  'deportes',
+                  'publico',
+                  'emergencia',
+                ].map((cat) => (
+                  <TouchableOpacity
+                    key={cat}
+                    style={[
+                      styles.categoryChip,
+                      selectedCategory === cat && styles.activeCategoryChip,
+                    ]}
+                    onPress={() => setSelectedCategory(cat as CategoryFilter)}
+                  >
+                    <Text
+                      style={[
+                        styles.categoryText,
+                        selectedCategory === cat && styles.activeCategoryText,
+                      ]}
+                    >
+                      {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.layersScroll}
+                contentContainerStyle={styles.layersContent}
+              >
+                <Text style={styles.layersLabel}>CAPAS:</Text>
+                {MAP_LAYER_OPTIONS.map((layer) => (
+                  <TouchableOpacity
+                    key={layer.key}
+                    style={[styles.layerChip, mapLayer === layer.key && styles.activeLayerChip]}
+                    onPress={() => setMapLayer(layer.key)}
+                  >
+                    <Text
+                      style={[
+                        styles.layerChipText,
+                        mapLayer === layer.key && styles.activeLayerChipText,
+                      ]}
+                    >
+                      {layer.icon} {layer.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </Animated.View>
+          </View>
+
+          {/* PANEL DE CONTROL DE SIMULACIÓN Y WEBSOCKET (Esquina Derecha / Inferior) */}
+          <View style={styles.controlPanel}>
+            <View style={styles.controlPanelGroup}>
+              <TouchableOpacity style={styles.simButton} onPress={triggerWebSocketEvent}>
+                <Text style={styles.simButtonText}>⚡ Simular WebSocket Go</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.toggleButton, showSectors && styles.toggleButtonActive]}
+                onPress={() => {
+                  setShowSectors(!showSectors);
+                  toast.success({
+                    title: showSectors ? 'Sectores ocultos' : 'Sectores visibles',
+                  });
+                }}
+              >
+                <MaterialIcons
+                  name={showSectors ? 'visibility' : 'visibility-off'}
+                  size={16}
+                  color={showSectors ? '#FFFFFF' : '#9CA3AF'}
+                />
+                <Text style={styles.toggleButtonText}>Sectores</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* TARJETA DETALLADA FLOTANTE (Efecto Emerger) */}
+          {selectedEvent &&
+            selectedEvent.category?.toLowerCase() !== 'tienda' &&
+            selectedEvent.category?.toLowerCase() !== 'fauna' && (
+              <Animated.View
                 style={[
-                  styles.categoryText,
-                  selectedCategory === 'todos' && styles.activeCategoryText,
+                  styles.detailsCard,
+                  {
+                    transform: [
+                      {
+                        translateY: cardHeight.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [300, 0],
+                        }),
+                      },
+                    ],
+                    opacity: cardHeight,
+                  },
                 ]}
               >
-                Todos
-              </Text>
-            </TouchableOpacity>
-            {[
-              'gastronomia',
-              'cultura',
-              'naturaleza',
-              'parque',
-              'agua',
-              'humedal',
-              'universidad',
-              'musica',
-              'deportes',
-              'publico',
-              'emergencia',
-            ].map((cat) => (
-              <TouchableOpacity
-                key={cat}
-                style={[styles.categoryChip, selectedCategory === cat && styles.activeCategoryChip]}
-                onPress={() => setSelectedCategory(cat as CategoryFilter)}
-              >
-                <Text
+                <View style={styles.cardHeader}>
+                  <View
+                    style={[
+                      styles.cardBadge,
+                      {
+                        backgroundColor: getCategoryColor(
+                          selectedEvent.category,
+                          selectedEvent.musicStyle,
+                        ),
+                      },
+                    ]}
+                  >
+                    <Text style={styles.cardBadgeText}>
+                      {['choque', 'incendio', 'accidente', 'calle_cortada'].includes(
+                        selectedEvent.category,
+                      )
+                        ? `🚨 ${selectedEvent.category.toUpperCase().replace('_', ' ')}`
+                        : selectedEvent.category.toUpperCase()}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => setSelectedEvent(null)}
+                    style={styles.closeButton}
+                  >
+                    <Text style={styles.closeButtonText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={styles.cardTitle}>{selectedEvent.title}</Text>
+                <Text style={styles.cardOrganizer}>
+                  {['choque', 'incendio', 'accidente', 'calle_cortada'].includes(
+                    selectedEvent.category,
+                  )
+                    ? 'Fuente / Reporte'
+                    : 'Organizado por'}
+                  : {selectedEvent.organizer}
+                </Text>
+                <Text style={styles.cardDesc}>{selectedEvent.description}</Text>
+
+                <View style={styles.cardDivider} />
+
+                <View style={styles.cardMetaRow}>
+                  <View style={styles.cardMetaItem}>
+                    <Text style={styles.metaLabel}>HORA</Text>
+                    <Text style={styles.metaValue}>🕒 {selectedEvent.time}</Text>
+                  </View>
+                  <View style={styles.cardMetaItem}>
+                    <Text style={styles.metaLabel}>ASISTENTES</Text>
+                    <Text style={styles.metaValue}>👥 {selectedEvent.attendeesCount} en vivo</Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity
                   style={[
-                    styles.categoryText,
-                    selectedCategory === cat && styles.activeCategoryText,
+                    styles.actionButton,
+                    {
+                      backgroundColor: getCategoryColor(
+                        selectedEvent.category,
+                        selectedEvent.musicStyle,
+                      ),
+                    },
                   ]}
                 >
-                  {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.layersScroll}
-            contentContainerStyle={styles.layersContent}
-          >
-            <Text style={styles.layersLabel}>CAPAS:</Text>
-            {MAP_LAYER_OPTIONS.map((layer) => (
-              <TouchableOpacity
-                key={layer.key}
-                style={[styles.layerChip, mapLayer === layer.key && styles.activeLayerChip]}
-                onPress={() => setMapLayer(layer.key)}
-              >
-                <Text
-                  style={[
-                    styles.layerChipText,
-                    mapLayer === layer.key && styles.activeLayerChipText,
-                  ]}
-                >
-                  {layer.icon} {layer.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </Animated.View>
-      </View>
-
-      {/* PANEL DE CONTROL DE SIMULACIÓN Y WEBSOCKET (Esquina Derecha / Inferior) */}
-      <View style={styles.controlPanel}>
-        <View style={styles.controlPanelGroup}>
-          <TouchableOpacity style={styles.simButton} onPress={triggerWebSocketEvent}>
-            <Text style={styles.simButtonText}>⚡ Simular WebSocket Go</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.toggleButton, showSectors && styles.toggleButtonActive]}
-            onPress={() => {
-              setShowSectors(!showSectors);
-              toast.success({
-                title: showSectors ? 'Sectores ocultos' : 'Sectores visibles',
-              });
-            }}
-          >
-            <MaterialIcons
-              name={showSectors ? 'visibility' : 'visibility-off'}
-              size={16}
-              color={showSectors ? '#FFFFFF' : '#9CA3AF'}
-            />
-            <Text style={styles.toggleButtonText}>Sectores</Text>
-          </TouchableOpacity>
+                  <Text style={styles.actionButtonText}>Asistir / Ver Detalles</Text>
+                </TouchableOpacity>
+              </Animated.View>
+            )}
         </View>
       </View>
-
-      {/* TARJETA DETALLADA FLOTANTE (Efecto Emerger) */}
-      {selectedEvent && 
-       selectedEvent.category?.toLowerCase() !== 'tienda' && 
-       selectedEvent.category?.toLowerCase() !== 'fauna' && (
-        <Animated.View
-          style={[
-            styles.detailsCard,
-            {
-              transform: [
-                {
-                  translateY: cardHeight.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [300, 0],
-                  }),
-                },
-              ],
-              opacity: cardHeight,
-            },
-          ]}
-        >
-          <View style={styles.cardHeader}>
-            <View
-              style={[
-                styles.cardBadge,
-                {
-                  backgroundColor: getCategoryColor(
-                    selectedEvent.category,
-                    selectedEvent.musicStyle,
-                  ),
-                },
-              ]}
-            >
-              <Text style={styles.cardBadgeText}>
-                {['choque', 'incendio', 'accidente', 'calle_cortada'].includes(
-                  selectedEvent.category,
-                )
-                  ? `🚨 ${selectedEvent.category.toUpperCase().replace('_', ' ')}`
-                  : selectedEvent.category.toUpperCase()}
-              </Text>
-            </View>
-            <TouchableOpacity onPress={() => setSelectedEvent(null)} style={styles.closeButton}>
-              <Text style={styles.closeButtonText}>✕</Text>
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.cardTitle}>{selectedEvent.title}</Text>
-          <Text style={styles.cardOrganizer}>
-            {['choque', 'incendio', 'accidente', 'calle_cortada'].includes(selectedEvent.category)
-              ? 'Fuente / Reporte'
-              : 'Organizado por'}
-            : {selectedEvent.organizer}
-          </Text>
-          <Text style={styles.cardDesc}>{selectedEvent.description}</Text>
-
-          <View style={styles.cardDivider} />
-
-          <View style={styles.cardMetaRow}>
-            <View style={styles.cardMetaItem}>
-              <Text style={styles.metaLabel}>HORA</Text>
-              <Text style={styles.metaValue}>🕒 {selectedEvent.time}</Text>
-            </View>
-            <View style={styles.cardMetaItem}>
-              <Text style={styles.metaLabel}>ASISTENTES</Text>
-              <Text style={styles.metaValue}>👥 {selectedEvent.attendeesCount} en vivo</Text>
-            </View>
-          </View>
-
-          <TouchableOpacity
-            style={[
-              styles.actionButton,
-              {
-                backgroundColor: getCategoryColor(selectedEvent.category, selectedEvent.musicStyle),
-              },
-            ]}
-          >
-            <Text style={styles.actionButtonText}>Asistir / Ver Detalles</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      )}
     </SafeAreaView>
   );
 }
@@ -503,6 +531,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0B0F19',
+  },
+  mainLayout: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  contentContainer: {
+    flex: 1,
+    position: 'relative',
   },
   topBarWrapper: {
     position: 'absolute',

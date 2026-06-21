@@ -71,18 +71,31 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
       ]}
       pointerEvents="box-none"
     >
-      <View style={[styles.tacticalHudGlass, { backgroundColor: theme.glassBg, borderColor: theme.glassBorder, shadowColor: theme.shadowColor as any }]}>
+      <View
+        style={[
+          styles.tacticalHudGlass,
+          {
+            backgroundColor: theme.glassBg,
+            borderColor: theme.glassBorder,
+            shadowColor: theme.shadowColor as any,
+          },
+        ]}
+      >
         <View style={styles.hudHeader}>
           <View style={styles.hudDot} />
           <Text style={[styles.hudTitle, { color: theme.textTitle }]}>COORDENADAS</Text>
         </View>
         <View style={styles.hudDataRow}>
           <Text style={[styles.hudLabel, { color: theme.textSecondary }]}>LAT</Text>
-          <Text style={[styles.hudValue, { color: theme.textPrimary }]}>{tacticalLocation.latitude.toFixed(6)}°</Text>
+          <Text style={[styles.hudValue, { color: theme.textPrimary }]}>
+            {tacticalLocation.latitude.toFixed(6)}°
+          </Text>
         </View>
         <View style={styles.hudDataRow}>
           <Text style={[styles.hudLabel, { color: theme.textSecondary }]}>LNG</Text>
-          <Text style={[styles.hudValue, { color: theme.textPrimary }]}>{tacticalLocation.longitude.toFixed(6)}°</Text>
+          <Text style={[styles.hudValue, { color: theme.textPrimary }]}>
+            {tacticalLocation.longitude.toFixed(6)}°
+          </Text>
         </View>
         <View style={styles.hudDataRow}>
           <Text style={[styles.hudLabel, { color: theme.textSecondary }]}>ALT</Text>
@@ -98,7 +111,8 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
             style={[
               styles.hudValue,
               {
-                color: tacticalLocation.surface === 'water' ? theme.surfaceWater : theme.surfaceLand,
+                color:
+                  tacticalLocation.surface === 'water' ? theme.surfaceWater : theme.surfaceLand,
                 fontWeight: '800',
               },
             ]}
@@ -107,9 +121,7 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
           </Text>
         </View>
 
-        <View
-          style={{ height: 1, backgroundColor: theme.separator, marginVertical: 8 }}
-        />
+        <View style={{ height: 1, backgroundColor: theme.separator, marginVertical: 8 }} />
 
         {isResolvingAddress ? (
           <View style={styles.hudDataRow}>
@@ -123,8 +135,13 @@ export const TacticalHUD: React.FC<TacticalHUDProps> = ({
               { flexDirection: 'column', alignItems: 'flex-start', gap: 2, marginBottom: 8 },
             ]}
           >
-            <Text style={[styles.hudLabel, { color: theme.textSecondary }]}>DIRECCIÓN DE EVENTO</Text>
-            <Text style={[styles.hudValue, { color: theme.textPrimary, fontSize: 10, lineHeight: 14 }]} numberOfLines={2}>
+            <Text style={[styles.hudLabel, { color: theme.textSecondary }]}>
+              DIRECCIÓN DE EVENTO
+            </Text>
+            <Text
+              style={[styles.hudValue, { color: theme.textPrimary, fontSize: 10, lineHeight: 14 }]}
+              numberOfLines={2}
+            >
               {resolvedAddress}
             </Text>
           </View>

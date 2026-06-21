@@ -85,16 +85,19 @@ export const CollectionsFloatingIsland = React.memo(function CollectionsFloating
     }
   }, []);
 
-  const handleSelectCollection = useCallback((collectionId: number) => {
-    setSelectedCollectionId(collectionId);
-    loadLocationsForCollection(collectionId);
-  }, [loadLocationsForCollection]);
+  const handleSelectCollection = useCallback(
+    (collectionId: number) => {
+      setSelectedCollectionId(collectionId);
+      loadLocationsForCollection(collectionId);
+    },
+    [loadLocationsForCollection],
+  );
 
   if (!visible) return null;
   if (!isAuthenticated) {
     return (
       <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable style={styles.islandContainer} onPress={e => e.stopPropagation()}>
+        <Pressable style={styles.islandContainer} onPress={(e) => e.stopPropagation()}>
           <View style={styles.emptyStateContainer}>
             <MaterialIcons name="lock-outline" size={48} color={COLORS.textMuted} />
             <Text style={styles.emptyStateText}>Inicia sesión para ver tus colecciones</Text>
@@ -106,7 +109,7 @@ export const CollectionsFloatingIsland = React.memo(function CollectionsFloating
 
   return (
     <Pressable style={styles.overlay} onPress={onClose}>
-      <Pressable style={styles.islandContainer} onPress={e => e.stopPropagation()}>
+      <Pressable style={styles.islandContainer} onPress={(e) => e.stopPropagation()}>
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Mi Colección</Text>
@@ -133,14 +136,11 @@ export const CollectionsFloatingIsland = React.memo(function CollectionsFloating
               style={styles.tabsContainer}
               contentContainerStyle={styles.tabsContent}
             >
-              {collections.map(collection => (
+              {collections.map((collection) => (
                 <TouchableOpacity
                   key={collection.id}
                   onPress={() => handleSelectCollection(collection.id)}
-                  style={[
-                    styles.tab,
-                    selectedCollectionId === collection.id && styles.tabActive,
-                  ]}
+                  style={[styles.tab, selectedCollectionId === collection.id && styles.tabActive]}
                 >
                   <Text
                     style={[
@@ -169,7 +169,7 @@ export const CollectionsFloatingIsland = React.memo(function CollectionsFloating
               ) : (
                 <FlatList
                   data={locations}
-                  keyExtractor={item => String(item.id)}
+                  keyExtractor={(item) => String(item.id)}
                   renderItem={({ item }) => <LocationItem location={item} />}
                   scrollEnabled={true}
                 />
@@ -241,10 +241,7 @@ const CollectionTab = React.memo(function CollectionTab({
 
   if (collection.id === 'all') {
     return (
-      <TouchableOpacity
-        onPress={onPress}
-        style={[styles.tab, isActive && styles.tabActive]}
-      >
+      <TouchableOpacity onPress={onPress} style={[styles.tab, isActive && styles.tabActive]}>
         {collection.icon && (
           <MaterialIcons
             name={collection.icon as any}
@@ -267,17 +264,9 @@ const CollectionTab = React.memo(function CollectionTab({
       //@ts-ignore
       style={[styles.tabWrapper, isDragging && styles.tabWrapperDragging]}
     >
-      <TouchableOpacity
-        onPress={onPress}
-        style={[styles.tab, isActive && styles.tabActive]}
-      >
+      <TouchableOpacity onPress={onPress} style={[styles.tab, isActive && styles.tabActive]}>
         {collection.color && (
-          <View
-            style={[
-              styles.tabColorBadge,
-              { backgroundColor: collection.color },
-            ]}
-          />
+          <View style={[styles.tabColorBadge, { backgroundColor: collection.color }]} />
         )}
         {collection.icon && (
           <MaterialIcons

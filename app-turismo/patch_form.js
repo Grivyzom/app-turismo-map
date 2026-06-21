@@ -3,9 +3,10 @@ const file = '/grivyzom/webs/app-turismo-map/app-turismo/app/(home)/index.tsx';
 const lines = fs.readFileSync(file, 'utf8').split('\n');
 
 // Find the start index (DIRECCIÓN FÍSICA REAL)
-let startIdx = lines.findIndex(l => l.includes('DIRECCIÓN FÍSICA REAL')) - 9; // go back to <Text
+let startIdx = lines.findIndex((l) => l.includes('DIRECCIÓN FÍSICA REAL')) - 9; // go back to <Text
 // Find the end index (reset form)
-let endIdx = lines.findIndex((l, idx) => idx > startIdx && l.includes('setFormTime(\'12:00 - 18:00\');')) + 1;
+let endIdx =
+  lines.findIndex((l, idx) => idx > startIdx && l.includes("setFormTime('12:00 - 18:00');")) + 1;
 
 if (startIdx > 0 && endIdx > startIdx) {
   const newForm = `                <SearchableSelect

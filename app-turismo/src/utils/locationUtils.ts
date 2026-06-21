@@ -29,19 +29,23 @@ export function calculateBearing(lat1: number, lon1: number, lat2: number, lon2:
 }
 
 // Calcula el centro (centroide de los vértices) de un polígono o camino
-export function getPolygonCenter(points: { latitude: number; longitude: number }[]): { latitude: number; longitude: number } {
+export function getPolygonCenter(points: { latitude: number; longitude: number }[]): {
+  latitude: number;
+  longitude: number;
+} {
   if (!points || points.length === 0) {
     return { latitude: 0, longitude: 0 };
   }
 
   let sumLat = 0;
   let sumLng = 0;
-  
+
   // Si es un polígono cerrado (el primer y el último punto son iguales), omitimos el último para no darle doble peso
   const first = points[0];
   const last = points[points.length - 1];
-  const isClosed = points.length > 1 && first.latitude === last.latitude && first.longitude === last.longitude;
-  
+  const isClosed =
+    points.length > 1 && first.latitude === last.latitude && first.longitude === last.longitude;
+
   const limit = isClosed ? points.length - 1 : points.length;
   if (limit <= 0) {
     return { latitude: first.latitude, longitude: first.longitude };
@@ -64,9 +68,8 @@ export function getZoneCentroid(geojson: any): { latitude: number; longitude: nu
 
   // Polygon: coordinates[ringIndex][pointIndex] = [lng, lat]
   // MultiPolygon: coordinates[polyIndex][ringIndex][pointIndex] = [lng, lat]
-  const ring = geojson.type === 'MultiPolygon'
-    ? geojson.coordinates[0]?.[0]
-    : geojson.coordinates[0];
+  const ring =
+    geojson.type === 'MultiPolygon' ? geojson.coordinates[0]?.[0] : geojson.coordinates[0];
 
   if (!Array.isArray(ring) || ring.length === 0) return null;
 

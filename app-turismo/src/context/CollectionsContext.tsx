@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+
 import { Collection, CollectionItem, CollectionsState } from '../types/collections';
 import {
   loadCollections,
@@ -36,15 +37,15 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
 
   const refresh = useCallback(async () => {
     try {
-      setState(prev => ({ ...prev, loading: true, error: null }));
+      setState((prev) => ({ ...prev, loading: true, error: null }));
       const collections = await loadCollections();
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         collections,
         loading: false,
       }));
     } catch (error) {
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         loading: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -62,19 +63,19 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
       await refresh();
       return collection;
     },
-    [refresh]
+    [refresh],
   );
 
   const handleDeleteCollection = useCallback(
     async (id: string) => {
       await deleteCollection(id);
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         selectedCollectionId: prev.selectedCollectionId === id ? 'all' : prev.selectedCollectionId,
       }));
       await refresh();
     },
-    [refresh]
+    [refresh],
   );
 
   const handleRenameCollection = useCallback(
@@ -82,7 +83,7 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
       await renameCollection(id, newName);
       await refresh();
     },
-    [refresh]
+    [refresh],
   );
 
   const handleAddItem = useCallback(
@@ -90,7 +91,7 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
       await addItemToCollection(collectionId, item);
       await refresh();
     },
-    [refresh]
+    [refresh],
   );
 
   const handleRemoveItem = useCallback(
@@ -98,7 +99,7 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
       await removeItemFromCollection(collectionId, itemId);
       await refresh();
     },
-    [refresh]
+    [refresh],
   );
 
   const handleShareCollection = useCallback(
@@ -107,7 +108,7 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
       await refresh();
       return link;
     },
-    [refresh]
+    [refresh],
   );
 
   const handleReorderCollections = useCallback(
@@ -115,7 +116,7 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
       await saveCollections(newOrder);
       await refresh();
     },
-    [refresh]
+    [refresh],
   );
 
   const value: CollectionsContextType = {
@@ -125,18 +126,13 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
     renameCollection: handleRenameCollection,
     addItem: handleAddItem,
     removeItem: handleRemoveItem,
-    setSelectedCollection: (id) =>
-      setState(prev => ({ ...prev, selectedCollectionId: id })),
+    setSelectedCollection: (id) => setState((prev) => ({ ...prev, selectedCollectionId: id })),
     shareCollection: handleShareCollection,
     reorderCollections: handleReorderCollections,
     refresh,
   };
 
-  return (
-    <CollectionsContext.Provider value={value}>
-      {children}
-    </CollectionsContext.Provider>
-  );
+  return <CollectionsContext.Provider value={value}>{children}</CollectionsContext.Provider>;
 }
 
 export function useCollections(): CollectionsContextType {

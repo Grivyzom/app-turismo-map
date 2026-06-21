@@ -1,6 +1,15 @@
 import { TurismoEvent } from '../components/Map/types';
 import { MapLayer } from '../components/Map/types';
-import { PARQUES_EVENTS, AGUA_EVENTS, HUMEDALES_EVENTS, UNIVERSIDADES_EVENTS, CASINO_DREAMS_EVENT, HOSPITALES_EVENTS, SEGURIDAD_EVENTS } from './polygonsData';
+
+import {
+  PARQUES_EVENTS,
+  AGUA_EVENTS,
+  HUMEDALES_EVENTS,
+  UNIVERSIDADES_EVENTS,
+  CASINO_DREAMS_EVENT,
+  HOSPITALES_EVENTS,
+  SEGURIDAD_EVENTS,
+} from './polygonsData';
 
 export type CategoryFilter =
   | 'todos'
@@ -35,7 +44,7 @@ export const INITIAL_EVENTS: TurismoEvent[] = [
   ...UNIVERSIDADES_EVENTS,
   ...HOSPITALES_EVENTS,
   ...SEGURIDAD_EVENTS,
-  CASINO_DREAMS_EVENT
+  CASINO_DREAMS_EVENT,
 ];
 
 export const WS_SIMULATION_POOL: Omit<TurismoEvent, 'id' | 'isRealTime'>[] = [];

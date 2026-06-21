@@ -86,7 +86,7 @@ func InitDB() {
 		`CREATE TABLE IF NOT EXISTS companies (
 			id SERIAL PRIMARY KEY,
 			business_name VARCHAR(255) NOT NULL,
-			entity_type VARCHAR(50) DEFAULT 'business' CHECK (entity_type IN ('business', 'independent', 'authority')),
+			entity_type VARCHAR(50) DEFAULT 'business' CHECK (entity_type IN ('business', 'independent', 'authority', 'independiente', 'pymes', 'empresas')),
 			category VARCHAR(100),
 			is_verified_badge BOOLEAN DEFAULT false,
 			tax_id VARCHAR(50),
@@ -307,7 +307,7 @@ func InitDB() {
 
 		// Asegurar restricciones de tipo de entidad en base de datos existente
 		`ALTER TABLE companies DROP CONSTRAINT IF EXISTS chk_entity_type;`,
-		`ALTER TABLE companies ADD CONSTRAINT chk_entity_type CHECK (entity_type IN ('business', 'independent', 'authority'));`,
+		`ALTER TABLE companies ADD CONSTRAINT chk_entity_type CHECK (entity_type IN ('business', 'independent', 'authority', 'independiente', 'pymes', 'empresas'));`,
 
 		// Función y Trigger para limitar anticipación de creación de eventos (máximo 14 días)
 		`CREATE OR REPLACE FUNCTION check_event_start_time()

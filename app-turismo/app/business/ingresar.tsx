@@ -127,7 +127,9 @@ export default function BusinessIngresarScreen() {
   const [businessName, setBusinessName] = useState('');
   const [managerName, setManagerName] = useState('');
   const [phone, setPhone] = useState('');
-  const [registerEntityType, setRegisterEntityType] = useState<'corporate' | 'sme' | 'independent'>('corporate');
+  const [registerEntityType, setRegisterEntityType] = useState<'corporate' | 'sme' | 'independent'>(
+    'corporate',
+  );
 
   // ── Estado general ──
   const [isLoading, setIsLoading] = useState(false);
@@ -152,7 +154,9 @@ export default function BusinessIngresarScreen() {
       if (!email) missing.push('correo corporativo');
       if (!password) missing.push('contraseña');
       const faltanStr = missing.length > 1 ? 'Faltan' : 'Falta';
-      setFormError(`Error: Por favor completa todos los campos obligatorios. (${faltanStr}: ${missing.join(' y ')})`);
+      setFormError(
+        `Error: Por favor completa todos los campos obligatorios. (${faltanStr}: ${missing.join(' y ')})`,
+      );
       return;
     }
     setIsLoading(true);
@@ -204,7 +208,9 @@ export default function BusinessIngresarScreen() {
       if (!email) missing.push('correo corporativo');
       if (!password) missing.push('contraseña');
       const faltanStr = missing.length > 1 ? 'Faltan' : 'Falta';
-      setFormError(`Error: Por favor completa todos los campos obligatorios. (${faltanStr}: ${missing.join(', ')})`);
+      setFormError(
+        `Error: Por favor completa todos los campos obligatorios. (${faltanStr}: ${missing.join(', ')})`,
+      );
       return;
     }
     setIsLoading(true);
@@ -216,7 +222,10 @@ export default function BusinessIngresarScreen() {
           email: email.trim(),
           password,
           name: managerName,
-          businessName: (registerEntityType === 'corporate' || registerEntityType === 'sme') ? businessName : undefined,
+          businessName:
+            registerEntityType === 'corporate' || registerEntityType === 'sme'
+              ? businessName
+              : undefined,
           userType: 'partner_owner',
           phone,
           entityType: registerEntityType,
@@ -236,7 +245,9 @@ export default function BusinessIngresarScreen() {
         });
         await signIn(data.token, true, '/business/dashboard');
       } else {
-        setFormError(`Error de registro: ${data.message || 'No se pudo crear la cuenta de empresa'}`);
+        setFormError(
+          `Error de registro: ${data.message || 'No se pudo crear la cuenta de empresa'}`,
+        );
       }
     } catch (err) {
       console.error('Register error:', err);
@@ -249,7 +260,9 @@ export default function BusinessIngresarScreen() {
   // ─── Recuperación ─────────────────────────────────────────────────────────────
   const handleRecovery = () => {
     if (!email) {
-      setFormError('Error: Por favor completa todos los campos obligatorios. (Falta: correo corporativo)');
+      setFormError(
+        'Error: Por favor completa todos los campos obligatorios. (Falta: correo corporativo)',
+      );
       return;
     }
     setIsLoading(true);
@@ -334,11 +347,23 @@ export default function BusinessIngresarScreen() {
                   styles.entityTypeBtn,
                   registerEntityType === 'corporate' && styles.entityTypeBtnActive,
                 ]}
-                onPress={() => { setRegisterEntityType('corporate'); setFormError(''); }}
+                onPress={() => {
+                  setRegisterEntityType('corporate');
+                  setFormError('');
+                }}
                 activeOpacity={0.8}
               >
-                <MaterialIcons name="business" size={16} color={registerEntityType === 'corporate' ? '#ffffff' : NAVY} />
-                <Text style={[styles.entityTypeText, registerEntityType === 'corporate' && styles.entityTypeTextActive]}>
+                <MaterialIcons
+                  name="business"
+                  size={16}
+                  color={registerEntityType === 'corporate' ? '#ffffff' : NAVY}
+                />
+                <Text
+                  style={[
+                    styles.entityTypeText,
+                    registerEntityType === 'corporate' && styles.entityTypeTextActive,
+                  ]}
+                >
                   Empresa
                 </Text>
               </TouchableOpacity>
@@ -347,11 +372,23 @@ export default function BusinessIngresarScreen() {
                   styles.entityTypeBtn,
                   registerEntityType === 'sme' && styles.entityTypeBtnActive,
                 ]}
-                onPress={() => { setRegisterEntityType('sme'); setFormError(''); }}
+                onPress={() => {
+                  setRegisterEntityType('sme');
+                  setFormError('');
+                }}
                 activeOpacity={0.8}
               >
-                <MaterialIcons name="storefront" size={16} color={registerEntityType === 'sme' ? '#ffffff' : NAVY} />
-                <Text style={[styles.entityTypeText, registerEntityType === 'sme' && styles.entityTypeTextActive]}>
+                <MaterialIcons
+                  name="storefront"
+                  size={16}
+                  color={registerEntityType === 'sme' ? '#ffffff' : NAVY}
+                />
+                <Text
+                  style={[
+                    styles.entityTypeText,
+                    registerEntityType === 'sme' && styles.entityTypeTextActive,
+                  ]}
+                >
                   PYME
                 </Text>
               </TouchableOpacity>
@@ -360,23 +397,46 @@ export default function BusinessIngresarScreen() {
                   styles.entityTypeBtn,
                   registerEntityType === 'independent' && styles.entityTypeBtnActive,
                 ]}
-                onPress={() => { setRegisterEntityType('independent'); setFormError(''); }}
+                onPress={() => {
+                  setRegisterEntityType('independent');
+                  setFormError('');
+                }}
                 activeOpacity={0.8}
               >
-                <MaterialIcons name="person-outline" size={16} color={registerEntityType === 'independent' ? '#ffffff' : NAVY} />
-                <Text style={[styles.entityTypeText, registerEntityType === 'independent' && styles.entityTypeTextActive]}>
+                <MaterialIcons
+                  name="person-outline"
+                  size={16}
+                  color={registerEntityType === 'independent' ? '#ffffff' : NAVY}
+                />
+                <Text
+                  style={[
+                    styles.entityTypeText,
+                    registerEntityType === 'independent' && styles.entityTypeTextActive,
+                  ]}
+                >
                   Independiente
                 </Text>
               </TouchableOpacity>
             </View>
-            
+
             {(registerEntityType === 'corporate' || registerEntityType === 'sme') && (
               <Field
                 field="businessName"
-                placeholder={registerEntityType === 'sme' ? "Nombre de la PYME *" : "Nombre de la empresa *"}
+                placeholder={
+                  registerEntityType === 'sme' ? 'Nombre de la PYME *' : 'Nombre de la empresa *'
+                }
                 value={businessName}
-                onChangeText={(v) => { setBusinessName(v); setFormError(''); }}
-                icon={<MaterialIcons name={registerEntityType === 'sme' ? "storefront" : "store"} size={16} color="#94a3b8" />}
+                onChangeText={(v) => {
+                  setBusinessName(v);
+                  setFormError('');
+                }}
+                icon={
+                  <MaterialIcons
+                    name={registerEntityType === 'sme' ? 'storefront' : 'store'}
+                    size={16}
+                    color="#94a3b8"
+                  />
+                }
                 autoCapitalize="words"
                 focusedField={focusedField}
                 setFocusedField={setFocusedField}
@@ -384,9 +444,16 @@ export default function BusinessIngresarScreen() {
             )}
             <Field
               field="managerName"
-              placeholder={registerEntityType === 'independent' ? "Nombre o marca personal *" : "Nombre del representante *"}
+              placeholder={
+                registerEntityType === 'independent'
+                  ? 'Nombre o marca personal *'
+                  : 'Nombre del representante *'
+              }
               value={managerName}
-              onChangeText={(v) => { setManagerName(v); setFormError(''); }}
+              onChangeText={(v) => {
+                setManagerName(v);
+                setFormError('');
+              }}
               icon={<MaterialIcons name="person" size={16} color="#94a3b8" />}
               autoCapitalize="words"
               focusedField={focusedField}
@@ -400,7 +467,10 @@ export default function BusinessIngresarScreen() {
           field="email"
           placeholder="correo@empresa.com"
           value={email}
-          onChangeText={(v) => { setEmail(v); setFormError(''); }}
+          onChangeText={(v) => {
+            setEmail(v);
+            setFormError('');
+          }}
           icon={<Ionicons name="mail-outline" size={16} color="#94a3b8" />}
           keyboardType="email-address"
           focusedField={focusedField}
@@ -413,7 +483,10 @@ export default function BusinessIngresarScreen() {
             field="phone"
             placeholder="Teléfono de contacto"
             value={phone}
-            onChangeText={(v) => { setPhone(v); setFormError(''); }}
+            onChangeText={(v) => {
+              setPhone(v);
+              setFormError('');
+            }}
             icon={<MaterialIcons name="phone" size={16} color="#94a3b8" />}
             keyboardType="phone-pad"
             focusedField={focusedField}
@@ -432,7 +505,10 @@ export default function BusinessIngresarScreen() {
               placeholderTextColor="#94a3b8"
               secureTextEntry={!showPassword}
               value={password}
-              onChangeText={(v) => { setPassword(v); setFormError(''); }}
+              onChangeText={(v) => {
+                setPassword(v);
+                setFormError('');
+              }}
               onFocus={() => setFocusedField('password')}
               onBlur={() => setFocusedField(null)}
               style={[
@@ -715,7 +791,12 @@ const styles = StyleSheet.create({
     backgroundColor: ACCENT,
     ...Platform.select({
       web: { boxShadow: '0 2px 4px rgba(0,0,0,0.1)' },
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
       android: { elevation: 2 },
     }),
   },

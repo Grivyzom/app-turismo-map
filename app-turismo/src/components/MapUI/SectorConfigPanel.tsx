@@ -10,6 +10,7 @@ import {
   TextInput,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+
 import { useUserLocationContext } from '../../context/UserLocationContext';
 
 interface Sector {
@@ -42,16 +43,19 @@ const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => 
     Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) * Math.sin(dl / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-  return R * c; 
+  return R * c;
 };
 
 const isPointInPolygon = (point: [number, number], vs: [number, number][]) => {
-  let x = point[0], y = point[1];
+  let x = point[0],
+    y = point[1];
   let inside = false;
   for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
-    let xi = vs[i][0], yi = vs[i][1];
-    let xj = vs[j][0], yj = vs[j][1];
-    let intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+    let xi = vs[i][0],
+      yi = vs[i][1];
+    let xj = vs[j][0],
+      yj = vs[j][1];
+    let intersect = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
     if (intersect) inside = !inside;
   }
   return inside;
@@ -69,8 +73,9 @@ const getPolygonCoords = (geojson: any): [number, number][] | null => {
 
 const getSectorCenter = (coords: [number, number][]): [number, number] => {
   if (!coords || coords.length === 0) return [0, 0];
-  let sumLon = 0, sumLat = 0;
-  coords.forEach(c => {
+  let sumLon = 0,
+    sumLat = 0;
+  coords.forEach((c) => {
     sumLon += c[0];
     sumLat += c[1];
   });
@@ -103,7 +108,7 @@ export const SectorConfigPanel: React.FC<SectorConfigPanelProps> = ({
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      list = list.filter(s => s.name.toLowerCase().includes(q));
+      list = list.filter((s) => s.name.toLowerCase().includes(q));
     }
     return list;
   }, [sectors, isDevMode, searchQuery]);
@@ -122,42 +127,49 @@ export const SectorConfigPanel: React.FC<SectorConfigPanelProps> = ({
 
   const citizenSectors = useMemo(() => {
     if (isDevMode) return [];
-    const withDistance = filteredAndSearchedSectors.map(sector => {
-        let distance = Infinity;
-        let isInside = false;
-        if (sector.geojson && userLocation) {
-          const coords = getPolygonCoords(sector.geojson);
-          if (coords) {
-             isInside = isPointInPolygon([userLocation.longitude, userLocation.latitude], coords);
-             const center = getSectorCenter(coords);
-             distance = getDistance(userLocation.latitude, userLocation.longitude, center[1], center[0]);
-          }
+    const withDistance = filteredAndSearchedSectors.map((sector) => {
+      let distance = Infinity;
+      let isInside = false;
+      if (sector.geojson && userLocation) {
+        const coords = getPolygonCoords(sector.geojson);
+        if (coords) {
+          isInside = isPointInPolygon([userLocation.longitude, userLocation.latitude], coords);
+          const center = getSectorCenter(coords);
+          distance = getDistance(
+            userLocation.latitude,
+            userLocation.longitude,
+            center[1],
+            center[0],
+          );
         }
-        return { ...sector, distance, isInside };
+      }
+      return { ...sector, distance, isInside };
     });
-    
+
     withDistance.sort((a, b) => {
       if (a.isInside && !b.isInside) return -1;
       if (!a.isInside && b.isInside) return 1;
       return a.distance - b.distance;
     });
-    
+
     return withDistance;
   }, [filteredAndSearchedSectors, isDevMode, userLocation]);
 
   return (
     <View style={styles.overlayContainer}>
       <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
-      
+
       <View style={styles.islandContainer}>
         <View style={styles.glowBorderTop} />
-        
+
         <View style={styles.contentHeader}>
           <View style={styles.headerTitleContainer}>
             <View style={styles.logoBadge}>
               <MaterialIcons name="layers" size={20} color="#6EE7B7" />
             </View>
-            <Text style={styles.contentHeaderTitle}>{isDevMode ? 'Configurar Capas' : 'Sectores Urbanos'}</Text>
+            <Text style={styles.contentHeaderTitle}>
+              {isDevMode ? 'Configurar Capas' : 'Sectores Urbanos'}
+            </Text>
           </View>
           <TouchableOpacity onPress={onClose} style={styles.closeButton} activeOpacity={0.8}>
             <MaterialIcons name="close" size={20} color="#9CA3AF" />
@@ -165,7 +177,6 @@ export const SectorConfigPanel: React.FC<SectorConfigPanelProps> = ({
         </View>
 
         <View style={styles.contentArea}>
-          
           <View style={styles.searchContainer}>
             <MaterialIcons name="search" size={20} color="#9CA3AF" />
             <TextInput
@@ -179,7 +190,11 @@ export const SectorConfigPanel: React.FC<SectorConfigPanelProps> = ({
 
           <View style={styles.masterRow}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <MaterialIcons name={showSectors ? "visibility" : "visibility-off"} size={20} color={showSectors ? "#6EE7B7" : "#9CA3AF"} />
+              <MaterialIcons
+                name={showSectors ? 'visibility' : 'visibility-off'}
+                size={20}
+                color={showSectors ? '#6EE7B7' : '#9CA3AF'}
+              />
               <Text style={styles.masterLabel}>Mostrar Capa de Sectores</Text>
             </View>
             <Switch
@@ -193,80 +208,107 @@ export const SectorConfigPanel: React.FC<SectorConfigPanelProps> = ({
           <View style={styles.divider} />
 
           <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
-            {isDevMode ? (
-              Object.entries(devGroups).map(([groupName, groupSectors]) => {
-                const isExpanded = expandedGroups[groupName] || false;
-                const displayName = groupName === 'otros' ? 'Otros' : groupName;
-                return (
-                  <View key={groupName} style={styles.groupContainer}>
-                    <TouchableOpacity 
-                      style={[styles.groupHeader, isExpanded && styles.groupHeaderActive]} 
-                      onPress={() => toggleGroup(groupName)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.groupTitle}>
-                        {displayName} <Text style={styles.groupCount}>({groupSectors.length})</Text>
-                      </Text>
-                      <MaterialIcons 
-                        name={isExpanded ? 'expand-less' : 'expand-more'} 
-                        size={20} 
-                        color="#9CA3AF" 
-                      />
-                    </TouchableOpacity>
-
-                    {isExpanded && (
-                      <View style={styles.groupContent}>
-                        {groupSectors.map((sector) => {
-                          const isVisible = visibleSectorIds.includes(sector.id);
-                          return (
-                            <View key={sector.id} style={[styles.sectorRow, !showSectors && { opacity: 0.5 }]}>
-                              <View style={styles.sectorInfo}>
-                                <View style={[styles.colorBadge, { backgroundColor: sector.color || '#6EE7B7' }]} />
-                                <Text style={styles.sectorName}>{sector.name}</Text>
-                              </View>
-                              <Switch
-                                value={isVisible}
-                                disabled={!showSectors}
-                                onValueChange={() => onToggleSector(sector.id)}
-                                trackColor={{ false: 'rgba(255, 255, 255, 0.1)', true: 'rgba(110, 231, 183, 0.3)' }}
-                                thumbColor={isVisible && showSectors ? '#6EE7B7' : '#9CA3AF'}
-                              />
-                            </View>
-                          );
-                        })}
-                      </View>
-                    )}
-                  </View>
-                );
-              })
-            ) : (
-              citizenSectors.map((sector: any) => {
-                const isVisible = visibleSectorIds.includes(sector.id);
-                return (
-                  <View key={sector.id} style={[styles.sectorRow, !showSectors && { opacity: 0.5 }]}>
-                    <View style={styles.sectorInfo}>
-                      <View style={[styles.colorBadge, { backgroundColor: sector.color || '#6EE7B7' }]} />
-                      <View>
-                        <Text style={styles.sectorName}>{sector.name}</Text>
-                        <Text style={styles.sectorDistance}>
-                          {sector.isInside ? 'Estás aquí' : sector.distance !== Infinity ? `A ${(sector.distance / 1000).toFixed(1)} km` : ''}
+            {isDevMode
+              ? Object.entries(devGroups).map(([groupName, groupSectors]) => {
+                  const isExpanded = expandedGroups[groupName] || false;
+                  const displayName = groupName === 'otros' ? 'Otros' : groupName;
+                  return (
+                    <View key={groupName} style={styles.groupContainer}>
+                      <TouchableOpacity
+                        style={[styles.groupHeader, isExpanded && styles.groupHeaderActive]}
+                        onPress={() => toggleGroup(groupName)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.groupTitle}>
+                          {displayName}{' '}
+                          <Text style={styles.groupCount}>({groupSectors.length})</Text>
                         </Text>
-                      </View>
+                        <MaterialIcons
+                          name={isExpanded ? 'expand-less' : 'expand-more'}
+                          size={20}
+                          color="#9CA3AF"
+                        />
+                      </TouchableOpacity>
+
+                      {isExpanded && (
+                        <View style={styles.groupContent}>
+                          {groupSectors.map((sector) => {
+                            const isVisible = visibleSectorIds.includes(sector.id);
+                            return (
+                              <View
+                                key={sector.id}
+                                style={[styles.sectorRow, !showSectors && { opacity: 0.5 }]}
+                              >
+                                <View style={styles.sectorInfo}>
+                                  <View
+                                    style={[
+                                      styles.colorBadge,
+                                      { backgroundColor: sector.color || '#6EE7B7' },
+                                    ]}
+                                  />
+                                  <Text style={styles.sectorName}>{sector.name}</Text>
+                                </View>
+                                <Switch
+                                  value={isVisible}
+                                  disabled={!showSectors}
+                                  onValueChange={() => onToggleSector(sector.id)}
+                                  trackColor={{
+                                    false: 'rgba(255, 255, 255, 0.1)',
+                                    true: 'rgba(110, 231, 183, 0.3)',
+                                  }}
+                                  thumbColor={isVisible && showSectors ? '#6EE7B7' : '#9CA3AF'}
+                                />
+                              </View>
+                            );
+                          })}
+                        </View>
+                      )}
                     </View>
-                    <Switch
-                      value={isVisible}
-                      disabled={!showSectors}
-                      onValueChange={() => onToggleSector(sector.id)}
-                      trackColor={{ false: 'rgba(255, 255, 255, 0.1)', true: 'rgba(110, 231, 183, 0.3)' }}
-                      thumbColor={isVisible && showSectors ? '#6EE7B7' : '#9CA3AF'}
-                    />
-                  </View>
-                );
-              })
-            )}
-            
+                  );
+                })
+              : citizenSectors.map((sector: any) => {
+                  const isVisible = visibleSectorIds.includes(sector.id);
+                  return (
+                    <View
+                      key={sector.id}
+                      style={[styles.sectorRow, !showSectors && { opacity: 0.5 }]}
+                    >
+                      <View style={styles.sectorInfo}>
+                        <View
+                          style={[
+                            styles.colorBadge,
+                            { backgroundColor: sector.color || '#6EE7B7' },
+                          ]}
+                        />
+                        <View>
+                          <Text style={styles.sectorName}>{sector.name}</Text>
+                          <Text style={styles.sectorDistance}>
+                            {sector.isInside
+                              ? 'Estás aquí'
+                              : sector.distance !== Infinity
+                                ? `A ${(sector.distance / 1000).toFixed(1)} km`
+                                : ''}
+                          </Text>
+                        </View>
+                      </View>
+                      <Switch
+                        value={isVisible}
+                        disabled={!showSectors}
+                        onValueChange={() => onToggleSector(sector.id)}
+                        trackColor={{
+                          false: 'rgba(255, 255, 255, 0.1)',
+                          true: 'rgba(110, 231, 183, 0.3)',
+                        }}
+                        thumbColor={isVisible && showSectors ? '#6EE7B7' : '#9CA3AF'}
+                      />
+                    </View>
+                  );
+                })}
+
             {filteredAndSearchedSectors.length === 0 && (
-              <Text style={styles.emptyText}>{searchQuery ? 'No se encontraron resultados' : 'Cargando sectores...'}</Text>
+              <Text style={styles.emptyText}>
+                {searchQuery ? 'No se encontraron resultados' : 'Cargando sectores...'}
+              </Text>
             )}
           </ScrollView>
 
@@ -493,4 +535,3 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
-

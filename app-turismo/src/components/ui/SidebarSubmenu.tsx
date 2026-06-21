@@ -1,13 +1,5 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Platform,
-  Pressable,
-  ScrollView,
-  Modal,
-} from 'react-native';
+import { View, Text, StyleSheet, Platform, Pressable, ScrollView, Modal } from 'react-native';
 
 interface SidebarSubmenuProps {
   visible: boolean;
@@ -69,11 +61,7 @@ export function SidebarSubmenu({
               {headerRight}
             </View>
           )}
-          <ScrollView
-            style={styles.scroll}
-            showsVerticalScrollIndicator={false}
-            bounces={false}
-          >
+          <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} bounces={false}>
             {children}
           </ScrollView>
         </View>
@@ -82,12 +70,7 @@ export function SidebarSubmenu({
   );
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="none"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       {content}
     </Modal>
   );

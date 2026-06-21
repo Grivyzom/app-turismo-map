@@ -27,19 +27,11 @@ export const FloorSelector: React.FC<FloorSelectorProps> = ({
           return (
             <TouchableOpacity
               key={floor.level}
-              style={[
-                styles.floorButton,
-                isActive && styles.floorButtonActive,
-              ]}
+              style={[styles.floorButton, isActive && styles.floorButtonActive]}
               onPress={() => onSelectFloor(floor.level)}
               activeOpacity={0.7}
             >
-              <Text
-                style={[
-                  styles.floorText,
-                  isActive && styles.floorTextActive,
-                ]}
-              >
+              <Text style={[styles.floorText, isActive && styles.floorTextActive]}>
                 {floor.label}
               </Text>
             </TouchableOpacity>

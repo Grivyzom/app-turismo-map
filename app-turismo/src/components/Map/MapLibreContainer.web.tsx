@@ -1229,9 +1229,17 @@ function renderUniversityMarker(
 
   const lowerTitle = (event.title || '').toLowerCase();
   let logoFilename = '';
-  if (lowerTitle.includes('sebastián') || lowerTitle.includes('sebastian') || lowerTitle.includes('uss')) {
+  if (
+    lowerTitle.includes('sebastián') ||
+    lowerTitle.includes('sebastian') ||
+    lowerTitle.includes('uss')
+  ) {
     logoFilename = 'logo_uss.svg';
-  } else if (lowerTitle.includes('tomas') || lowerTitle.includes('tomás') || lowerTitle.includes('ust')) {
+  } else if (
+    lowerTitle.includes('tomas') ||
+    lowerTitle.includes('tomás') ||
+    lowerTitle.includes('ust')
+  ) {
     logoFilename = 'logo_santo_tomas.svg';
   } else if (lowerTitle.includes('inacap')) {
     logoFilename = 'logo_inacap.svg';
@@ -4453,7 +4461,11 @@ export function MapLibreContainer({
 
         map.setPaintProperty('user-wave-layer', 'circle-radius', radius);
         map.setPaintProperty('user-wave-layer', 'circle-stroke-opacity', (1 - t) * 0.85);
-        map.setPaintProperty('user-wave-layer', 'circle-stroke-color', getUserWaveColor(mapLayerRef.current));
+        map.setPaintProperty(
+          'user-wave-layer',
+          'circle-stroke-color',
+          getUserWaveColor(mapLayerRef.current),
+        );
       }
       rafId = requestAnimationFrame(tick);
     };

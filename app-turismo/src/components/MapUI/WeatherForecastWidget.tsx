@@ -178,16 +178,28 @@ export function WeatherForecastWidget({ isDark }: WeatherForecastWidgetProps) {
                 {/* Compact Environmental & Meteorological Grid */}
                 <View style={styles.miniGrid}>
                   {/* Humedad */}
-                  <View style={[styles.miniCard, { backgroundColor: theme.cardBg, borderColor: theme.cardBorder }]}>
+                  <View
+                    style={[
+                      styles.miniCard,
+                      { backgroundColor: theme.cardBg, borderColor: theme.cardBorder },
+                    ]}
+                  >
                     <Ionicons name="water" size={14} color="#60A5FA" />
                     <View>
                       <Text style={[styles.miniLabel, { color: theme.textSec }]}>Humedad</Text>
-                      <Text style={[styles.miniValue, { color: theme.text }]}>{zone.humidity}%</Text>
+                      <Text style={[styles.miniValue, { color: theme.text }]}>
+                        {zone.humidity}%
+                      </Text>
                     </View>
                   </View>
 
                   {/* AQI */}
-                  <View style={[styles.miniCard, { backgroundColor: theme.cardBg, borderColor: theme.cardBorder }]}>
+                  <View
+                    style={[
+                      styles.miniCard,
+                      { backgroundColor: theme.cardBg, borderColor: theme.cardBorder },
+                    ]}
+                  >
                     <Ionicons name="leaf" size={14} color="#34D399" />
                     <View>
                       <Text style={[styles.miniLabel, { color: theme.textSec }]}>AQI</Text>
@@ -196,20 +208,38 @@ export function WeatherForecastWidget({ isDark }: WeatherForecastWidgetProps) {
                   </View>
 
                   {/* Viento */}
-                  <View style={[styles.miniCard, { backgroundColor: theme.cardBg, borderColor: theme.cardBorder }]}>
-                    <Ionicons name="swap-horizontal" size={14} color={localIsDark ? '#38BDF8' : '#0284C7'} />
+                  <View
+                    style={[
+                      styles.miniCard,
+                      { backgroundColor: theme.cardBg, borderColor: theme.cardBorder },
+                    ]}
+                  >
+                    <Ionicons
+                      name="swap-horizontal"
+                      size={14}
+                      color={localIsDark ? '#38BDF8' : '#0284C7'}
+                    />
                     <View>
                       <Text style={[styles.miniLabel, { color: theme.textSec }]}>Viento</Text>
-                      <Text style={[styles.miniValue, { color: theme.text }]}>{zone.windSpeed} km/h</Text>
+                      <Text style={[styles.miniValue, { color: theme.text }]}>
+                        {zone.windSpeed} km/h
+                      </Text>
                     </View>
                   </View>
 
                   {/* Lluvia */}
-                  <View style={[styles.miniCard, { backgroundColor: theme.cardBg, borderColor: theme.cardBorder }]}>
+                  <View
+                    style={[
+                      styles.miniCard,
+                      { backgroundColor: theme.cardBg, borderColor: theme.cardBorder },
+                    ]}
+                  >
                     <Ionicons name="rainy-outline" size={14} color="#60A5FA" />
                     <View>
                       <Text style={[styles.miniLabel, { color: theme.textSec }]}>Lluvia</Text>
-                      <Text style={[styles.miniValue, { color: theme.text }]}>{zone.precipitation} mm</Text>
+                      <Text style={[styles.miniValue, { color: theme.text }]}>
+                        {zone.precipitation} mm
+                      </Text>
                     </View>
                   </View>
                 </View>

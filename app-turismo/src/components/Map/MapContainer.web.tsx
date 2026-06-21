@@ -2,9 +2,9 @@ import React, { Suspense } from 'react';
 
 import { MAP_CONFIG } from '../../config/mapConfig';
 import { LoadingFallback } from '../ui/LoadingFallback';
+import { lazyWithRetry } from '../../utils/lazyWithRetry';
 
 import { MapContainerProps } from './types';
-import { lazyWithRetry } from '../../utils/lazyWithRetry';
 
 // Lazy-load both map providers so that maplibre-gl (the heaviest dependency,
 // ~200-250 KiB) and the Google Maps SDK are split into separate chunks and only

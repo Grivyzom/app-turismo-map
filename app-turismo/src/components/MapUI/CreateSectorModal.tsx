@@ -1,7 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Pressable } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  StyleSheet,
+  Pressable,
+} from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import Ionicons from '@expo/vector-icons/Ionicons';
+
 import { SearchableSelect } from '../ui/SearchableSelect';
 
 interface CreateSectorModalProps {
@@ -23,7 +32,7 @@ export const CreateSectorModal: React.FC<CreateSectorModalProps> = ({
   showNotification,
   onSuccess,
   hidden,
-  onStartDrawing
+  onStartDrawing,
 }) => {
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
@@ -58,14 +67,22 @@ export const CreateSectorModal: React.FC<CreateSectorModalProps> = ({
         name: formName,
         description: formDescription,
         category: formCategory,
-        color: formCategory === 'edificio' ? '#6366F1' : formCategory === 'reserva' ? '#22C55E' : '#EAB308',
+        color:
+          formCategory === 'edificio'
+            ? '#6366F1'
+            : formCategory === 'reserva'
+              ? '#22C55E'
+              : '#EAB308',
       };
 
       if (formCategory === 'reserva') {
         if (formRating.trim()) payload.rating = parseFloat(formRating);
         if (formOpeningHours.trim()) payload.openingHours = formOpeningHours.trim();
         if (formParkType.trim()) payload.parkType = formParkType.trim();
-        const imagesList = formImages.split('\n').map((url) => url.trim()).filter(Boolean);
+        const imagesList = formImages
+          .split('\n')
+          .map((url) => url.trim())
+          .filter(Boolean);
         if (imagesList.length > 0) payload.images = imagesList;
       }
 
@@ -83,11 +100,15 @@ export const CreateSectorModal: React.FC<CreateSectorModalProps> = ({
       const response = await fetch(`${baseUrl}/api/v1/admin/zones`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) {
-        showNotification(extractedGeometry ? 'Sector creado exitosamente con Varita Mágica' : 'Sector creado exitosamente manual');
+        showNotification(
+          extractedGeometry
+            ? 'Sector creado exitosamente con Varita Mágica'
+            : 'Sector creado exitosamente manual',
+        );
         if (onSuccess) onSuccess();
         onClose();
       } else {
@@ -107,10 +128,7 @@ export const CreateSectorModal: React.FC<CreateSectorModalProps> = ({
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-      <Pressable
-        style={StyleSheet.absoluteFill}
-        onPress={onClose}
-      />
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       <View style={styles.modalContainer}>
         <View style={styles.header}>
           <Text style={styles.titleText}>🪄 CREAR SECTOR (MÁGICO)</Text>
@@ -119,12 +137,21 @@ export const CreateSectorModal: React.FC<CreateSectorModalProps> = ({
           </TouchableOpacity>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
-          
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 24 }}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={styles.badgeContainer}>
-            <MaterialIcons name={extractedGeometry ? "auto-awesome" : "format-shapes"} size={16} color="#38BDF8" />
+            <MaterialIcons
+              name={extractedGeometry ? 'auto-awesome' : 'format-shapes'}
+              size={16}
+              color="#38BDF8"
+            />
             <Text style={styles.badgeText}>
-              {extractedGeometry ? 'Geometría capturada automáticamente.' : 'Geometría trazada manualmente.'}
+              {extractedGeometry
+                ? 'Geometría capturada automáticamente.'
+                : 'Geometría trazada manualmente.'}
             </Text>
           </View>
 
@@ -198,8 +225,8 @@ export const CreateSectorModal: React.FC<CreateSectorModalProps> = ({
           )}
 
           {!extractedGeometry && (!draftRoutePoints || draftRoutePoints.length === 0) ? (
-            <TouchableOpacity 
-              style={[styles.saveBtn, { backgroundColor: '#F59E0B', marginTop: 10 }]} 
+            <TouchableOpacity
+              style={[styles.saveBtn, { backgroundColor: '#F59E0B', marginTop: 10 }]}
               onPress={() => {
                 if (onStartDrawing) onStartDrawing();
               }}
@@ -207,15 +234,16 @@ export const CreateSectorModal: React.FC<CreateSectorModalProps> = ({
               <Text style={styles.saveBtnText}>Dibujar en Mapa</Text>
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity 
-              style={[styles.saveBtn, isSubmitting && { opacity: 0.7 }]} 
+            <TouchableOpacity
+              style={[styles.saveBtn, isSubmitting && { opacity: 0.7 }]}
               onPress={handleCreateSector}
               disabled={isSubmitting}
             >
-              <Text style={styles.saveBtnText}>{isSubmitting ? 'Guardando...' : 'Crear Sector'}</Text>
+              <Text style={styles.saveBtnText}>
+                {isSubmitting ? 'Guardando...' : 'Crear Sector'}
+              </Text>
             </TouchableOpacity>
           )}
-
         </ScrollView>
       </View>
     </View>

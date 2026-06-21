@@ -285,7 +285,9 @@ export default function IngresarScreen() {
       if (!email) missing.push('correo');
       if (!password) missing.push('contraseña');
       const faltanStr = missing.length > 1 ? 'Faltan' : 'Falta';
-      setFormError(`Error: Por favor completa todos los campos obligatorios. (${faltanStr}: ${missing.join(' y ')})`);
+      setFormError(
+        `Error: Por favor completa todos los campos obligatorios. (${faltanStr}: ${missing.join(' y ')})`,
+      );
       return;
     }
     setIsLoading(true);
@@ -325,7 +327,9 @@ export default function IngresarScreen() {
       if (!email) missing.push('correo');
       if (!password) missing.push('contraseña');
       const faltanStr = missing.length > 1 ? 'Faltan' : 'Falta';
-      setFormError(`Error: Por favor completa todos los campos obligatorios. (${faltanStr}: ${missing.join(', ')})`);
+      setFormError(
+        `Error: Por favor completa todos los campos obligatorios. (${faltanStr}: ${missing.join(', ')})`,
+      );
       return;
     }
     if (password !== confirmPassword) {
@@ -434,27 +438,27 @@ export default function IngresarScreen() {
       {/* Animated Tabs & Header */}
       {!isRecovery && (
         <View className="mb-6 w-full">
-          <View 
+          <View
             className="flex-row bg-gray-100/80 rounded-xl p-1 relative w-full"
             onLayout={(e) => setTabsWidth(e.nativeEvent.layout.width)}
           >
             {tabsWidth > 0 && (
-              <Animated.View 
+              <Animated.View
                 className="absolute top-1 bottom-1 left-1 bg-white rounded-lg"
                 style={[
-                  { 
-                    shadowColor: '#000', 
-                    shadowOffset: { width: 0, height: 1 }, 
-                    shadowOpacity: 0.1, 
-                    shadowRadius: 2, 
+                  {
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 2,
                     elevation: 1,
                     width: tabsWidth > 8 ? (tabsWidth - 8) / 2 : 0,
-                    transform: [{ translateX: slideAnim }]
-                  }
+                    transform: [{ translateX: slideAnim }],
+                  },
                 ]}
               />
             )}
-            <TouchableOpacity 
+            <TouchableOpacity
               className="flex-1 py-2 items-center justify-center z-10"
               onPress={() => {
                 if (!isLogin) {
@@ -468,11 +472,13 @@ export default function IngresarScreen() {
               }}
               activeOpacity={0.7}
             >
-              <Text className={`text-sm font-semibold ${isLogin ? 'text-gray-900' : 'text-gray-500'}`}>
+              <Text
+                className={`text-sm font-semibold ${isLogin ? 'text-gray-900' : 'text-gray-500'}`}
+              >
                 Iniciar sesión
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity 
+            <TouchableOpacity
               className="flex-1 py-2 items-center justify-center z-10"
               onPress={() => {
                 if (!isRegister) {
@@ -486,7 +492,9 @@ export default function IngresarScreen() {
               }}
               activeOpacity={0.7}
             >
-              <Text className={`text-sm font-semibold ${isRegister ? 'text-gray-900' : 'text-gray-500'}`}>
+              <Text
+                className={`text-sm font-semibold ${isRegister ? 'text-gray-900' : 'text-gray-500'}`}
+              >
                 Registrarse
               </Text>
             </TouchableOpacity>
@@ -545,7 +553,10 @@ export default function IngresarScreen() {
               placeholderTextColor="#9ca3af"
               autoCapitalize="words"
               value={fullName}
-              onChangeText={(v) => { setFullName(v); setFormError(''); }}
+              onChangeText={(v) => {
+                setFullName(v);
+                setFormError('');
+              }}
               onFocus={() => setFocusedField('name')}
               onBlur={() => setFocusedField(null)}
               style={{
@@ -566,14 +577,17 @@ export default function IngresarScreen() {
           </View>
           <TextInput
             ref={emailRef}
-            returnKeyType={isRecovery ? "done" : "next"}
-            onSubmitEditing={() => isRecovery ? handleSubmit() : passwordRef.current?.focus()}
+            returnKeyType={isRecovery ? 'done' : 'next'}
+            onSubmitEditing={() => (isRecovery ? handleSubmit() : passwordRef.current?.focus())}
             placeholder="tu@ejemplo.com"
             placeholderTextColor="#9ca3af"
             keyboardType="email-address"
             autoCapitalize="none"
             value={email}
-            onChangeText={(v) => { setEmail(v); setFormError(''); }}
+            onChangeText={(v) => {
+              setEmail(v);
+              setFormError('');
+            }}
             onFocus={() => setFocusedField('email')}
             onBlur={() => setFocusedField(null)}
             style={{
@@ -590,9 +604,7 @@ export default function IngresarScreen() {
         {isRecovery && formError ? (
           <View className="flex-row items-center gap-1.5 mt-1.5 px-1 w-full">
             <Ionicons name="alert-circle-outline" size={16} color="#ef4444" />
-            <Text className="text-[13px] text-red-500 flex-1 leading-tight">
-              {formError}
-            </Text>
+            <Text className="text-[13px] text-red-500 flex-1 leading-tight">{formError}</Text>
           </View>
         ) : null}
 
@@ -605,13 +617,18 @@ export default function IngresarScreen() {
               </View>
               <TextInput
                 ref={passwordRef}
-                returnKeyType={isRegister ? "next" : "done"}
-                onSubmitEditing={() => isRegister ? confirmPasswordRef.current?.focus() : handleSubmit()}
+                returnKeyType={isRegister ? 'next' : 'done'}
+                onSubmitEditing={() =>
+                  isRegister ? confirmPasswordRef.current?.focus() : handleSubmit()
+                }
                 placeholder="Contraseña"
                 placeholderTextColor="#9ca3af"
                 secureTextEntry={!showPassword}
                 value={password}
-                onChangeText={(v) => { setPassword(v); setFormError(''); }}
+                onChangeText={(v) => {
+                  setPassword(v);
+                  setFormError('');
+                }}
                 onFocus={() => setFocusedField('password')}
                 onBlur={() => setFocusedField(null)}
                 style={{
@@ -648,7 +665,10 @@ export default function IngresarScreen() {
                   placeholderTextColor="#9ca3af"
                   secureTextEntry={!showPassword}
                   value={confirmPassword}
-                  onChangeText={(v) => { setConfirmPassword(v); setFormError(''); }}
+                  onChangeText={(v) => {
+                    setConfirmPassword(v);
+                    setFormError('');
+                  }}
                   onFocus={() => setFocusedField('confirm')}
                   onBlur={() => setFocusedField(null)}
                   style={{
@@ -666,9 +686,7 @@ export default function IngresarScreen() {
             {!isRecovery && formError ? (
               <View className="flex-row items-center gap-1.5 mt-1 px-1 w-full">
                 <Ionicons name="alert-circle-outline" size={16} color="#ef4444" />
-                <Text className="text-[13px] text-red-500 flex-1 leading-tight">
-                  {formError}
-                </Text>
+                <Text className="text-[13px] text-red-500 flex-1 leading-tight">{formError}</Text>
               </View>
             ) : null}
 
@@ -739,57 +757,60 @@ export default function IngresarScreen() {
         )}
 
         {/* Selector de tipo de usuario (solo registro) */}
-        {isRegister && password.length > 0 && confirmPassword.length > 0 && password === confirmPassword && (
-          <View className="mt-2">
-            <Text className="text-[13px] text-gray-500 font-semibold mb-2 text-center">
-              ¿Qué te trae por aquí?
-            </Text>
-            <View className="flex-row gap-3">
-              <TouchableOpacity
-                onPress={() => setVisitorType('citizen')}
-                style={{
-                  borderColor: visitorType === 'citizen' ? theme.accent : '#e5e7eb',
-                  backgroundColor: visitorType === 'citizen' ? `${theme.accent}10` : '#ffffff',
-                }}
-                className="flex-1 border rounded-xl py-3 px-2 items-center flex-row justify-center gap-2"
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name="home"
-                  size={18}
-                  color={visitorType === 'citizen' ? theme.accent : '#4b5563'}
-                />
-                <Text
-                  style={{ color: visitorType === 'citizen' ? theme.accent : '#4b5563' }}
-                  className="text-sm font-semibold"
+        {isRegister &&
+          password.length > 0 &&
+          confirmPassword.length > 0 &&
+          password === confirmPassword && (
+            <View className="mt-2">
+              <Text className="text-[13px] text-gray-500 font-semibold mb-2 text-center">
+                ¿Qué te trae por aquí?
+              </Text>
+              <View className="flex-row gap-3">
+                <TouchableOpacity
+                  onPress={() => setVisitorType('citizen')}
+                  style={{
+                    borderColor: visitorType === 'citizen' ? theme.accent : '#e5e7eb',
+                    backgroundColor: visitorType === 'citizen' ? `${theme.accent}10` : '#ffffff',
+                  }}
+                  className="flex-1 border rounded-xl py-3 px-2 items-center flex-row justify-center gap-2"
+                  activeOpacity={0.7}
                 >
-                  Vivo aquí
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setVisitorType('tourist')}
-                style={{
-                  borderColor: visitorType === 'tourist' ? theme.accent : '#e5e7eb',
-                  backgroundColor: visitorType === 'tourist' ? `${theme.accent}10` : '#ffffff',
-                }}
-                className="flex-1 border rounded-xl py-3 px-2 items-center flex-row justify-center gap-2"
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name="airplane"
-                  size={18}
-                  color={visitorType === 'tourist' ? theme.accent : '#4b5563'}
-                />
-                <Text
-                  style={{ color: visitorType === 'tourist' ? theme.accent : '#4b5563' }}
-                  className="text-sm font-semibold"
+                  <Ionicons
+                    name="home"
+                    size={18}
+                    color={visitorType === 'citizen' ? theme.accent : '#4b5563'}
+                  />
+                  <Text
+                    style={{ color: visitorType === 'citizen' ? theme.accent : '#4b5563' }}
+                    className="text-sm font-semibold"
+                  >
+                    Vivo aquí
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setVisitorType('tourist')}
+                  style={{
+                    borderColor: visitorType === 'tourist' ? theme.accent : '#e5e7eb',
+                    backgroundColor: visitorType === 'tourist' ? `${theme.accent}10` : '#ffffff',
+                  }}
+                  className="flex-1 border rounded-xl py-3 px-2 items-center flex-row justify-center gap-2"
+                  activeOpacity={0.7}
                 >
-                  Estoy de visita
-                </Text>
-              </TouchableOpacity>
+                  <Ionicons
+                    name="airplane"
+                    size={18}
+                    color={visitorType === 'tourist' ? theme.accent : '#4b5563'}
+                  />
+                  <Text
+                    style={{ color: visitorType === 'tourist' ? theme.accent : '#4b5563' }}
+                    className="text-sm font-semibold"
+                  >
+                    Estoy de visita
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        )}
+          )}
 
         {/* Botón principal */}
         <TouchableOpacity
@@ -810,7 +831,12 @@ export default function IngresarScreen() {
       {isRecovery ? (
         <View className="mt-6 flex-row justify-center items-center gap-1.5">
           <Text className="text-sm text-gray-500">{footerQuestion}</Text>
-          <TouchableOpacity onPress={() => { setFormError(''); setVista(VISTAS.LOGIN); }}>
+          <TouchableOpacity
+            onPress={() => {
+              setFormError('');
+              setVista(VISTAS.LOGIN);
+            }}
+          >
             <Text style={{ color: theme.accent }} className="text-sm font-semibold">
               {footerAction}
             </Text>

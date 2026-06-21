@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import Supercluster from 'supercluster';
 
 import { TurismoEvent, Cluster, MapItem } from '../components/Map/types';
+
 import { getCategoryColor } from './mapUtils';
 
 /**
@@ -158,7 +159,7 @@ export function useSuperclusterEvents(
     return events.filter((e) => {
       if (['agua', 'humedal'].includes(e.category)) return false;
       if (e.category === 'embarcacion') return true; // Siempre visibles
-      
+
       const cat = e.category?.toLowerCase() || '';
       if (cat === 'camara') {
         return zoom >= 17;
@@ -184,7 +185,14 @@ export function useSuperclusterEvents(
     const points: Supercluster.PointFeature<TurismoEvent>[] = visibleEventsForTier
       .filter((e) => {
         const cat = e.category?.toLowerCase() || '';
-        return cat !== 'embarcacion' && cat !== 'parque' && cat !== 'reserva' && cat !== 'reservas' && cat !== 'naturaleza' && cat !== 'camara';
+        return (
+          cat !== 'embarcacion' &&
+          cat !== 'parque' &&
+          cat !== 'reserva' &&
+          cat !== 'reservas' &&
+          cat !== 'naturaleza' &&
+          cat !== 'camara'
+        );
       })
       .map((event) => ({
         type: 'Feature',
@@ -208,7 +216,13 @@ export function useSuperclusterEvents(
     // Los barcos, parques/reservas y camaras siempre se devuelven como items individuales (sin clustering)
     const unclusteredEvents = visibleEventsForTier.filter((e) => {
       const cat = e.category?.toLowerCase() || '';
-      const isUnclustered = cat === 'embarcacion' || cat === 'parque' || cat === 'reserva' || cat === 'reservas' || cat === 'naturaleza' || cat === 'camara';
+      const isUnclustered =
+        cat === 'embarcacion' ||
+        cat === 'parque' ||
+        cat === 'reserva' ||
+        cat === 'reservas' ||
+        cat === 'naturaleza' ||
+        cat === 'camara';
       if (!isUnclustered) return false;
 
       // Optimización crítica: solo cargar elementos de la zona visible (bbox) para evitar sobrecarga de marcadores fuera de pantalla
@@ -225,7 +239,14 @@ export function useSuperclusterEvents(
       const visibleClusteredCandidates = visibleEventsForTier
         .filter((e) => {
           const cat = e.category?.toLowerCase() || '';
-          return cat !== 'embarcacion' && cat !== 'parque' && cat !== 'reserva' && cat !== 'reservas' && cat !== 'naturaleza' && cat !== 'camara';
+          return (
+            cat !== 'embarcacion' &&
+            cat !== 'parque' &&
+            cat !== 'reserva' &&
+            cat !== 'reservas' &&
+            cat !== 'naturaleza' &&
+            cat !== 'camara'
+          );
         })
         .filter(
           (event) =>

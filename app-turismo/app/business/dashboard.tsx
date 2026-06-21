@@ -136,7 +136,11 @@ export default function BusinessDashboardScreen() {
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.headerLabel}>
-              {entityType === 'independent' ? 'Perfil Independiente' : entityType === 'sme' ? 'Perfil PYME' : 'Panel de Control Corporativo'}
+              {entityType === 'independent'
+                ? 'Perfil Independiente'
+                : entityType === 'sme'
+                  ? 'Perfil PYME'
+                  : 'Panel de Control Corporativo'}
             </Text>
             <Text style={styles.headerTitle}>{displayName}</Text>
             <View style={styles.roleBadge}>

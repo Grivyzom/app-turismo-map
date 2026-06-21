@@ -23,36 +23,52 @@ export default function DelimitarZonasScreen() {
           <MaterialIcons name="layers" size={32} color={GREEN} />
           <Text style={styles.infoTitle}>Zonas de Interés</Text>
           <Text style={styles.infoText}>
-            Esta herramienta te permite delimitar áreas específicas en el mapa, como sectores comerciales, centros urbanos o zonas de eventos.
+            Esta herramienta te permite delimitar áreas específicas en el mapa, como sectores
+            comerciales, centros urbanos o zonas de eventos.
           </Text>
         </View>
 
         <View style={styles.featureCard}>
           <Text style={styles.featureTitle}>¿Cómo funciona?</Text>
           <View style={styles.step}>
-            <View style={styles.stepNumber}><Text style={styles.stepNumberText}>1</Text></View>
+            <View style={styles.stepNumber}>
+              <Text style={styles.stepNumberText}>1</Text>
+            </View>
             <Text style={styles.stepText}>Identifica el área que deseas resaltar en el mapa.</Text>
           </View>
           <View style={styles.step}>
-            <View style={styles.stepNumber}><Text style={styles.stepNumberText}>2</Text></View>
-            <Text style={styles.stepText}>Define los puntos del polígono que delimitan la zona.</Text>
+            <View style={styles.stepNumber}>
+              <Text style={styles.stepNumberText}>2</Text>
+            </View>
+            <Text style={styles.stepText}>
+              Define los puntos del polígono que delimitan la zona.
+            </Text>
           </View>
           <View style={styles.step}>
-            <View style={styles.stepNumber}><Text style={styles.stepNumberText}>3</Text></View>
-            <Text style={styles.stepText}>Asigna un nombre y color distintivo para que los usuarios lo identifiquen.</Text>
+            <View style={styles.stepNumber}>
+              <Text style={styles.stepNumberText}>3</Text>
+            </View>
+            <Text style={styles.stepText}>
+              Asigna un nombre y color distintivo para que los usuarios lo identifiquen.
+            </Text>
           </View>
         </View>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.mainBtn}
-          onPress={() => alert('La herramienta de dibujo de polígonos estará disponible en la próxima actualización.')}
+          onPress={() =>
+            alert(
+              'La herramienta de dibujo de polígonos estará disponible en la próxima actualización.',
+            )
+          }
         >
           <Text style={styles.mainBtnText}>Comenzar a Dibujar</Text>
           <MaterialIcons name="gesture" size={20} color="#ffffff" />
         </TouchableOpacity>
 
         <Text style={styles.footerNote}>
-          Nota: Los polígonos se renderizan de forma nativa usando WebGL para una máxima fluidez y escalado perfecto.
+          Nota: Los polígonos se renderizan de forma nativa usando WebGL para una máxima fluidez y
+          escalado perfecto.
         </Text>
       </ScrollView>
     </View>

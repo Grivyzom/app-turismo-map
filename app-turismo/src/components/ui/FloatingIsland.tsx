@@ -1,22 +1,18 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Platform,
-  Dimensions,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, Dimensions } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { loadUserProfile, getDefaultUserProfile, type NormalUserProfile } from '../../utils/userProfileStorage';
-import { useAuth } from '../../context/AuthContext';
 
+import {
+  loadUserProfile,
+  getDefaultUserProfile,
+  type NormalUserProfile,
+} from '../../utils/userProfileStorage';
+import { useAuth } from '../../context/AuthContext';
 import FeedScreen from '../../screens/FeedScreen';
 import PassportScreen from '../../screens/PassportScreen';
 import ForumScreen from '../../screens/ForumScreen';
 import UserProfileScreen from '../../screens/UserProfileScreen';
-
 import { TabType } from '../MapUI/types';
 
 export interface FloatingIslandItem {
@@ -132,11 +128,7 @@ export default function FloatingIsland({
   return (
     <View style={styles.overlayContainer}>
       {/* Tap-to-dismiss background backdrop */}
-      <TouchableOpacity
-        style={StyleSheet.absoluteFill}
-        activeOpacity={1}
-        onPress={onClose}
-      />
+      <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
 
       <View style={styles.islandContainer}>
         {/* Glowing sub-borders (Visual enhancement) */}
@@ -144,8 +136,11 @@ export default function FloatingIsland({
 
         {/* SIDEBAR DE NAVEGACIÓN */}
         {showSidebar && (
-          <View 
-            style={[styles.sidebar, { width: isExpanded ? 280 : 88, paddingHorizontal: isExpanded ? 24 : 12 }]}
+          <View
+            style={[
+              styles.sidebar,
+              { width: isExpanded ? 280 : 88, paddingHorizontal: isExpanded ? 24 : 12 },
+            ]}
             {...(Platform.OS === 'web'
               ? {
                   onMouseEnter: () => setIsHovered(true),
@@ -166,7 +161,12 @@ export default function FloatingIsland({
                     </View>
                   </View>
                   <TouchableOpacity onPress={() => setIsPinned(!isPinned)} style={styles.pinButton}>
-                    <MaterialIcons name={"push-pin"} size={16} color={isPinned ? "#6EE7B7" : "#4B5563"} style={!isPinned ? { transform: [{ rotate: '45deg' }] } : {}} />
+                    <MaterialIcons
+                      name={'push-pin'}
+                      size={16}
+                      color={isPinned ? '#6EE7B7' : '#4B5563'}
+                      style={!isPinned ? { transform: [{ rotate: '45deg' }] } : {}}
+                    />
                   </TouchableOpacity>
                 </>
               ) : (
@@ -248,7 +248,12 @@ export default function FloatingIsland({
             <TouchableOpacity
               style={[
                 styles.sidebarProfile,
-                !isExpanded && { padding: 0, backgroundColor: 'transparent', borderWidth: 0, justifyContent: 'center' }
+                !isExpanded && {
+                  padding: 0,
+                  backgroundColor: 'transparent',
+                  borderWidth: 0,
+                  justifyContent: 'center',
+                },
               ]}
               onPress={() => onTabChange('profile')}
               activeOpacity={0.9}
@@ -263,8 +268,8 @@ export default function FloatingIsland({
                       {profile.fullName}
                     </Text>
                     <Text style={styles.profileRole}>
-                      {!isAuthenticated 
-                        ? "Para más funciones"
+                      {!isAuthenticated
+                        ? 'Para más funciones'
                         : profile.userType === 'citizen'
                           ? 'Turista'
                           : profile.userType === 'partner_owner'
@@ -281,9 +286,7 @@ export default function FloatingIsland({
         {/* CONTENEDOR PRINCIPAL DE CONTENIDO */}
         <View style={styles.contentArea}>
           <View style={styles.contentHeader}>
-            <Text style={styles.contentHeaderTitle}>
-              {getHeaderTitle()}
-            </Text>
+            <Text style={styles.contentHeaderTitle}>{getHeaderTitle()}</Text>
             <TouchableOpacity style={styles.closeButton} onPress={onClose} activeOpacity={0.8}>
               <Ionicons name="close" size={20} color="#9CA3AF" />
             </TouchableOpacity>
@@ -292,24 +295,22 @@ export default function FloatingIsland({
           <View style={styles.contentWrapper}>
             {/* Animación fade-in controlada mediante CSS en Web */}
             <View style={styles.innerContent}>
-              {children ? (
-                children
-              ) : (
-                screenElements.map((screen) => {
-                  const isActive = activeTab === screen.id;
-                  return (
-                    <View
-                      key={screen.id}
-                      style={{
-                        display: isActive ? 'flex' : 'none',
-                        flex: 1,
-                      }}
-                    >
-                      {screen.element}
-                    </View>
-                  );
-                })
-              )}
+              {children
+                ? children
+                : screenElements.map((screen) => {
+                    const isActive = activeTab === screen.id;
+                    return (
+                      <View
+                        key={screen.id}
+                        style={{
+                          display: isActive ? 'flex' : 'none',
+                          flex: 1,
+                        }}
+                      >
+                        {screen.element}
+                      </View>
+                    );
+                  })}
             </View>
           </View>
         </View>

@@ -22,7 +22,11 @@ interface SmartVoiceSearchProps {
   isEmbedded?: boolean;
 }
 
-export function SmartVoiceSearch({ onSearchComplete, onPartialResult, isEmbedded = false }: SmartVoiceSearchProps) {
+export function SmartVoiceSearch({
+  onSearchComplete,
+  onPartialResult,
+  isEmbedded = false,
+}: SmartVoiceSearchProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [statusText, setStatusText] = useState('Escribe o dicta tu búsqueda...');
 
@@ -160,7 +164,7 @@ export function SmartVoiceSearch({ onSearchComplete, onPartialResult, isEmbedded
     if (searchText.trim()) {
       // Guardar de manera ultra ligera en AsyncStorage
       addRecentSearch(searchText);
-      
+
       onSearchComplete({
         query: searchText,
         category: 'todos',
@@ -182,7 +186,7 @@ export function SmartVoiceSearch({ onSearchComplete, onPartialResult, isEmbedded
             styles.placeholderText,
             isRecording && styles.textRecording,
             isProcessing && styles.textProcessing,
-            Platform.OS === 'web' && { outlineStyle: 'none' } as any,
+            Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
           ]}
           value={searchText}
           onChangeText={setSearchText}
@@ -355,4 +359,3 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
 });
-

@@ -1,5 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Image, ActionSheetIOS, Platform, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  Image,
+  ActionSheetIOS,
+  Platform,
+  Alert,
+} from 'react-native';
 import { router } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
@@ -141,13 +150,18 @@ export default function ProfileDashboardScreen() {
               </View>
             </View>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               className="bg-indigo-600 p-4 rounded-2xl items-center shadow-lg shadow-indigo-900/50 mt-2"
               onPress={() => {
                 if (Platform.OS === 'ios') {
                   ActionSheetIOS.showActionSheetWithOptions(
                     {
-                      options: ['Cancelar', 'Punto de Interés / Evento', 'Sector / Edificio', 'Ruta / Ciclovía'],
+                      options: [
+                        'Cancelar',
+                        'Punto de Interés / Evento',
+                        'Sector / Edificio',
+                        'Ruta / Ciclovía',
+                      ],
                       cancelButtonIndex: 0,
                       title: '¿Qué deseas emitir en el mapa?',
                     },
@@ -159,14 +173,26 @@ export default function ProfileDashboardScreen() {
                       } else if (buttonIndex === 3) {
                         router.push({ pathname: '/', params: { action: 'create_route' } });
                       }
-                    }
+                    },
                   );
                 } else {
                   Alert.alert('¿Qué deseas emitir?', '', [
                     { text: 'Cancelar', style: 'cancel' },
-                    { text: 'Punto de Interés', onPress: () => router.push({ pathname: '/', params: { action: 'create_point' } }) },
-                    { text: 'Sector / Edificio', onPress: () => router.push({ pathname: '/', params: { action: 'create_sector' } }) },
-                    { text: 'Ruta / Ciclovía', onPress: () => router.push({ pathname: '/', params: { action: 'create_route' } }) },
+                    {
+                      text: 'Punto de Interés',
+                      onPress: () =>
+                        router.push({ pathname: '/', params: { action: 'create_point' } }),
+                    },
+                    {
+                      text: 'Sector / Edificio',
+                      onPress: () =>
+                        router.push({ pathname: '/', params: { action: 'create_sector' } }),
+                    },
+                    {
+                      text: 'Ruta / Ciclovía',
+                      onPress: () =>
+                        router.push({ pathname: '/', params: { action: 'create_route' } }),
+                    },
                   ]);
                 }
               }}

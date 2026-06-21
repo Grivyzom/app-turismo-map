@@ -20,7 +20,7 @@ export const parseFurniture = (): FurniturePOI[] => {
       const [lng, lat] = f.geometry.coordinates;
       let amenity: FurnitureAmenity = 'unknown';
       const propAmenity = f.properties?.amenity;
-      
+
       if (propAmenity === 'bench') amenity = 'bench';
       else if (propAmenity === 'waste_basket') amenity = 'waste_basket';
       else if (propAmenity === 'drinking_water') amenity = 'drinking_water';
@@ -36,7 +36,7 @@ export const parseFurniture = (): FurniturePOI[] => {
       }
     }
   }
-  
+
   return pois;
 };
 

@@ -6,13 +6,15 @@ export const PARQUES_EVENTS: TurismoEvent[] = data.features.map((f: any, i: numb
   const event: TurismoEvent = {
     id: 'parque-' + (f.properties['@id'] || f.id || i).toString().replace(/\//g, '-'),
     title: f.properties.name || 'Parque',
-    description: f.properties.description || (f.properties['leisure'] === 'park' ? 'Parque público' : 'Área verde'),
+    description:
+      f.properties.description ||
+      (f.properties['leisure'] === 'park' ? 'Parque público' : 'Área verde'),
     latitude: 0,
     longitude: 0,
     category: 'parque',
     organizer: f.properties.operator || 'Público',
     time: f.properties.opening_hours || '24/7',
-    address: f.properties['addr:street'] || f.properties['object:street'] || ''
+    address: f.properties['addr:street'] || f.properties['object:street'] || '',
   };
 
   if (f.geometry.type === 'Point') {
@@ -31,7 +33,7 @@ export const PARQUES_EVENTS: TurismoEvent[] = data.features.map((f: any, i: numb
 
   // Fallback if overpass exported geometry in properties (rare)
   if (f.properties.geometry && Array.isArray(f.properties.geometry)) {
-     event.polygon = f.properties.geometry.map((c: any) => ({ latitude: c.lat, longitude: c.lon }));
+    event.polygon = f.properties.geometry.map((c: any) => ({ latitude: c.lat, longitude: c.lon }));
   }
 
   // Centrar marcador en el centroide del área/línea

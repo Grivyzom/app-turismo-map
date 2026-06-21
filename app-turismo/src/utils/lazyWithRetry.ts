@@ -21,20 +21,23 @@ export function lazyWithRetry<T extends ComponentType<any>>(
       } catch (error) {
         if (i === retries) {
           console.error(`Failed to load chunk after ${retries} retries:`, error);
-          
+
           // If we are on web and it's a chunk loading error, we might want to suggest a reload
-          if (typeof window !== 'undefined' && (error as any)?.name === 'ChunkLoadError' || (error as any)?.message?.includes('Loading chunk')) {
-             // Optional: automatically reload if it's a chunk error (can be disruptive)
-             // window.location.reload();
+          if (
+            (typeof window !== 'undefined' && (error as any)?.name === 'ChunkLoadError') ||
+            (error as any)?.message?.includes('Loading chunk')
+          ) {
+            // Optional: automatically reload if it's a chunk error (can be disruptive)
+            // window.location.reload();
           }
-          
+
           throw error;
         }
-        
+
         await new Promise((resolve) => setTimeout(resolve, interval));
       }
     }
-    
+
     // Should never reach here but for type safety:
     throw new Error('Unexpected end of lazyWithRetry');
   });

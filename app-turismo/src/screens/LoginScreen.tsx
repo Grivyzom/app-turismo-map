@@ -11,6 +11,7 @@ import {
   Image,
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+
 import { toast } from '../components/ui/ToastNotification';
 
 type LoginScreenProps = {

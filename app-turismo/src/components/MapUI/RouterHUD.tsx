@@ -9,6 +9,7 @@ import {
   ScrollView,
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+
 import { RouteType, RoutePoint } from '../Map/types';
 
 interface RouterHUDProps {
@@ -56,7 +57,7 @@ export const RouterHUD: React.FC<RouterHUDProps> = ({
   onFinishSingleTarget,
   onSave,
   onCancel,
-  hideSaveBlock
+  hideSaveBlock,
 }) => {
   if (!isRoutingActive) return null;
   if (routingType === 'sector' && isRouteFinished) return null;
@@ -79,8 +80,10 @@ export const RouterHUD: React.FC<RouterHUDProps> = ({
     let dist = 0;
     for (let i = 0; i < draftRoutePoints.length - 1; i++) {
       dist += calculateDistance(
-        draftRoutePoints[i].latitude, draftRoutePoints[i].longitude,
-        draftRoutePoints[i+1].latitude, draftRoutePoints[i+1].longitude
+        draftRoutePoints[i].latitude,
+        draftRoutePoints[i].longitude,
+        draftRoutePoints[i + 1].latitude,
+        draftRoutePoints[i + 1].longitude,
       );
     }
     return dist;
@@ -105,20 +108,41 @@ export const RouterHUD: React.FC<RouterHUDProps> = ({
         {!isRouteFinished ? (
           <>
             <View style={styles.typeSelector}>
-              {(['direct', 'single_target', 'multi_target', 'ciclovia', 'sector', 'measure'] as RouteType[]).map((type) => (
+              {(
+                [
+                  'direct',
+                  'single_target',
+                  'multi_target',
+                  'ciclovia',
+                  'sector',
+                  'measure',
+                ] as RouteType[]
+              ).map((type) => (
                 <TouchableOpacity
                   key={type}
                   style={[
                     styles.typeButton,
                     routingType === type && styles.typeButtonActive,
-                    draftRoutePoints.length > 0 && routingType !== type && styles.typeButtonDisabled,
+                    draftRoutePoints.length > 0 &&
+                      routingType !== type &&
+                      styles.typeButtonDisabled,
                   ]}
                   onPress={() => draftRoutePoints.length === 0 && setRoutingType(type)}
                   disabled={draftRoutePoints.length > 0}
                 >
                   <MaterialIcons
                     name={
-                      type === 'direct' ? 'straighten' : type === 'single_target' ? 'gesture' : type === 'multi_target' ? 'hub' : type === 'ciclovia' ? 'pedal-bike' : type === 'sector' ? 'format-shapes' : 'square-foot'
+                      type === 'direct'
+                        ? 'straighten'
+                        : type === 'single_target'
+                          ? 'gesture'
+                          : type === 'multi_target'
+                            ? 'hub'
+                            : type === 'ciclovia'
+                              ? 'pedal-bike'
+                              : type === 'sector'
+                                ? 'format-shapes'
+                                : 'square-foot'
                     }
                     size={16}
                     color={routingType === type ? '#0B0F19' : '#D1D5DB'}
@@ -129,7 +153,11 @@ export const RouterHUD: React.FC<RouterHUDProps> = ({
 
             {/* Categoría Selector */}
             <View style={styles.categorySelector}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryScroll}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.categoryScroll}
+              >
                 {(routingType === 'sector' ? SECTOR_CATEGORIES : ROUTE_CATEGORIES).map((cat) => (
                   <TouchableOpacity
                     key={cat.id}
@@ -139,7 +167,9 @@ export const RouterHUD: React.FC<RouterHUDProps> = ({
                     ]}
                     onPress={() => setRouteCategory(cat.id)}
                   >
-                    <Text style={[styles.catChipText, routeCategory === cat.id && { color: '#0B0F19' }]}>
+                    <Text
+                      style={[styles.catChipText, routeCategory === cat.id && { color: '#0B0F19' }]}
+                    >
                       {cat.label}
                     </Text>
                   </TouchableOpacity>
@@ -175,7 +205,15 @@ export const RouterHUD: React.FC<RouterHUDProps> = ({
               <View style={styles.instructionsContainer}>
                 <Text style={styles.instructions}>
                   {routingType === 'measure' && draftRoutePoints.length > 1 && (
-                    <Text style={{color: '#34D399', fontWeight: 'bold', fontSize: 16, textAlign: 'center', marginBottom: 4}}>
+                    <Text
+                      style={{
+                        color: '#34D399',
+                        fontWeight: 'bold',
+                        fontSize: 16,
+                        textAlign: 'center',
+                        marginBottom: 4,
+                      }}
+                    >
                       {(totalDist / 1000).toFixed(2)} km
                     </Text>
                   )}
@@ -190,24 +228,38 @@ export const RouterHUD: React.FC<RouterHUDProps> = ({
               </View>
             )}
 
-            {(routingType === 'single_target' || routingType === 'ciclovia' || routingType === 'sector' || routingType === 'measure') && draftRoutePoints.length >= (routingType === 'sector' ? 3 : 2) && (
-              <TouchableOpacity style={styles.finishButton} onPress={onFinishSingleTarget}>
-                <Text style={styles.finishButtonText}>{routingType === 'sector' ? 'Cerrar Polígono' : routingType === 'measure' ? 'Limpiar Medición' : 'Finalizar Trazado'}</Text>
-              </TouchableOpacity>
-            )}
+            {(routingType === 'single_target' ||
+              routingType === 'ciclovia' ||
+              routingType === 'sector' ||
+              routingType === 'measure') &&
+              draftRoutePoints.length >= (routingType === 'sector' ? 3 : 2) && (
+                <TouchableOpacity style={styles.finishButton} onPress={onFinishSingleTarget}>
+                  <Text style={styles.finishButtonText}>
+                    {routingType === 'sector'
+                      ? 'Cerrar Polígono'
+                      : routingType === 'measure'
+                        ? 'Limpiar Medición'
+                        : 'Finalizar Trazado'}
+                  </Text>
+                </TouchableOpacity>
+              )}
           </>
         ) : !hideSaveBlock ? (
           <View style={styles.saveContainer}>
             <TextInput
               style={styles.input}
-              placeholder={routingType === 'sector' ? "Nombre del sector..." : "Nombre de la ruta..."}
+              placeholder={
+                routingType === 'sector' ? 'Nombre del sector...' : 'Nombre de la ruta...'
+              }
               placeholderTextColor="#9CA3AF"
               value={draftRouteName}
               onChangeText={setDraftRouteName}
               autoFocus
             />
             <TouchableOpacity style={styles.saveButton} onPress={onSave}>
-              <Text style={styles.saveButtonText}>{routingType === 'sector' ? "Guardar Sector" : "Guardar Ruta"}</Text>
+              <Text style={styles.saveButtonText}>
+                {routingType === 'sector' ? 'Guardar Sector' : 'Guardar Ruta'}
+              </Text>
             </TouchableOpacity>
           </View>
         ) : null}
@@ -231,10 +283,14 @@ export const RouterHUD: React.FC<RouterHUDProps> = ({
 
 const getPointColor = (type: string) => {
   switch (type) {
-    case 'origin': return '#34D399';
-    case 'destination': return '#EF4444';
-    case 'target': return '#F59E0B';
-    default: return '#9CA3AF';
+    case 'origin':
+      return '#34D399';
+    case 'destination':
+      return '#EF4444';
+    case 'target':
+      return '#F59E0B';
+    default:
+      return '#9CA3AF';
   }
 };
 

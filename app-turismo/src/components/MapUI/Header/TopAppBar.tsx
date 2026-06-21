@@ -17,12 +17,12 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
 
 import { TopAppBarProps, TabType } from '../types';
 import { SmartVoiceSearch } from '../../ui/SmartVoiceSearch';
 import { ParsedSearch } from '../../../utils/aiSearchParser';
 import { useAuth } from '../../../context/AuthContext';
-import { useRouter } from 'expo-router';
 import { loadUserProfile, NormalUserProfile } from '../../../utils/userProfileStorage';
 import { ContextualSurveyWidget } from '../../ui/ContextualSurveyWidget';
 import { SidebarSubmenu } from '../../ui/SidebarSubmenu';
@@ -85,7 +85,12 @@ const styles = StyleSheet.create({
     borderColor: C.border,
     overflow: 'hidden', // Hide overflow during expansion animation
     ...ISLAND_SHADOW,
-    ...Platform.select({ web: { backgroundColor: C.bgGlass, transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)' } as any }),
+    ...Platform.select({
+      web: {
+        backgroundColor: C.bgGlass,
+        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      } as any,
+    }),
   },
   searchIslandFocused: {
     borderColor: C.accent,
@@ -355,7 +360,13 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     zIndex: 150,
     ...ISLAND_SHADOW,
-    ...Platform.select({ web: { backgroundColor: C.bgGlass, backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' } as any }),
+    ...Platform.select({
+      web: {
+        backgroundColor: C.bgGlass,
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+      } as any,
+    }),
   },
   recentSearchItem: {
     flexDirection: 'row',
@@ -460,13 +471,18 @@ const styles = StyleSheet.create({
     borderColor: C.borderMid,
   },
   btnSecondaryText: { color: C.textMuted, fontSize: 13, fontWeight: '600' },
-  btnPrimary: { backgroundColor: C.accent, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 12 },
+  btnPrimary: {
+    backgroundColor: C.accent,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+  },
   btnPrimaryText: { color: C.textPrimary, fontSize: 13, fontWeight: '700' },
 
   // ── Tooltip ───────────────────────────────────────────────────────────────
   tooltip: {
     position: 'absolute',
-    left: 50,        // just past the icon button
+    left: 50, // just past the icon button
     top: 6,
     backgroundColor: 'rgba(26, 26, 26, 0.97)',
     borderRadius: 10,
@@ -518,21 +534,27 @@ const SidebarItem = React.memo(function SidebarItem({
       onPress={onClick}
       activeOpacity={0.7}
       //@ts-ignore
-      onMouseEnter={() => { setIsHovered(true); onHover?.(); }}
+      onMouseEnter={() => {
+        setIsHovered(true);
+        onHover?.();
+      }}
       onMouseLeave={() => setIsHovered(false)}
       style={[
         styles.sidebarItem,
         styles.sidebarItemIconOnly,
         active && styles.sidebarItemActive,
         isMarked && styles.sidebarItemMarked,
-        isHovered && !active && !isMarked && {
-          backgroundColor: 'rgba(255, 255, 255, 0.08)',
-          borderColor: C.border,
-        },
-        isHovered && isMarked && {
-          backgroundColor: C.accentBg,
-          borderColor: C.accent,
-        }
+        isHovered &&
+          !active &&
+          !isMarked && {
+            backgroundColor: 'rgba(255, 255, 255, 0.08)',
+            borderColor: C.border,
+          },
+        isHovered &&
+          isMarked && {
+            backgroundColor: C.accentBg,
+            borderColor: C.accent,
+          },
       ]}
     >
       <MaterialIcons
@@ -575,7 +597,9 @@ const DropdownItem = React.memo(function DropdownItem({
       onMouseLeave={() => setIsHovered(false)}
       style={[
         styles.dropdownItem,
-        isHovered && { backgroundColor: isDestructive ? C.destructiveBg : 'rgba(255, 255, 255, 0.06)' },
+        isHovered && {
+          backgroundColor: isDestructive ? C.destructiveBg : 'rgba(255, 255, 255, 0.06)',
+        },
       ]}
     >
       <MaterialIcons
@@ -603,7 +627,7 @@ const DropdownItem = React.memo(function DropdownItem({
 const RecentSearchRow = React.memo(function RecentSearchRow({
   item,
   onSelect,
-  onDelete
+  onDelete,
 }: {
   item: RecentSearch;
   onSelect: () => void;
@@ -617,9 +641,15 @@ const RecentSearchRow = React.memo(function RecentSearchRow({
       onMouseLeave={() => setIsHovered(false)}
       style={[styles.recentSearchItem, isHovered && styles.recentSearchItemHovered]}
     >
-      <TouchableOpacity style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }} onPress={onSelect} activeOpacity={0.7}>
+      <TouchableOpacity
+        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }}
+        onPress={onSelect}
+        activeOpacity={0.7}
+      >
         <Ionicons name="time-outline" size={16} color={C.textMuted} />
-        <Text style={styles.recentSearchText} numberOfLines={1}>{item.query}</Text>
+        <Text style={styles.recentSearchText} numberOfLines={1}>
+          {item.query}
+        </Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.recentSearchDeleteBtn} onPress={onDelete}>
         <Ionicons name="close" size={16} color={C.textMuted} />
@@ -708,7 +738,9 @@ export const TopAppBar: React.FC<
     try {
       const stored = await loadUserProfile();
       setProfile(stored);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   const loadSettings = useCallback(async () => {
@@ -723,7 +755,9 @@ export const TopAppBar: React.FC<
       if (s !== null) setSoundEffects(s === 'true');
       if (l !== null) setLanguage(l as 'es' | 'en');
       if (t !== null) setThemeMode(t as 'dark' | 'light');
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   useEffect(() => {
@@ -741,7 +775,9 @@ export const TopAppBar: React.FC<
         AsyncStorage.setItem('app-turismo.settings.theme', themeMode),
       ]);
       setIsSettingsVisible(false);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, [pushNotifications, soundEffects, language, themeMode]);
 
   useEffect(() => {
@@ -769,45 +805,54 @@ export const TopAppBar: React.FC<
   }, [isHidden, sidebarAnim]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
-  const handleTabChange = useCallback((tab: TabType) => {
-    if (tab === 'saved') {
-      onCollectionsClick?.();
-      return;
-    }
-    setActiveTab(tab);
-    onTabChange?.(tab);
-  }, [onTabChange, onCollectionsClick]);
+  const handleTabChange = useCallback(
+    (tab: TabType) => {
+      if (tab === 'saved') {
+        onCollectionsClick?.();
+        return;
+      }
+      setActiveTab(tab);
+      onTabChange?.(tab);
+    },
+    [onTabChange, onCollectionsClick],
+  );
 
-  const handleToggleSearch = useCallback((active: boolean) => {
-    // Elegant expansion animation
-    LayoutAnimation.configureNext(
-      LayoutAnimation.create(
-        300,
-        LayoutAnimation.Types.easeInEaseOut,
-        LayoutAnimation.Properties.opacity
-      )
-    );
-    if (active && isModalOpen) {
-      onSearchFocus?.(); // Close modal when interacting with search
-    }
-    if (active) {
-      getRecentSearches().then(setRecentSearches);
-    }
-    setIsSearchActive(active);
-  }, [isModalOpen, onSearchFocus]);
+  const handleToggleSearch = useCallback(
+    (active: boolean) => {
+      // Elegant expansion animation
+      LayoutAnimation.configureNext(
+        LayoutAnimation.create(
+          300,
+          LayoutAnimation.Types.easeInEaseOut,
+          LayoutAnimation.Properties.opacity,
+        ),
+      );
+      if (active && isModalOpen) {
+        onSearchFocus?.(); // Close modal when interacting with search
+      }
+      if (active) {
+        getRecentSearches().then(setRecentSearches);
+      }
+      setIsSearchActive(active);
+    },
+    [isModalOpen, onSearchFocus],
+  );
 
-  const handleRecentSearchSelect = useCallback((item: RecentSearch) => {
-    onVoiceSearch?.({
-      query: item.query,
-      category: item.category,
-      originalText: item.query,
-      isFinal: true
-    });
-  }, [onVoiceSearch]);
+  const handleRecentSearchSelect = useCallback(
+    (item: RecentSearch) => {
+      onVoiceSearch?.({
+        query: item.query,
+        category: item.category,
+        originalText: item.query,
+        isFinal: true,
+      });
+    },
+    [onVoiceSearch],
+  );
 
   const handleDeleteRecentSearch = useCallback(async (id: string) => {
     await removeRecentSearch(id);
-    setRecentSearches(prev => prev.filter(s => s.id !== id));
+    setRecentSearches((prev) => prev.filter((s) => s.id !== id));
   }, []);
 
   const handleToggleDropdown = useCallback(() => {
@@ -820,10 +865,8 @@ export const TopAppBar: React.FC<
       avatarRef.current.measure((x, y, w, h, px, py) => {
         // Place dropdown to the RIGHT of the sidebar button
         const estimatedHeight = 160; // Estimated height for Mi Perfil, Ajustes, Logout
-        const topPos = py + estimatedHeight > windowHeight - 20 
-          ? py - estimatedHeight + h 
-          : py;
-        
+        const topPos = py + estimatedHeight > windowHeight - 20 ? py - estimatedHeight + h : py;
+
         setDropdownPosition({ top: Math.max(16, topPos), left: px + w + 12 });
         setIsDropdownOpen(true);
       });
@@ -862,7 +905,6 @@ export const TopAppBar: React.FC<
         },
       ]}
     >
-
       {/* ━━━ ISLAND 1: Search Bar ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <View style={{ zIndex: 100 }}>
         <View
@@ -902,11 +944,11 @@ export const TopAppBar: React.FC<
             <TouchableOpacity
               onPress={() => handleToggleSearch(true)}
               activeOpacity={0.8}
-            style={styles.searchInactiveBtnIconOnly}
-          >
-            <Ionicons name="search" size={17} color={C.textMuted} />
-          </TouchableOpacity>
-        )}
+              style={styles.searchInactiveBtnIconOnly}
+            >
+              <Ionicons name="search" size={17} color={C.textMuted} />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* ── Recent Searches Dropdown ── */}
@@ -929,10 +971,9 @@ export const TopAppBar: React.FC<
 
       {/* ━━━ ISLAND 2: Navigation Sidebar ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <View style={styles.sidebarIsland}>
-
         {/* ── Top: Nav Tabs ───────────────────────────────────────────────── */}
-        <ScrollView 
-          style={{ flex: 1 }} 
+        <ScrollView
+          style={{ flex: 1 }}
           contentContainerStyle={styles.navSection}
           showsVerticalScrollIndicator={false}
         >
@@ -962,7 +1003,6 @@ export const TopAppBar: React.FC<
 
         {/* ── Bottom: Actions (Avatar + Notifications) ─────────────────────── */}
         <View style={styles.actionsSection}>
-
           {isAuthenticated ? (
             <>
               {/* Avatar / Profile button */}
@@ -977,10 +1017,11 @@ export const TopAppBar: React.FC<
                   styles.avatarButton,
                   styles.sidebarItemIconOnly,
                   isAvatarActive && styles.avatarButtonActive,
-                  isAvatarHovered && !isAvatarActive && {
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    borderColor: C.border,
-                  },
+                  isAvatarHovered &&
+                    !isAvatarActive && {
+                      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                      borderColor: C.border,
+                    },
                 ]}
               >
                 <View style={[styles.avatarCircle, isAvatarActive && styles.avatarCircleActive]}>
@@ -1016,7 +1057,9 @@ export const TopAppBar: React.FC<
                 {Platform.OS === 'web' && isNotifHovered && (
                   <View style={styles.tooltip} pointerEvents="none">
                     <Text style={styles.tooltipText}>
-                      {notificationsCount > 0 ? `${notificationsCount} notificaciones` : 'Notificaciones'}
+                      {notificationsCount > 0
+                        ? `${notificationsCount} notificaciones`
+                        : 'Notificaciones'}
                     </Text>
                   </View>
                 )}
@@ -1030,9 +1073,8 @@ export const TopAppBar: React.FC<
               onClick={() => router.push('/ingresar')}
             />
           )}
-
         </View>
-        
+
         <ContextualSurveyWidget isSearchActive={isSearchActive} />
       </View>
 
@@ -1092,7 +1134,6 @@ export const TopAppBar: React.FC<
       >
         <View style={styles.settingsOverlay}>
           <View style={styles.settingsCard}>
-
             <View style={styles.settingsHeader}>
               <Text style={styles.settingsTitle}>Ajustes de la Aplicación</Text>
               <TouchableOpacity
@@ -1104,12 +1145,13 @@ export const TopAppBar: React.FC<
             </View>
 
             <ScrollView contentContainerStyle={styles.settingsBody}>
-
               {/* Notificaciones Push */}
               <View style={styles.settingRow}>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingLabel}>Notificaciones Push</Text>
-                  <Text style={styles.settingDesc}>Recibe alertas de eventos cercanos en tiempo real</Text>
+                  <Text style={styles.settingDesc}>
+                    Recibe alertas de eventos cercanos en tiempo real
+                  </Text>
                 </View>
                 <Switch
                   value={pushNotifications}
@@ -1124,7 +1166,9 @@ export const TopAppBar: React.FC<
               <View style={styles.settingRow}>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingLabel}>Efectos de Sonido</Text>
-                  <Text style={styles.settingDesc}>Reproduce sonidos en interacciones y búsquedas</Text>
+                  <Text style={styles.settingDesc}>
+                    Reproduce sonidos en interacciones y búsquedas
+                  </Text>
                 </View>
                 <Switch
                   value={soundEffects}
@@ -1148,7 +1192,12 @@ export const TopAppBar: React.FC<
                       style={[styles.selectorBtn, language === lang && styles.selectorBtnActive]}
                       onPress={() => setLanguage(lang)}
                     >
-                      <Text style={[styles.selectorBtnText, language === lang && styles.selectorBtnTextActive]}>
+                      <Text
+                        style={[
+                          styles.selectorBtnText,
+                          language === lang && styles.selectorBtnTextActive,
+                        ]}
+                      >
                         {lang.toUpperCase()}
                       </Text>
                     </TouchableOpacity>
@@ -1168,7 +1217,12 @@ export const TopAppBar: React.FC<
                     style={[styles.selectorBtn, themeMode === 'dark' && styles.selectorBtnActive]}
                     onPress={() => setThemeMode('dark')}
                   >
-                    <Text style={[styles.selectorBtnText, themeMode === 'dark' && styles.selectorBtnTextActive]}>
+                    <Text
+                      style={[
+                        styles.selectorBtnText,
+                        themeMode === 'dark' && styles.selectorBtnTextActive,
+                      ]}
+                    >
                       Oscuro
                     </Text>
                   </TouchableOpacity>
@@ -1176,28 +1230,33 @@ export const TopAppBar: React.FC<
                     style={[styles.selectorBtn, themeMode === 'light' && styles.selectorBtnActive]}
                     onPress={() => setThemeMode('light')}
                   >
-                    <Text style={[styles.selectorBtnText, themeMode === 'light' && styles.selectorBtnTextActive]}>
+                    <Text
+                      style={[
+                        styles.selectorBtnText,
+                        themeMode === 'light' && styles.selectorBtnTextActive,
+                      ]}
+                    >
                       Claro
                     </Text>
                   </TouchableOpacity>
                 </View>
               </View>
-
             </ScrollView>
 
             <View style={styles.settingsFooter}>
-              <TouchableOpacity style={styles.btnSecondary} onPress={() => setIsSettingsVisible(false)}>
+              <TouchableOpacity
+                style={styles.btnSecondary}
+                onPress={() => setIsSettingsVisible(false)}
+              >
                 <Text style={styles.btnSecondaryText}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.btnPrimary} onPress={saveSettings}>
                 <Text style={styles.btnPrimaryText}>Guardar</Text>
               </TouchableOpacity>
             </View>
-
           </View>
         </View>
       </Modal>
-
     </Animated.View>
   );
 };

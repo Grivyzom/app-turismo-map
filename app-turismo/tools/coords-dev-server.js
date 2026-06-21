@@ -19,7 +19,9 @@ const server = http.createServer((req, res) => {
   // GET /api/coords/files
   if (req.method === 'GET' && req.url === '/api/coords/files') {
     try {
-      const files = fs.readdirSync(COORDS_DIR).filter(f => f.endsWith('.json') || f.endsWith('.geojson'));
+      const files = fs
+        .readdirSync(COORDS_DIR)
+        .filter((f) => f.endsWith('.json') || f.endsWith('.geojson'));
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(files));
     } catch (e) {
@@ -33,12 +35,16 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET' && req.url.startsWith('/api/coords/')) {
     const filename = req.url.replace('/api/coords/', '');
     if (!filename.endsWith('.json') && !filename.endsWith('.geojson')) {
-      res.writeHead(400); res.end(JSON.stringify({ error: 'Invalid file type' })); return;
+      res.writeHead(400);
+      res.end(JSON.stringify({ error: 'Invalid file type' }));
+      return;
     }
-    
+
     const filePath = path.join(COORDS_DIR, filename);
     if (!fs.existsSync(filePath)) {
-      res.writeHead(404); res.end(JSON.stringify({ error: 'File not found' })); return;
+      res.writeHead(404);
+      res.end(JSON.stringify({ error: 'File not found' }));
+      return;
     }
 
     try {
@@ -46,7 +52,8 @@ const server = http.createServer((req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(data);
     } catch (e) {
-      res.writeHead(500); res.end(JSON.stringify({ error: e.message }));
+      res.writeHead(500);
+      res.end(JSON.stringify({ error: e.message }));
     }
     return;
   }
@@ -55,16 +62,18 @@ const server = http.createServer((req, res) => {
   if (req.method === 'POST' && req.url.startsWith('/api/coords/')) {
     const filename = req.url.replace('/api/coords/', '');
     if (!filename.endsWith('.json') && !filename.endsWith('.geojson')) {
-      res.writeHead(400); res.end(JSON.stringify({ error: 'Invalid file type' })); return;
+      res.writeHead(400);
+      res.end(JSON.stringify({ error: 'Invalid file type' }));
+      return;
     }
 
     const filePath = path.join(COORDS_DIR, filename);
-    
+
     let body = '';
-    req.on('data', chunk => {
+    req.on('data', (chunk) => {
       body += chunk.toString();
     });
-    
+
     req.on('end', () => {
       try {
         const parsed = JSON.parse(body);
@@ -72,7 +81,8 @@ const server = http.createServer((req, res) => {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true }));
       } catch (e) {
-        res.writeHead(500); res.end(JSON.stringify({ error: e.message }));
+        res.writeHead(500);
+        res.end(JSON.stringify({ error: e.message }));
       }
     });
     return;

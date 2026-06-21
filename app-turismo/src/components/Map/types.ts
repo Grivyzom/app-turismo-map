@@ -1,17 +1,17 @@
 /** Tipo de viñeta (badge) que se muestra en el borde superior del pin */
 export type VinetaType =
-  | 'en_vivo'       // Transmisión en vivo - rojo neón/morado
-  | 'agendado'      // Evento agendado - naranja/azul claro
-  | 'calificacion'  // Calificación estrellas - amarillo/naranja
-  | 'oferta'        // Oferta/Promoción - azul/rosa
-  | 'aforo'         // Nivel de aforo - turquesa
-  | 'disponibilidad'// Disponibilidad - verde agua
-  | 'mantenimiento';// Mantenimiento - cian
+  | 'en_vivo' // Transmisión en vivo - rojo neón/morado
+  | 'agendado' // Evento agendado - naranja/azul claro
+  | 'calificacion' // Calificación estrellas - amarillo/naranja
+  | 'oferta' // Oferta/Promoción - azul/rosa
+  | 'aforo' // Nivel de aforo - turquesa
+  | 'disponibilidad' // Disponibilidad - verde agua
+  | 'mantenimiento'; // Mantenimiento - cian
 
 export interface Vineta {
   type: VinetaType;
-  label?: string;   // Texto corto (e.g. "4.5", "2x1", "80%")
-  value?: number;   // Valor numérico (e.g. rating 4.5, aforo 80)
+  label?: string; // Texto corto (e.g. "4.5", "2x1", "80%")
+  value?: number; // Valor numérico (e.g. rating 4.5, aforo 80)
   active?: boolean; // Si la viñeta está activa/visible (default true)
 }
 
@@ -214,7 +214,13 @@ export type MapItem = TurismoEvent | Cluster;
 
 // ── Routing Types (Geo-Router) ──────────────────────────────────────────
 
-export type RouteType = 'direct' | 'single_target' | 'multi_target' | 'ciclovia' | 'sector' | 'measure';
+export type RouteType =
+  | 'direct'
+  | 'single_target'
+  | 'multi_target'
+  | 'ciclovia'
+  | 'sector'
+  | 'measure';
 
 export type RoutePointType = 'origin' | 'destination' | 'target' | 'waypoint';
 

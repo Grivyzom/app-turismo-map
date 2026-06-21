@@ -21,14 +21,14 @@ export async function addRecentSearch(query: string, category: string = 'todos')
     let searches: RecentSearch[] = currentStr ? JSON.parse(currentStr) : [];
 
     // Filtrar la búsqueda exacta si ya existe (para moverla al principio y no duplicarla)
-    searches = searches.filter(s => s.query.toLowerCase() !== query.toLowerCase().trim());
+    searches = searches.filter((s) => s.query.toLowerCase() !== query.toLowerCase().trim());
 
     // Agregar nueva búsqueda al inicio
     const newSearch: RecentSearch = {
       id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
       query: query.trim(),
       category,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
 
     searches.unshift(newSearch);
@@ -67,7 +67,7 @@ export async function removeRecentSearch(id: string): Promise<void> {
     const currentStr = await AsyncStorage.getItem(RECENT_SEARCHES_KEY);
     if (currentStr) {
       let searches: RecentSearch[] = JSON.parse(currentStr);
-      searches = searches.filter(s => s.id !== id);
+      searches = searches.filter((s) => s.id !== id);
       await AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(searches));
     }
   } catch (error) {

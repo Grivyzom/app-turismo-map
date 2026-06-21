@@ -1,4 +1,5 @@
 import { API_URL } from '../config/api';
+
 import { getAuthTokenAsync } from './authStorage';
 
 export interface BackendCollection {
@@ -43,7 +44,7 @@ export async function fetchCollectionsFromBackend(): Promise<BackendCollection[]
 }
 
 export async function fetchCollectionLocations(
-  collectionId: number
+  collectionId: number,
 ): Promise<BackendSavedLocation[]> {
   try {
     const token = await getAuthTokenAsync();
@@ -114,7 +115,7 @@ export async function deleteCollectionOnBackend(collectionId: number): Promise<b
 
 export async function addLocationToCollection(
   collectionId: number,
-  location: Omit<BackendSavedLocation, 'id' | 'collectionId' | 'createdAt'>
+  location: Omit<BackendSavedLocation, 'id' | 'collectionId' | 'createdAt'>,
 ): Promise<BackendSavedLocation | null> {
   try {
     const token = await getAuthTokenAsync();
@@ -143,7 +144,7 @@ export async function addLocationToCollection(
 
 export async function removeLocationFromCollection(
   collectionId: number,
-  locationId: number
+  locationId: number,
 ): Promise<boolean> {
   try {
     const token = await getAuthTokenAsync();
@@ -156,7 +157,7 @@ export async function removeLocationFromCollection(
         headers: {
           Authorization: `Bearer ${token}`,
         },
-      }
+      },
     );
 
     return response.ok;

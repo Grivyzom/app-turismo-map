@@ -1,5 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Platform, TextInput } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  Platform,
+  TextInput,
+} from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 interface CoordsEditorHUDProps {
@@ -24,29 +32,29 @@ export const CoordsEditorHUD: React.FC<CoordsEditorHUDProps> = ({
 
   useEffect(() => {
     fetch(`${BASE_URL}/files`)
-      .then(res => res.json())
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         if (Array.isArray(data)) setFiles(data);
       })
-      .catch(err => console.error('Error fetching coords files:', err));
+      .catch((err) => console.error('Error fetching coords files:', err));
   }, []);
 
   const loadFile = (filename: string) => {
     setSelectedFile(filename);
     setSelectedFeatureIndex(null);
     fetch(`${BASE_URL}/${filename}`)
-      .then(res => res.json())
-      .then(data => setGeojsonData(data))
-      .catch(err => console.error('Error reading file:', err));
+      .then((res) => res.json())
+      .then((data) => setGeojsonData(data))
+      .catch((err) => console.error('Error reading file:', err));
   };
 
   const handleMove = (dir: 'up' | 'down' | 'left' | 'right') => {
     if (selectedFeatureIndex === null || !geojsonData) return;
-    
+
     const step = 0.00005; // Finer precision than simulator
     const newData = { ...geojsonData };
     const feature = newData.features[selectedFeatureIndex];
-    
+
     if (feature.geometry.type === 'Point') {
       let [lng, lat] = feature.geometry.coordinates;
       if (dir === 'up') lat += step;
@@ -60,7 +68,7 @@ export const CoordsEditorHUD: React.FC<CoordsEditorHUDProps> = ({
 
   const addPointAtCrosshair = () => {
     if (!geojsonData || !crosshairLocation) return;
-    
+
     const newFeature = {
       type: 'Feature',
       id: `dev-added-${Date.now()}`,
@@ -70,14 +78,14 @@ export const CoordsEditorHUD: React.FC<CoordsEditorHUDProps> = ({
       },
       geometry: {
         type: 'Point',
-        coordinates: [crosshairLocation.longitude, crosshairLocation.latitude]
-      }
+        coordinates: [crosshairLocation.longitude, crosshairLocation.latitude],
+      },
     };
-    
+
     const newData = { ...geojsonData };
     if (!newData.features) newData.features = [];
     newData.features.push(newFeature);
-    
+
     setGeojsonData(newData);
     setSelectedFeatureIndex(newData.features.length - 1);
   };
@@ -85,26 +93,29 @@ export const CoordsEditorHUD: React.FC<CoordsEditorHUDProps> = ({
   const handleSave = () => {
     if (!selectedFile || !geojsonData) return;
     setIsSaving(true);
-    
+
     fetch(`${BASE_URL}/${selectedFile}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(geojsonData),
     })
-      .then(res => res.json())
+      .then((res) => res.json())
       .then(() => {
         setIsSaving(false);
         onRefreshMapData(); // Force app to reload coords if necessary
         alert('Archivo guardado correctamente en el disco.');
       })
-      .catch(err => {
+      .catch((err) => {
         console.error('Error saving:', err);
         setIsSaving(false);
         alert('Error al guardar. Asegúrate de que coords-dev-server esté corriendo.');
       });
   };
 
-  const pointFeatures = geojsonData?.features?.map((f: any, idx: number) => ({ ...f, _idx: idx })).filter((f: any) => f.geometry?.type === 'Point') || [];
+  const pointFeatures =
+    geojsonData?.features
+      ?.map((f: any, idx: number) => ({ ...f, _idx: idx }))
+      .filter((f: any) => f.geometry?.type === 'Point') || [];
 
   return (
     <View style={styles.container} pointerEvents="box-none">
@@ -121,7 +132,7 @@ export const CoordsEditorHUD: React.FC<CoordsEditorHUDProps> = ({
           <View>
             <Text style={styles.sectionTitle}>Selecciona Archivo (Solo lectura local)</Text>
             <ScrollView style={{ maxHeight: 150 }}>
-              {files.map(f => (
+              {files.map((f) => (
                 <TouchableOpacity key={f} style={styles.fileButton} onPress={() => loadFile(f)}>
                   <MaterialIcons name="description" size={14} color="#9CA3AF" />
                   <Text style={styles.fileText}>{f}</Text>
@@ -131,19 +142,28 @@ export const CoordsEditorHUD: React.FC<CoordsEditorHUDProps> = ({
           </View>
         ) : (
           <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 8,
+              }}
+            >
               <TouchableOpacity onPress={() => setSelectedFile(null)}>
                 <Text style={{ color: '#8B5CF6', fontSize: 12 }}>← Volver</Text>
               </TouchableOpacity>
-              <Text style={{ color: '#FFF', fontSize: 12, fontWeight: 'bold' }}>{selectedFile}</Text>
+              <Text style={{ color: '#FFF', fontSize: 12, fontWeight: 'bold' }}>
+                {selectedFile}
+              </Text>
             </View>
 
             {crosshairLocation && (
               <View style={styles.addSection}>
-                <TextInput 
-                  style={styles.input} 
-                  value={newFeatureType} 
-                  onChangeText={setNewFeatureType} 
+                <TextInput
+                  style={styles.input}
+                  value={newFeatureType}
+                  onChangeText={setNewFeatureType}
                   placeholder="Ej: bench, waste_basket"
                   placeholderTextColor="#6B7280"
                 />
@@ -157,26 +177,48 @@ export const CoordsEditorHUD: React.FC<CoordsEditorHUDProps> = ({
               {pointFeatures.map((feature: any) => {
                 const isSelected = selectedFeatureIndex === feature._idx;
                 return (
-                  <View key={feature._idx} style={[styles.eventCard, isSelected && { borderColor: '#8B5CF6', backgroundColor: 'rgba(139, 92, 246, 0.1)' }]}>
-                    <TouchableOpacity 
+                  <View
+                    key={feature._idx}
+                    style={[
+                      styles.eventCard,
+                      isSelected && {
+                        borderColor: '#8B5CF6',
+                        backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                      },
+                    ]}
+                  >
+                    <TouchableOpacity
                       style={styles.eventInfo}
                       onPress={() => setSelectedFeatureIndex(isSelected ? null : feature._idx)}
                     >
-                      <Text style={styles.eventName}>{feature.properties?.amenity || feature.properties?.name || 'Punto Sin Nombre'}</Text>
-                      <Text style={styles.eventCoords}>{feature.geometry.coordinates[1].toFixed(5)}, {feature.geometry.coordinates[0].toFixed(5)}</Text>
+                      <Text style={styles.eventName}>
+                        {feature.properties?.amenity ||
+                          feature.properties?.name ||
+                          'Punto Sin Nombre'}
+                      </Text>
+                      <Text style={styles.eventCoords}>
+                        {feature.geometry.coordinates[1].toFixed(5)},{' '}
+                        {feature.geometry.coordinates[0].toFixed(5)}
+                      </Text>
                     </TouchableOpacity>
-                    
+
                     {isSelected && (
                       <View style={styles.dpad}>
                         <TouchableOpacity style={styles.dpadBtn} onPress={() => handleMove('up')}>
                           <MaterialIcons name="arrow-upward" size={16} color="#FFF" />
                         </TouchableOpacity>
                         <View style={styles.dpadMiddle}>
-                          <TouchableOpacity style={styles.dpadBtn} onPress={() => handleMove('left')}>
+                          <TouchableOpacity
+                            style={styles.dpadBtn}
+                            onPress={() => handleMove('left')}
+                          >
                             <MaterialIcons name="arrow-back" size={16} color="#FFF" />
                           </TouchableOpacity>
                           <View style={styles.dpadCenter} />
-                          <TouchableOpacity style={styles.dpadBtn} onPress={() => handleMove('right')}>
+                          <TouchableOpacity
+                            style={styles.dpadBtn}
+                            onPress={() => handleMove('right')}
+                          >
                             <MaterialIcons name="arrow-forward" size={16} color="#FFF" />
                           </TouchableOpacity>
                         </View>
@@ -190,12 +232,14 @@ export const CoordsEditorHUD: React.FC<CoordsEditorHUDProps> = ({
               })}
             </ScrollView>
 
-            <TouchableOpacity 
-              style={[styles.saveButton, isSaving && { opacity: 0.5 }]} 
+            <TouchableOpacity
+              style={[styles.saveButton, isSaving && { opacity: 0.5 }]}
               onPress={handleSave}
               disabled={isSaving}
             >
-              <Text style={styles.saveButtonText}>{isSaving ? 'Guardando...' : 'GUARDAR ARCHIVO (POST)'}</Text>
+              <Text style={styles.saveButtonText}>
+                {isSaving ? 'Guardando...' : 'GUARDAR ARCHIVO (POST)'}
+              </Text>
             </TouchableOpacity>
           </View>
         )}
@@ -235,7 +279,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   closeButton: { padding: 4 },
-  sectionTitle: { color: '#9CA3AF', fontSize: 11, fontWeight: '600', marginBottom: 8, textTransform: 'uppercase' },
+  sectionTitle: {
+    color: '#9CA3AF',
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
   fileButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -257,7 +307,12 @@ const styles = StyleSheet.create({
   },
   eventInfo: { padding: 12 },
   eventName: { color: '#FFF', fontSize: 13, fontWeight: '700' },
-  eventCoords: { color: '#9CA3AF', fontSize: 11, marginTop: 2, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
+  eventCoords: {
+    color: '#9CA3AF',
+    fontSize: 11,
+    marginTop: 2,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
   dpad: {
     backgroundColor: 'rgba(0,0,0,0.5)',
     padding: 8,
@@ -266,7 +321,13 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(255,255,255,0.05)',
   },
   dpadMiddle: { flexDirection: 'row', alignItems: 'center', marginVertical: 4 },
-  dpadCenter: { width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)', marginHorizontal: 8 },
+  dpadCenter: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    marginHorizontal: 8,
+  },
   dpadBtn: {
     backgroundColor: 'rgba(139, 92, 246, 0.4)',
     width: 32,
@@ -303,5 +364,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 6,
   },
-  addButtonText: { color: '#FFF', fontSize: 11, fontWeight: 'bold' }
+  addButtonText: { color: '#FFF', fontSize: 11, fontWeight: 'bold' },
 });

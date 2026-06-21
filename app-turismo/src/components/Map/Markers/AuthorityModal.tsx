@@ -1,12 +1,5 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Linking,
-  Platform,
-  Pressable,
-} from 'react-native';
+import { View, Text, StyleSheet, Linking, Platform, Pressable } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import Animated, {
   ZoomIn,
@@ -75,7 +68,9 @@ export const AuthorityModal = ({ event, isLightMode }: AuthorityModalProps) => {
   };
 
   const getBusinessStatus = (openingHours?: string) => {
-    const isOpen = openingHours ? openingHours.toLowerCase().includes('abierto') || openingHours.includes('24/7') : true; 
+    const isOpen = openingHours
+      ? openingHours.toLowerCase().includes('abierto') || openingHours.includes('24/7')
+      : true;
     return {
       isOpen,
       text: isOpen ? 'Abierto' : 'Cerrado',
@@ -93,7 +88,7 @@ export const AuthorityModal = ({ event, isLightMode }: AuthorityModalProps) => {
   const subtextColor = isLightMode ? '#414844' : '#C1C8C3';
   const bgColor = isLightMode ? '#FFFFFF' : 'rgba(34, 34, 34, 0.95)';
   const borderColor = isLightMode ? 'rgba(0,0,0,0.05)' : 'rgba(255, 255, 255, 0.1)';
-  
+
   const getEmergencyNumber = () => {
     const catLower = event.category?.toLowerCase() || '';
     if (catLower === 'carabinero') return '133';
@@ -101,7 +96,7 @@ export const AuthorityModal = ({ event, isLightMode }: AuthorityModalProps) => {
     if (catLower === 'hospital') return '131';
     return '';
   };
-  
+
   const emergencyNumber = getEmergencyNumber();
 
   return (
@@ -126,7 +121,7 @@ export const AuthorityModal = ({ event, isLightMode }: AuthorityModalProps) => {
                 {event.title}
               </Text>
             </View>
-            
+
             {status && (
               <View style={styles.statusRow}>
                 <View style={[styles.statusDot, { backgroundColor: status.color }]} />
@@ -156,11 +151,7 @@ export const AuthorityModal = ({ event, isLightMode }: AuthorityModalProps) => {
             {/* Action Buttons */}
             <View style={styles.actionsRow}>
               <AnimatedPressable
-                style={[
-                  styles.actionButton,
-                  { backgroundColor: color },
-                  primaryBtn.animatedStyle,
-                ]}
+                style={[styles.actionButton, { backgroundColor: color }, primaryBtn.animatedStyle]}
                 onPress={(e) => {
                   e.stopPropagation();
                   handleContact();

@@ -1,5 +1,13 @@
 import React from 'react';
-import { SafeAreaView, View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
+import {
+  SafeAreaView,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Platform,
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
@@ -18,7 +26,7 @@ export default function DevDashboardScreen() {
 
         <View style={styles.grid}>
           {/* Herramienta 1: Geo-Router y Mapa */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.card}
             activeOpacity={0.8}
             onPress={() => router.push('/dev/mapa')}
@@ -29,12 +37,15 @@ export default function DevDashboardScreen() {
             >
               <MaterialIcons name="map" size={36} color="#34D399" />
               <Text style={styles.cardTitle}>Geo-Lab</Text>
-              <Text style={styles.cardDesc}>Sandbox del mapa. Prueba el Geo-Router, simulador de eventos, herramienta de medición y editor de polígonos.</Text>
+              <Text style={styles.cardDesc}>
+                Sandbox del mapa. Prueba el Geo-Router, simulador de eventos, herramienta de
+                medición y editor de polígonos.
+              </Text>
             </LinearGradient>
           </TouchableOpacity>
 
           {/* Herramienta 2: Variables de Entorno (Mock) */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.card}
             activeOpacity={0.8}
             onPress={() => alert('Pronto: Gestor de Variables')}
@@ -45,12 +56,14 @@ export default function DevDashboardScreen() {
             >
               <MaterialIcons name="tune" size={36} color="#6366F1" />
               <Text style={styles.cardTitle}>Environment</Text>
-              <Text style={styles.cardDesc}>Ajusta variables de entorno al vuelo sin recargar. Simula fallos de API o latencia.</Text>
+              <Text style={styles.cardDesc}>
+                Ajusta variables de entorno al vuelo sin recargar. Simula fallos de API o latencia.
+              </Text>
             </LinearGradient>
           </TouchableOpacity>
 
           {/* Herramienta 3: Simulador de Tiempo (Mock) */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.card}
             activeOpacity={0.8}
             onPress={() => alert('Pronto: Máquina del Tiempo')}
@@ -61,12 +74,14 @@ export default function DevDashboardScreen() {
             >
               <MaterialIcons name="update" size={36} color="#F59E0B" />
               <Text style={styles.cardTitle}>Time Machine</Text>
-              <Text style={styles.cardDesc}>Acelera el reloj interno para probar notificaciones programadas y eventos futuros.</Text>
+              <Text style={styles.cardDesc}>
+                Acelera el reloj interno para probar notificaciones programadas y eventos futuros.
+              </Text>
             </LinearGradient>
           </TouchableOpacity>
 
           {/* Herramienta 4: Memory & Cache (Mock) */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.card}
             activeOpacity={0.8}
             onPress={() => alert('Pronto: Inspector de Caché')}
@@ -77,15 +92,15 @@ export default function DevDashboardScreen() {
             >
               <MaterialIcons name="memory" size={36} color="#EF4444" />
               <Text style={styles.cardTitle}>Memory & Cache</Text>
-              <Text style={styles.cardDesc}>Forza limpiezas de caché de tiles del mapa y estado global para depurar fugas de memoria.</Text>
+              <Text style={styles.cardDesc}>
+                Forza limpiezas de caché de tiles del mapa y estado global para depurar fugas de
+                memoria.
+              </Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity 
-          style={styles.backHomeButton}
-          onPress={() => router.push('/(home)/map')}
-        >
+        <TouchableOpacity style={styles.backHomeButton} onPress={() => router.push('/(home)/map')}>
           <MaterialIcons name="arrow-back" size={20} color="#FFF" />
           <Text style={styles.backHomeText}>Volver a la App Principal</Text>
         </TouchableOpacity>
@@ -103,7 +118,7 @@ const styles = StyleSheet.create({
     padding: 24,
     ...Platform.select({
       ios: { paddingTop: 60 },
-    })
+    }),
   },
   header: {
     alignItems: 'center',
@@ -167,5 +182,5 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 16,
     fontWeight: '600',
-  }
+  },
 });
