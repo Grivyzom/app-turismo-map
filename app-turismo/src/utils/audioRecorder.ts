@@ -1,11 +1,33 @@
 import { Audio } from 'expo-av';
+import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 
 export class AudioRecorder {
   private recording: Audio.Recording | null = null;
+  private isBusy: boolean = false;
 
   async requestPermissions(): Promise<boolean> {
     try {
+      if (Platform.OS === 'web') {
+        const isSecureContext = typeof window !== 'undefined' && window.isSecureContext;
+        const hasGetUserMedia =
+          typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia;
+
+        if (!hasGetUserMedia) {
+          console.error('Microphone permission API not available in this browser.');
+          return false;
+        }
+
+        if (!isSecureContext) {
+          console.error('Microphone permission requires HTTPS or localhost.');
+          return false;
+        }
+
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((track) => track.stop());
+        return true;
+      }
+
       const { status } = await Audio.requestPermissionsAsync();
       return status === 'granted';
     } catch (err) {
@@ -15,9 +37,17 @@ export class AudioRecorder {
   }
 
   async startRecording(): Promise<void> {
+    if (this.isBusy) {
+      console.warn('AudioRecorder is already busy with another operation');
+      return;
+    }
+
     try {
+      this.isBusy = true;
+
+      // Ensure any existing recording is stopped and unloaded
       if (this.recording) {
-        await this.stopRecording();
+        await this.stopRecordingInternal();
       }
 
       const hasPermission = await this.requestPermissions();
@@ -31,34 +61,52 @@ export class AudioRecorder {
       });
 
       const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
+        Audio.RecordingOptionsPresets.HIGH_QUALITY,
       );
       this.recording = recording;
     } catch (err) {
       console.error('Failed to start recording', err);
+      this.recording = null;
       throw err;
+    } finally {
+      this.isBusy = false;
     }
   }
 
   async stopRecording(): Promise<string | null> {
+    if (this.isBusy && !this.recording) {
+      return null;
+    }
+
+    try {
+      this.isBusy = true;
+      return await this.stopRecordingInternal();
+    } finally {
+      this.isBusy = false;
+    }
+  }
+
+  private async stopRecordingInternal(): Promise<string | null> {
     if (!this.recording) {
       return null;
     }
 
     try {
-      // Small timeout or state check to ensure we don't call stop concurrently
       const rec = this.recording;
-      this.recording = null; // Clear immediately to prevent double stops
+      this.recording = null;
 
-      await rec.stopAndUnloadAsync();
+      const status = await rec.getStatusAsync();
+      if (status.canRecord) {
+        await rec.stopAndUnloadAsync();
+      }
+
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
       });
 
-      const uri = rec.getURI();
-      return uri;
+      return rec.getURI();
     } catch (err) {
-      console.error('Failed to stop recording', err);
+      console.error('Failed to stop recording internal', err);
       return null;
     }
   }

@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Platform } from 'react-native';
 import * as Location from 'expo-location';
 
+import { calculateDistance, calculateBearing } from '../utils/locationUtils';
+
 export interface UserLocation {
   latitude: number;
   longitude: number;
@@ -38,35 +40,11 @@ export function getHeadingDirection(heading: number | null): string | null {
   return 'Norte';
 }
 
-// Haversine para calcular distancia en metros entre dos coordenadas
-function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371000; // Radio de la Tierra en metros
-  const phi1 = (lat1 * Math.PI) / 180;
-  const phi2 = (lat2 * Math.PI) / 180;
-  const deltaPhi = ((lat2 - lat1) * Math.PI) / 180;
-  const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
-
-  const a =
-    Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
-    Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-  return R * c;
-}
-
-// Rumbo geodésico (bearing) entre dos puntos en grados
-function calculateBearing(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const lat1Rad = (lat1 * Math.PI) / 180;
-  const lat2Rad = (lat2 * Math.PI) / 180;
-
-  const y = Math.sin(dLon) * Math.cos(lat2Rad);
-  const x =
-    Math.cos(lat1Rad) * Math.sin(lat2Rad) - Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
-
-  const brng = (Math.atan2(y, x) * 180) / Math.PI;
-  return (brng + 360) % 360;
-}
+const ACCURACY_MIN_METERS = 3;
+const ACCURACY_MAX_METERS_NATIVE = 80;
+const ACCURACY_MAX_METERS_WEB = 120;
+const ACCURACY_STALE_MS = 15000;
+const ACCURACY_EMA_ALPHA = 0.25;
 
 export function useUserLocation() {
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
@@ -75,6 +53,13 @@ export function useUserLocation() {
 
   // Guardar última ubicación en ref para cálculo cinemático de rumbo
   const prevCoordsRef = useRef<{ latitude: number; longitude: number } | null>(null);
+  const accuracyEmaRef = useRef<number | null>(null);
+  const lastGoodFixRef = useRef<(UserLocation & { timestamp: number }) | null>(null);
+
+  // Refs para throttling del React state
+  const lastStateUpdateRef = useRef<number>(0);
+  const lastLoggedCoordsRef = useRef<{ latitude: number; longitude: number } | null>(null);
+  const lastLoggedHeadingRef = useRef<number | null>(null);
 
   // Referencias para combinar datos de GPS y Brújula de forma asíncrona
   const latestCoords = useRef<{
@@ -110,7 +95,7 @@ export function useUserLocation() {
         ? latestHeading.current.headingDirection
         : getHeadingDirection(headingVal);
 
-    setUserLocation({
+    const newLocationData = {
       latitude: latestCoords.current.latitude,
       longitude: latestCoords.current.longitude,
       altitude: latestCoords.current.altitude,
@@ -118,8 +103,151 @@ export function useUserLocation() {
       accuracy: latestCoords.current.accuracy,
       heading: headingVal,
       headingDirection: headingDir,
-    });
+    };
+
+    // 1. Emitir evento de alta frecuencia para los mapas en Web (bypasseando React)
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('high-frequency-user-location', {
+          detail: newLocationData,
+        }),
+      );
+    }
+
+    // 2. Throttling para el React State general (usado en check-in, widgets, etc.)
+    const now = Date.now();
+    const lastUpdate = lastStateUpdateRef.current;
+    const lastCoords = lastLoggedCoordsRef.current;
+    const lastHeading = lastLoggedHeadingRef.current;
+
+    let shouldUpdateState = false;
+
+    if (userLocation === null) {
+      // Forzar la primera actualización
+      shouldUpdateState = true;
+    } else if (now - lastUpdate >= 1000) {
+      // Solo actualizamos el estado si ha pasado más de 1 segundo
+      const movedSignificantly =
+        !lastCoords ||
+        Math.abs(lastCoords.latitude - newLocationData.latitude) > 0.00003 || // ~3 metros
+        Math.abs(lastCoords.longitude - newLocationData.longitude) > 0.00003;
+
+      const rotatedSignificantly =
+        headingVal !== null && (lastHeading === null || Math.abs(headingVal - lastHeading) >= 10); // ~10 grados
+
+      if (
+        movedSignificantly ||
+        rotatedSignificantly ||
+        newLocationData.accuracy !== userLocation.accuracy
+      ) {
+        shouldUpdateState = true;
+      }
+    }
+
+    if (shouldUpdateState) {
+      setUserLocation(newLocationData);
+      lastStateUpdateRef.current = now;
+      lastLoggedCoordsRef.current = {
+        latitude: newLocationData.latitude,
+        longitude: newLocationData.longitude,
+      };
+      lastLoggedHeadingRef.current = headingVal;
+    }
+  }, [userLocation]);
+
+  const accuracyMaxMeters =
+    Platform.OS === 'web' ? ACCURACY_MAX_METERS_WEB : ACCURACY_MAX_METERS_NATIVE;
+
+  const normalizeAccuracy = useCallback((rawAccuracy: number | null) => {
+    if (rawAccuracy === null || Number.isNaN(rawAccuracy)) {
+      return accuracyEmaRef.current;
+    }
+
+    const clamped = Math.max(ACCURACY_MIN_METERS, rawAccuracy);
+    if (accuracyEmaRef.current === null) {
+      accuracyEmaRef.current = clamped;
+    } else {
+      accuracyEmaRef.current =
+        accuracyEmaRef.current + (clamped - accuracyEmaRef.current) * ACCURACY_EMA_ALPHA;
+    }
+
+    return accuracyEmaRef.current;
   }, []);
+
+  const applyLocationUpdate = useCallback(
+    ({
+      latitude,
+      longitude,
+      altitude,
+      speed,
+      accuracy,
+      heading,
+    }: {
+      latitude: number;
+      longitude: number;
+      altitude: number | null;
+      speed: number | null;
+      accuracy: number | null;
+      heading: number | null;
+    }) => {
+      const now = Date.now();
+      const normalizedAccuracy = normalizeAccuracy(accuracy);
+      const roundedAccuracy =
+        normalizedAccuracy !== null && !Number.isNaN(normalizedAccuracy)
+          ? Math.round(normalizedAccuracy)
+          : null;
+
+      const isGoodFix = roundedAccuracy !== null && roundedAccuracy <= accuracyMaxMeters;
+
+      if (isGoodFix || !lastGoodFixRef.current) {
+        lastGoodFixRef.current = {
+          latitude,
+          longitude,
+          altitude,
+          speed,
+          accuracy: roundedAccuracy,
+          heading,
+          headingDirection: getHeadingDirection(heading),
+          timestamp: now,
+        };
+      }
+
+      const useFallback =
+        !isGoodFix &&
+        lastGoodFixRef.current &&
+        now - lastGoodFixRef.current.timestamp <= ACCURACY_STALE_MS;
+
+      const base =
+        useFallback && lastGoodFixRef.current
+          ? lastGoodFixRef.current
+          : {
+              latitude,
+              longitude,
+              altitude,
+              speed,
+              accuracy: roundedAccuracy,
+              heading,
+              headingDirection: getHeadingDirection(heading),
+            };
+
+      latestCoords.current = {
+        latitude: base.latitude,
+        longitude: base.longitude,
+        altitude: base.altitude,
+        speed: base.speed,
+        accuracy: base.accuracy,
+        heading: heading,
+      };
+
+      if (isGoodFix || !prevCoordsRef.current) {
+        prevCoordsRef.current = { latitude, longitude };
+      }
+
+      updateLocationState();
+      setIsLoadingLocation(false);
+    },
+    [accuracyMaxMeters, normalizeAccuracy, updateLocationState],
+  );
 
   const startLocationTracking = useCallback(async () => {
     // Rendir el hilo de ejecución para que sea completamente asíncrono y silenciar la regla set-state-in-effect
@@ -165,21 +293,14 @@ export function useUserLocation() {
               }
             }
 
-            // Actualizar referencia de coordenadas
-            latestCoords.current = {
+            applyLocationUpdate({
               latitude,
               longitude,
               altitude: altitude !== null ? Math.round(altitude) : null,
               accuracy: accuracy !== null ? Math.round(accuracy) : null,
               speed: speedKmh,
               heading: calculatedHeading,
-            };
-
-            // Guardar posición anterior
-            prevCoordsRef.current = { latitude, longitude };
-
-            updateLocationState();
-            setIsLoadingLocation(false);
+            });
           },
           (error) => {
             let errorMsg = 'Error al obtener ubicación';
@@ -197,7 +318,7 @@ export function useUserLocation() {
             setLocationError(errorMsg);
             setIsLoadingLocation(false);
           },
-          { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000 },
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
         );
 
         // 2. RASTREAR DIRECCIÓN/BRÚJULA DE SENSORES (WEB)
@@ -239,11 +360,11 @@ export function useUserLocation() {
         }
 
         const initialLocation = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
+          accuracy: Location.Accuracy.Highest,
         });
 
         const initCoords = initialLocation.coords;
-        latestCoords.current = {
+        applyLocationUpdate({
           latitude: initCoords.latitude,
           longitude: initCoords.longitude,
           altitude: initCoords.altitude !== null ? Math.round(initCoords.altitude) : null,
@@ -253,16 +374,14 @@ export function useUserLocation() {
               ? parseFloat((initCoords.speed * 3.6).toFixed(1))
               : 0,
           heading: initCoords.heading,
-        };
-        prevCoordsRef.current = { latitude: initCoords.latitude, longitude: initCoords.longitude };
-        updateLocationState();
+        });
 
         // 1. RASTREAR POSICIÓN NATIVA
         positionSub.current = await Location.watchPositionAsync(
           {
-            accuracy: Location.Accuracy.High,
-            timeInterval: 3000, // Actualizar cada 3s para suavidad
-            distanceInterval: 3, // Cada 3 metros
+            accuracy: Location.Accuracy.BestForNavigation,
+            timeInterval: 2000, // Actualizar cada 2s para mejor precisión
+            distanceInterval: 2, // Cada 2 metros
           },
           (location) => {
             const { latitude, longitude, altitude, accuracy, speed, heading } = location.coords;
@@ -287,18 +406,14 @@ export function useUserLocation() {
               }
             }
 
-            latestCoords.current = {
+            applyLocationUpdate({
               latitude,
               longitude,
               altitude: altitude !== null ? Math.round(altitude) : null,
               accuracy: accuracy !== null ? Math.round(accuracy) : null,
               speed: speedKmh,
               heading: calculatedHeading,
-            };
-
-            prevCoordsRef.current = { latitude, longitude };
-            updateLocationState();
-            setIsLoadingLocation(false);
+            });
           },
         );
 
@@ -318,7 +433,7 @@ export function useUserLocation() {
       setLocationError('Ocurrió un error al rastrear la ubicación');
       setIsLoadingLocation(false);
     }
-  }, [updateLocationState]);
+  }, [applyLocationUpdate, updateLocationState]);
 
   const startTrackingRef = useRef(startLocationTracking);
 
@@ -340,7 +455,11 @@ export function useUserLocation() {
       }
       if (headingSub.current) {
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
-          (window as any).removeEventListener('deviceorientationabsolute', headingSub.current, true);
+          (window as any).removeEventListener(
+            'deviceorientationabsolute',
+            headingSub.current,
+            true,
+          );
           (window as any).removeEventListener('deviceorientation', headingSub.current, true);
         } else {
           headingSub.current.remove();

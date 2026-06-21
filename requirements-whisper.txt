@@ -1,0 +1,5 @@
+torch
+transformers
+websockets
+accelerate
+safetensors

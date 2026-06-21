@@ -8,6 +8,11 @@ module.exports = {
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
+    splash: {
+      image: './assets/splash-icon.png',
+      resizeMode: 'contain',
+      backgroundColor: '#E6F4FE',
+    },
     scheme: 'app-turismo',
     ios: {
       supportsTablet: true,
@@ -38,9 +43,20 @@ module.exports = {
     },
     web: {
       favicon: './assets/favicon.png',
+      bundler: 'metro',
+      output: 'static',
     },
     plugins: [
       'expo-router',
+      [
+        '@react-native-google-signin/google-signin',
+        {
+          iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || 'dummy-ios-id',
+          iosUrlScheme:
+            process.env.EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME ||
+            'com.googleusercontent.apps.dummy-ios-id',
+        },
+      ],
       [
         'expo-location',
         {

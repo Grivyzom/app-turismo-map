@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import Ionicons from '@expo/vector-icons/Ionicons';
+
 import { UserLocation } from '../../hooks/useUserLocation';
 
 interface TelemetryWidgetProps {

@@ -50,29 +50,34 @@ Para evitar esquemas rígidos y cambios costosos de migración en el futuro, las
 }
 ```
 
-### B. Listas de Guardados y Favoritos (`saved_lists` & `saved_places`)
-En lugar de crear tablas separadas para "Favoritos" y "Guardados", unificamos la funcionalidad para que el usuario pueda tener listas predeterminadas (como *"Favoritos"*) o personalizadas (como *"Cafeterías por visitar"*).
+### B. Colecciones y Ubicaciones Guardadas (`collections` & `saved_locations`)
+Implementado para permitir al usuario organizar sus puntos de interés en carpetas temáticas.
 
 ```sql
-CREATE TABLE IF NOT EXISTS saved_lists (
+CREATE TABLE IF NOT EXISTS collections (
     id SERIAL PRIMARY KEY,
     user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    name VARCHAR(100) NOT NULL, -- ej. "Mis Favoritos", "Parques para el fin de semana"
+    name VARCHAR(255) NOT NULL, -- ej. "Turismo", "Mis Favoritos"
     description TEXT,
-    is_public BOOLEAN DEFAULT false,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    visibility VARCHAR(50) DEFAULT 'private',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS saved_places (
+CREATE TABLE IF NOT EXISTS saved_locations (
     id SERIAL PRIMARY KEY,
-    list_id INT NOT NULL REFERENCES saved_lists(id) ON DELETE CASCADE,
-    branch_id INT REFERENCES company_branches(id) ON DELETE CASCADE, -- Si es un comercio local interno
-    external_place_id VARCHAR(255), -- Si el lugar proviene de una API externa (ej. Google Places API)
-    notes TEXT, -- Nota personal sobre por qué se guardó el lugar
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(list_id, branch_id, external_place_id)
+    collection_id INT NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+    location_type VARCHAR(50) NOT NULL, -- 'event' (evento interno) o 'custom_pin' (pincho manual)
+    ref_id VARCHAR(100), -- ID del evento si es de tipo 'event'
+    latitude DOUBLE PRECISION NOT NULL,
+    longitude DOUBLE PRECISION NOT NULL,
+    title VARCHAR(255),
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
+
+Para más detalles sobre la implementación técnica, ver: [[Sistema de Colecciones y Ubicaciones Guardadas]]
 
 ### C. Eventos y Asistencia (`events` & `event_attendance`)
 Permite a los usuarios marcar interés, confirmar asistencia o realizar un Check-In geoespacial cuando se encuentren en las coordenadas físicas del evento.

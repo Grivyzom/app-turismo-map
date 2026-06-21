@@ -7,16 +7,25 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 export type UserProfileIconName = ComponentProps<typeof MaterialIcons>['name'];
 
+export type UserPreferences = {
+  categories: string[];
+  travelStyle: string;
+  stayDuration: string;
+};
+
 export type NormalUserProfile = {
   fullName: string;
   email: string;
   location: string;
   avatarIcon: UserProfileIconName;
-  userType: 'citizen' | 'partner_owner' | 'guest';
+  userType: 'citizen' | 'partner_owner' | 'partner_worker' | 'admin' | 'guest';
   twoFactorEnabled: boolean;
   twoFactorSecret: string | null;
+  preferences?: UserPreferences;
   createdAt: string;
   updatedAt: string;
+  entityType?: 'corporate' | 'sme' | 'independent' | 'authority' | string;
+  companyRole?: string;
 };
 
 const USER_PROFILE_STORAGE_KEY = 'app-turismo.normal-user-profile';
@@ -49,6 +58,8 @@ export const getDefaultUserProfile = (): NormalUserProfile => ({
   twoFactorSecret: null,
   createdAt: getNowIso(),
   updatedAt: getNowIso(),
+  entityType: undefined,
+  companyRole: undefined,
 });
 
 const isValidProfileIcon = (value: string | null | undefined): value is UserProfileIconName => {
@@ -74,6 +85,8 @@ const normalizeUserProfile = (
     createdAt: profile?.createdAt ?? baseProfile.createdAt,
     twoFactorEnabled: profile?.twoFactorEnabled ?? baseProfile.twoFactorEnabled,
     twoFactorSecret: profile?.twoFactorSecret ?? baseProfile.twoFactorSecret,
+    entityType: profile?.entityType ?? baseProfile.entityType,
+    companyRole: profile?.companyRole ?? baseProfile.companyRole,
     updatedAt: options?.touchUpdatedAt
       ? getNowIso()
       : (profile?.updatedAt ?? baseProfile.updatedAt),

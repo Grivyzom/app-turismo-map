@@ -1,372 +1,386 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback, Suspense } from 'react';
+import React, { Suspense, useState, useCallback, useEffect } from 'react';
 import {
   SafeAreaView,
-  StyleSheet,
   View,
   Text,
   TouchableOpacity,
   ScrollView,
-  TextInput,
   Dimensions,
   Platform,
   Animated,
+  Easing,
   Pressable,
   Image,
+  ActivityIndicator,
+  TextInput,
+  Linking,
+  Share,
+  Clipboard,
 } from 'react-native';
-import { TelemetryWidget } from '../../src/components/MapUI/TelemetryWidget';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { StatusBar } from 'expo-status-bar';
 
-import { TopAppBar, type TabType } from '../../src/components/MapUI';
-import { MapContainer } from '../../src/components/Map/MapContainer';
-import { MapLayer, TurismoEvent, MAX_ZOOM_PER_LAYER } from '../../src/components/Map/types';
-import FloatingIsland from '../../src/components/ui/FloatingIsland';
-import { LoadingFallback } from '../../src/components/ui/LoadingFallback';
-import { getCategoryColor } from '../../src/utils/mapUtils';
+import { TelemetryWidget } from '../../src/components/MapUI/TelemetryWidget';
 import {
-  DEFAULT_MAP_LAYER,
-  loadPersistedMapLayer,
-  savePersistedMapLayer,
-} from '../../src/utils/mapPreferences';
-import { useUserLocation } from '../../src/hooks/useUserLocation';
-import { ParsedSearch } from '../../src/utils/aiSearchParser';
+  TopAppBar,
+  WeatherForecastWidget,
+  NotificationTray,
+  RouterHUD,
+  TacticalHUD,
+} from '../../src/components/MapUI';
+import { TelemetryHUD } from '../../src/components/MapUI/TelemetryHUD';
+import { BuildingGallery } from '../../src/components/MapUI/BuildingGallery';
+import { MyLocationButton } from '../../src/components/MapUI/MyLocationButton';
+import {
+  EventCheckInSection,
+  LocationErrorNotifier,
+  SectorConfigPanel,
+} from '../../src/components/MapUI';
+import { MapContainer } from '../../src/components/Map/MapContainer';
+import { getCategoryColor, getCategoryIcon } from '../../src/utils/mapUtils';
+import { CHECKIN_EXCLUDED_CATEGORIES } from '../../src/utils/checkInStorage';
+import FloatingIsland from '../../src/components/ui/FloatingIsland';
+import { ContextualRadialMenu, SearchableSelect } from '../../src/components/ui';
+import { SaveToCollectionModal } from '../../src/components/ui/SaveToCollectionModal';
+import { NearbyEventsPanel } from '../../src/components/MapUI/NearbyEventsPanel';
+import { LoadingFallback } from '../../src/components/ui/LoadingFallback';
+import { CheckInModal } from '../../src/components/ui/CheckInModal';
+import { CreatePointModal } from '../../src/components/MapUI/CreatePointModal';
+import { CreateSectorModal } from '../../src/components/MapUI/CreateSectorModal';
+import { CoordsEditorHUD } from '../../src/components/MapUI/CoordsEditorHUD';
+import { CategoryFilter, CATEGORY_ICONS, MAP_LAYER_OPTIONS } from '../../src/data/mockEvents';
+import { ContextualSurveyWidget } from '../../src/components/ui/ContextualSurveyWidget';
+import { useAuth } from '../../src/context/AuthContext';
+
+import { useHomeScreenState } from './useHomeScreenState';
+import { styles } from './styles';
+import { lazyWithRetry } from '../../src/utils/lazyWithRetry';
 
 // --- Lazy-loaded screens ---
-// Each screen is split into its own JS chunk that is downloaded only when the
-// user navigates to that tab, keeping the initial entry bundle as small as possible.
-const UserProfileScreen = React.lazy(() => import('../../src/screens/UserProfileScreen'));
-const FeedScreen        = React.lazy(() => import('../../src/screens/FeedScreen'));
-const PassportScreen    = React.lazy(() => import('../../src/screens/PassportScreen'));
-const ForumScreen       = React.lazy(() => import('../../src/screens/ForumScreen'));
+const UserProfileScreen = lazyWithRetry(() => import('../../src/screens/UserProfileScreen'));
+const FeedScreen = lazyWithRetry(() => import('../../src/screens/FeedScreen'));
+const PassportScreen = lazyWithRetry(() => import('../../src/screens/PassportScreen'));
+const ForumScreen = lazyWithRetry(() => import('../../src/screens/ForumScreen'));
 
-// Prefetch helpers — call these on tab hover to pre-download the chunk before
-// the user clicks, eliminating the visible loading delay.
-const prefetchFeed    = () => import('../../src/screens/FeedScreen');
-const prefetchSaved   = () => import('../../src/screens/PassportScreen');
-const prefetchForum   = () => import('../../src/screens/ForumScreen');
+// Prefetch helpers
+const prefetchFeed = () => import('../../src/screens/FeedScreen');
+const prefetchSaved = () => import('../../src/screens/PassportScreen');
+const prefetchForum = () => import('../../src/screens/ForumScreen');
 const prefetchProfile = () => import('../../src/screens/UserProfileScreen');
 
-const INITIAL_EVENTS: TurismoEvent[] = [
-  {
-    id: '1',
-    title: 'Muestra Gastronómica Kunstmann',
-    description:
-      'Disfruta de la mejor cerveza artesanal de Valdivia y platos típicos alemanes en el corazón de Torobayo.',
-    latitude: -39.8252,
-    longitude: -73.2845,
-    category: 'gastronomia',
-    organizer: 'Cervecería Kunstmann',
-    time: '12:00 - 23:00',
-    attendeesCount: 342,
-    imageUrl:
-      'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&q=80&w=800',
-    radius: 400,
-  },
-  {
-    id: '2',
-    title: 'Exposición Histórica Maurice van de Maele',
-    description:
-      'Un recorrido por el pasado colonial de Valdivia, su arqueología y la cultura mapuche-huilliche.',
-    latitude: -39.8172,
-    longitude: -73.2508,
-    category: 'cultura',
-    organizer: 'Museos UACh',
-    time: '10:00 - 18:00',
-    attendeesCount: 88,
-    imageUrl:
-      'https://images.unsplash.com/photo-1565552643952-443e20e88b8d?auto=format&fit=crop&q=80&w=800',
-  },
-  {
-    id: '3',
-    title: 'Sendero de Lotos en Parque Saval',
-    description:
-      'Visita guiada por la laguna de los lotos gigantes y el bosque valdiviano en Isla Teja.',
-    latitude: -39.808,
-    longitude: -73.2482,
-    category: 'naturaleza',
-    organizer: 'Municipalidad de Valdivia',
-    time: '09:00 - 17:00',
-    attendeesCount: 154,
-    imageUrl:
-      'https://images.unsplash.com/photo-1440342359743-84fcb8c21f21?auto=format&fit=crop&q=80&w=800',
-    polygon: [
-      { latitude: -39.806, longitude: -73.250 },
-      { latitude: -39.806, longitude: -73.246 },
-      { latitude: -39.810, longitude: -73.246 },
-      { latitude: -39.810, longitude: -73.250 },
-    ],
-  },
-  {
-    id: '4',
-    title: 'Concierto de Jazz en Esmeralda',
-    description:
-      'Noche de jazz en vivo en la calle más bohemia e histórica de Valdivia con músicos locales e invitados.',
-    latitude: -39.813,
-    longitude: -73.245,
-    category: 'musica',
-    organizer: 'Club de Jazz Valdivia',
-    time: '21:00 - 01:00',
-    attendeesCount: 120,
-    imageUrl:
-      'https://images.unsplash.com/photo-1511192336575-5a79af67a629?auto=format&fit=crop&q=80&w=800',
-  },
-  {
-    id: '5',
-    title: 'Regata Universitaria de Remo',
-    description:
-      'Competencia tradicional de remo olímpico sobre las aguas del Río Calle-Calle con universidades del sur de Chile.',
-    latitude: -39.8115,
-    longitude: -73.2415,
-    category: 'deportes',
-    organizer: 'Club Deportivo Phoenix',
-    time: '08:30 - 13:00',
-    attendeesCount: 450,
-    imageUrl:
-      'https://images.unsplash.com/photo-1555025062-811c7fb3bf56?auto=format&fit=crop&q=80&w=800',
-  },
-  {
-    id: '6',
-    title: 'Gran Carnaval del Río Calle-Calle',
-    description:
-      'Evento masivo al aire libre con carros alegóricos, comparsas y fuegos artificiales a orillas del río.',
-    latitude: -39.8122,
-    longitude: -73.2480,
-    category: 'publico',
-    organizer: 'Ilustre Municipalidad de Valdivia',
-    time: '18:00 - 23:30',
-    attendeesCount: 500, // Asistencia mediana
-    imageUrl:
-      'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?auto=format&fit=crop&q=80&w=800',
-  },
-];
+// @ts-ignore - Safety fallback for legacy build references
+const isEmergency = false;
 
-const WS_SIMULATION_POOL: Omit<TurismoEvent, 'id' | 'isRealTime'>[] = [
-  {
-    title: 'Feria Fluvial del Libro',
-    description:
-      '¡NUEVO! Venta e intercambio de libros y charlas literarias junto al mercado fluvial frente al Río Valdivia.',
-    latitude: -39.8138,
-    longitude: -73.2435,
-    category: 'cultura',
-    organizer: 'Corporación Cultural Valdivia',
-    time: '11:00 - 20:00',
-    attendeesCount: 65,
-    imageUrl:
-      'https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&q=80&w=800',
-  },
-  {
-    title: 'Feria del Chocolate Artesanal',
-    description:
-      '¡NUEVO! Degustación y talleres de chocolatería fina de autor en la glorieta de la Plaza de la República.',
-    latitude: -39.8148,
-    longitude: -73.2465,
-    category: 'gastronomia',
-    organizer: 'Agrupación Chocolateros del Sur',
-    time: '10:00 - 21:00',
-    attendeesCount: 210,
-    imageUrl:
-      'https://images.unsplash.com/photo-1600021617454-e67c87c4613b?auto=format&fit=crop&q=80&w=800',
-  },
-  {
-    title: 'Festival Internacional de Cine Valdivia (Charla)',
-    description:
-      '¡NUEVO! Conferencia magistral al aire libre sobre cine independiente iberoamericano en el Aula Magna UACh.',
-    latitude: -39.819,
-    longitude: -73.253,
-    category: 'musica',
-    organizer: 'CPC UACh',
-    time: '18:00 - 19:30',
-    attendeesCount: 310,
-    imageUrl:
-      'https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?auto=format&fit=crop&q=80&w=800',
-  },
-];
+interface MapLayerMenuProps {
+  currentLayer: any;
+  onSelectLayer: (layer: any) => void;
+  isReady: boolean;
+}
 
-type CategoryFilter = 'todos' | 'gastronomia' | 'cultura' | 'naturaleza' | 'musica' | 'deportes' | 'publico';
-
-const CATEGORY_ICONS: Record<CategoryFilter, { name: any; family: 'Ionicons' | 'MaterialIcons' }> = {
-  todos: { name: 'apps', family: 'Ionicons' },
-  gastronomia: { name: 'restaurant', family: 'MaterialIcons' },
-  cultura: { name: 'museum', family: 'MaterialIcons' },
-  naturaleza: { name: 'park', family: 'MaterialIcons' },
-  musica: { name: 'music-note', family: 'MaterialIcons' },
-  deportes: { name: 'sports-soccer', family: 'MaterialIcons' },
-  publico: { name: 'groups', family: 'MaterialIcons' },
+const MapLayerMenu: React.FC<MapLayerMenuProps> = ({ currentLayer, onSelectLayer, isReady }) => {
+  return (
+    <View style={{ marginTop: 16, paddingHorizontal: 16 }}>
+      <Text style={[styles.filterSectionTitle, { paddingHorizontal: 0, marginBottom: 8, color: '#94A3B8' }]}>Capa del Mapa</Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        {MAP_LAYER_OPTIONS.map((layer) => {
+          const IconComponent = layer.iconFamily === 'Ionicons' ? Ionicons : MaterialIcons;
+          const isActive = currentLayer === layer.key;
+          return (
+            <TouchableOpacity
+              key={layer.key}
+              style={[styles.layerChip, isActive && styles.activeLayerChip, { flex: 1, minWidth: 80 }]}
+              onPress={() => onSelectLayer(layer.key)}
+              disabled={!isReady}
+            >
+              <IconComponent
+                name={layer.iconName}
+                size={14}
+                color={isActive ? '#34D399' : '#CBD5E0'}
+                style={{ marginRight: 6 }}
+              />
+              <Text style={[styles.layerChipText, isActive && styles.activeLayerChipText]}>
+                {layer.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
 };
 
-const MAP_LAYER_OPTIONS: { key: MapLayer; label: string; iconName: any; iconFamily: 'Ionicons' | 'MaterialIcons' }[] = [
-  { key: 'dark', label: 'Noche', iconName: 'moon', iconFamily: 'Ionicons' },
-  { key: 'streets', label: 'Calles', iconName: 'add-road', iconFamily: 'MaterialIcons' },
-  { key: 'light', label: 'Claro', iconName: 'sunny', iconFamily: 'Ionicons' },
-  { key: 'satellite', label: 'Satélite', iconName: 'satellite', iconFamily: 'MaterialIcons' },
-  { key: 'terrain', label: 'Relieve', iconName: 'terrain', iconFamily: 'MaterialIcons' },
-];
-
 export default function HomeScreen() {
-  const [events, setEvents] = useState<TurismoEvent[]>(INITIAL_EVENTS);
-  const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>('todos');
-  const [selectedEvent, setSelectedEvent] = useState<TurismoEvent | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [simulationIndex, setSimulationIndex] = useState(0);
-  const [mapLayer, setMapLayer] = useState<MapLayer>(DEFAULT_MAP_LAYER);
-  const [mapLayerReady, setMapLayerReady] = useState(false);
-  const [showTraffic, setShowTraffic] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabType>('map');
-  const [showFilters, setShowFilters] = useState(false);
-  const [isTacticalModeActive, setIsTacticalModeActive] = useState(false);
-  const [tacticalLocation, setTacticalLocation] = useState<{
-    latitude: number;
-    longitude: number;
-    x?: number;
-    y?: number;
-  } | null>(null);
+  const { token } = useAuth();
+  console.log('[DEBUG] Rendering HomeScreen v2.2');
+  const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams();
 
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [toastY] = useState(() => new Animated.Value(-150));
-  const [panelSlide] = useState(() => new Animated.Value(0));
+  const [collectionModalVisible, setCollectionModalVisible] = useState(false);
+  const [locationToSave, setLocationToSave] = useState<any>(null);
+  const [showCoordsEditor, setShowCoordsEditor] = useState(false);
 
-  const { userLocation, locationError, isLoadingLocation, retryLocation } = useUserLocation();
-  const [centerTrigger, setCenterTrigger] = useState(0);
-  const [zoom, setZoom] = useState(13);
+  const {
+    events,
+    selectedCategory,
+    setSelectedCategory,
+    selectedEvent,
+    setSelectedEvent,
+    searchQuery,
+    setSearchQuery,
+    simulationIndex,
+    setSimulationIndex,
+    mapLayer,
+    setMapLayer,
+    mapLayerReady,
+    showTraffic,
+    setShowTraffic,
+    showSectors,
+    setShowSectors,
+    activeNestedZone,
+    setActiveNestedZone,
+    selectedSector,
+    setSelectedSector,
+    activeFloor,
+    setActiveFloor,
+    activeTab,
+    setActiveTab,
+    showFilters,
+    setShowFilters,
+    showToolsMenu,
+    setShowToolsMenu,
+    showSectorsConfig,
+    setShowSectorsConfig,
+    sectors,
+    visibleSectorIds,
+    setVisibleSectorIds,
+    isTacticalModeActive,
+    setIsTacticalModeActive,
+    showZoomSlider,
+    setShowZoomSlider,
+    isTelemetryExpanded,
+    setIsTelemetryExpanded,
+    tacticalLocation,
+    setTacticalLocation,
+    mapPincho,
+    handleMapPincho,
+    clearMapPincho,
+    resolvedAddress,
+    isResolvingAddress,
+    showCreateEventModal,
+    setShowCreateEventModal,
+    showNearbyEvents,
+    setShowNearbyEvents,
+    handleCreateNewEvent,
+    notifications,
+    setNotifications,
+    showNotificationTray,
+    setShowNotificationTray,
+    userProfile,
+    panelSlide,
+    pinchoSlide,
+    showRightSheet,
+    rightSheetSlide,
+    checkInModalRecord,
+    setCheckInModalRecord,
+    showCheckInModal,
+    setShowCheckInModal,
+    centerTrigger,
+    setCenterTrigger,
+    zoom,
+    setZoom,
+    setMapBounds,
+    currentMaxZoom,
+    showNotification,
+    handleVoiceSearch,
+    handleVoicePartialSearch,
+    triggerWebSocketEvent,
+    isDesktop,
+    screenWidth,
+    panelWidth,
+    openRightSheet,
+    closeRightSheet,
+    filteredEvents,
+    handleSelectEvent,
+    closeEventPanel,
+    showWeather,
+    setShowWeather,
+    weatherType,
+    setWeatherType,
+    showCycleways,
+    setShowCycleways,
+    cycleways,
 
-  /** Zoom máximo dinámico según la capa activa */
-  const currentMaxZoom = MAX_ZOOM_PER_LAYER[mapLayer] || 18;
+    // Routing Mode (Geo-Router)
+    isRoutingActive,
+    setIsRoutingActive,
+    routingType,
+    setRoutingType,
+    routeCategory,
+    setRouteCategory,
+    draftRoutePoints,
+    setDraftRoutePoints,
+    draftRouteName,
+    setDraftRouteName,
+    isRouteFinished,
+    savedRoutes,
+    showSavedRoutes,
+    setShowSavedRoutes,
+    handleMapClickForRouting,
+    finishSingleTargetRoute,
+    saveRoute,
+    cancelRouting,
+    rateRoute,
+    viewMode,
+    handleToggleViewMode,
+    activeToast,
+  } = useHomeScreenState(token);
 
-  const showNotification = useCallback(
-    (message: string) => {
-      setToastMessage(message);
-      Animated.sequence([
-        Animated.timing(toastY, {
-          toValue: Platform.OS === 'web' ? 20 : 50,
-          duration: 400,
-          useNativeDriver: Platform.OS !== 'web',
-        }),
-        Animated.delay(3500),
-        Animated.timing(toastY, {
-          toValue: -150,
-          duration: 400,
-          useNativeDriver: Platform.OS !== 'web',
-        }),
-      ]).start(() => setToastMessage(null));
-    },
-    [toastY],
-  );
-
-  const handleVoiceSearch = useCallback((result: ParsedSearch) => {
-    setSelectedCategory(result.category as CategoryFilter);
-    setSearchQuery(result.query);
-    showNotification(`Búsqueda: "${result.originalText}"`);
-  }, [showNotification]);
-
-  const triggerWebSocketEvent = useCallback(() => {
-    if (simulationIndex >= WS_SIMULATION_POOL.length) {
-      showNotification('ℹ️ Todos los eventos de simulación ya están en el mapa.');
-      return;
+  useEffect(() => {
+    if (params.action === 'create_sector') {
+      setIsRoutingActive(true);
+      setRoutingType('sector');
+      setRouteCategory('edificio');
+    } else if (params.action === 'create_route') {
+      setIsRoutingActive(true);
+      setRoutingType('single_target');
+    } else if (params.action === 'create_point') {
+      setShowCreateEventModal(true);
     }
+  }, [params.action]);
 
-    const baseEvent = WS_SIMULATION_POOL[simulationIndex];
-    const newEvent: TurismoEvent = {
-      ...baseEvent,
-      id: `ws-${Date.now()}`,
-      isRealTime: true,
-      attendeesCount: baseEvent.attendeesCount + Math.floor(Math.random() * 20),
-    };
+  const isEmergencyEvent = selectedEvent
+    ? ['choque', 'incendio', 'accidente', 'calle_cortada'].includes(selectedEvent.category)
+    : false;
 
-    setEvents((prev) => [newEvent, ...prev]);
-    setSelectedEvent(newEvent);
-    setSimulationIndex((prev) => prev + 1);
-    showNotification(`⚡ Live WS: Nuevo evento en Valdivia! "${newEvent.title}"`);
-  }, [simulationIndex, showNotification]);
+  const isInformative = selectedEvent?.category?.toLowerCase() === 'fauna';
 
-  useEffect(() => {
-    if (activeTab !== 'map') return;
-    const timer = setTimeout(() => {
-      if (simulationIndex < WS_SIMULATION_POOL.length) {
-        triggerWebSocketEvent();
-      }
-    }, 15000);
-    return () => clearTimeout(timer);
-  }, [simulationIndex, triggerWebSocketEvent, activeTab]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    void loadPersistedMapLayer().then((storedMapLayer) => {
-      if (!isMounted) {
-        return;
-      }
-
-      if (storedMapLayer) {
-        setMapLayer(storedMapLayer);
-      }
-
-      setMapLayerReady(true);
+  const handleSectorPress = useCallback((zone: any) => {
+    // Verificar si hay un evento con minimodal en esta misma ubicación (ej: Carabinero)
+    const minimodalCategories = ['hospital', 'universidad', 'bombero', 'carabinero', 'camara', 'fauna'];
+    const matchingEvent = filteredEvents.find((ev) => {
+      if (!minimodalCategories.includes(ev.category?.toLowerCase() || '')) return false;
+      
+      const zoneLat = zone.latitude || (zone.geojson && zone.geojson.coordinates ? zone.geojson.coordinates[0][0][1] : 0);
+      const zoneLng = zone.longitude || (zone.geojson && zone.geojson.coordinates ? zone.geojson.coordinates[0][0][0] : 0);
+      
+      const latDiff = Math.abs((ev.latitude || 0) - zoneLat);
+      const lngDiff = Math.abs((ev.longitude || 0) - zoneLng);
+      
+      // Si están a menos de ~100 metros de distancia, asumimos que es el mismo edificio
+      return latDiff < 0.001 && lngDiff < 0.001;
     });
 
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!mapLayerReady) {
+    if (matchingEvent) {
+      handleSelectEvent(matchingEvent);
       return;
     }
 
-    void savePersistedMapLayer(mapLayer);
-  }, [mapLayer, mapLayerReady]);
-
-  useEffect(() => {
-    if (locationError) {
-      const timer = setTimeout(() => {
-        showNotification(`📍 ${locationError}`);
-      }, 0);
-      return () => clearTimeout(timer);
+    if (zone.category === 'edificio' || zone.category === 'reserva') {
+      setSelectedSector(zone);
     }
-  }, [locationError, showNotification]);
+  }, [setSelectedSector, filteredEvents, handleSelectEvent]);
 
-  const screenWidth = Dimensions.get('window').width;
-  const isDesktop = Platform.OS === 'web' && screenWidth > 768;
-  const panelWidth = isDesktop ? 380 : screenWidth - 32;
-
-  useEffect(() => {
-    if (selectedEvent) {
-      Animated.spring(panelSlide, {
-        toValue: 1,
-        tension: 65,
-        friction: 11,
-        useNativeDriver: false,
-      }).start();
-    } else {
-      Animated.timing(panelSlide, {
-        toValue: 0,
-        duration: 280,
-        useNativeDriver: false,
-      }).start();
+  const handleExploreSector = useCallback(() => {
+    if (selectedSector) {
+      setActiveNestedZone(selectedSector);
+      setSelectedSector(null);
     }
-  }, [selectedEvent, panelSlide]);
+  }, [selectedSector, setActiveNestedZone]);
 
-  const filteredEvents = useMemo(
-    () =>
-      events.filter((event) => {
-        const matchesCategory = selectedCategory === 'todos' || event.category === selectedCategory;
-        const query = searchQuery.toLowerCase();
-        const matchesSearch =
-          event.title.toLowerCase().includes(query) ||
-          event.description.toLowerCase().includes(query) ||
-          event.organizer.toLowerCase().includes(query);
-        return matchesCategory && matchesSearch;
-      }),
-    [events, selectedCategory, searchQuery],
-  );
-
-  // Callback estable para que MapContainer (React.memo) no se re-renderice innecesariamente
-  const handleSelectEvent = useCallback((event: TurismoEvent | null) => {
-    setSelectedEvent(event);
+  const closeSectorPanel = useCallback(() => {
+    setSelectedSector(null);
   }, []);
 
-  const showMainUI = !isDesktop || activeTab === 'map';
+  const handleSaveLocation = useCallback((data: any) => {
+    if (!token) {
+      showNotification('Inicia sesión para guardar ubicaciones', 'warning');
+      router.push('/ingresar');
+      return;
+    }
+    setLocationToSave(data);
+    setCollectionModalVisible(true);
+  }, [token, showNotification]);
+
+  const handleToggleSector = useCallback(
+    (sectorId: number) => {
+      setVisibleSectorIds((prev) =>
+        prev.includes(sectorId) ? prev.filter((id) => id !== sectorId) : [...prev, sectorId],
+      );
+    },
+    [setVisibleSectorIds],
+  );
+
+  const showMainUI = activeTab === 'map';
+  const isModalOpen = (!!selectedEvent && selectedEvent.category?.toLowerCase() !== 'camara') || !!mapPincho || (isDesktop && activeTab !== 'map');
+
+  const [isSidebarHovered, setIsSidebarHovered] = React.useState(false);
+  const [isSidebarPinned, setIsSidebarPinned] = React.useState(true);
+  const isSidebarVisible = !isModalOpen || isSidebarHovered || isSidebarPinned;
+
+  const modalShiftAnim = React.useRef(new Animated.Value(1)).current;
+  React.useEffect(() => {
+    Animated.timing(modalShiftAnim, {
+      toValue: isSidebarVisible ? 1 : 0,
+      duration: 350,
+      easing: Easing.bezier(0.4, 0, 0.2, 1),
+      useNativeDriver: false, // Changed to false to allow layout animations like 'left'
+    }).start();
+  }, [isSidebarVisible, modalShiftAnim]);
+
+  const [formAddress, setFormAddress] = React.useState('');
+
+  const copyToClipboard = React.useCallback(
+    async (text: string) => {
+      try {
+        if (Platform.OS === 'web') {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(text);
+            showNotification('Coordenadas copiadas al portapapeles');
+            return;
+          }
+        }
+        Clipboard.setString(text);
+        showNotification('Coordenadas copiadas al portapapeles');
+      } catch (err) {
+        console.error('Failed to copy to clipboard:', err);
+        try {
+          Clipboard.setString(text);
+          showNotification('Coordenadas copiadas al portapapeles');
+        } catch (fallbackErr) {
+          console.error('Fallback copy failed:', fallbackErr);
+          showNotification('Error al copiar al portapapeles');
+        }
+      }
+    },
+    [showNotification],
+  );
+
+  const handleSharePincho = React.useCallback(async () => {
+    if (!mapPincho) return;
+
+    const message = `Pincho en ${mapPincho.address}\n${mapPincho.latitude.toFixed(
+      5,
+    )}, ${mapPincho.longitude.toFixed(5)}\n${mapPincho.googleMapsUrl}`;
+
+    try {
+      await Share.share({
+        message,
+        url: mapPincho.googleMapsUrl,
+        title: 'Pincho de ubicación',
+      });
+    } catch (error) {
+      console.warn('No se pudo compartir el pincho:', error);
+    }
+  }, [mapPincho]);
+
+  React.useEffect(() => {
+    if (showCreateEventModal && resolvedAddress) {
+      setFormAddress(resolvedAddress);
+    }
+  }, [showCreateEventModal, resolvedAddress]);
 
   if (!isDesktop && activeTab === 'profile') {
     return (
@@ -400,6 +414,9 @@ export default function HomeScreen() {
             currentTab={activeTab}
             onTabChange={setActiveTab}
             onVoiceSearch={handleVoiceSearch}
+            onVoicePartialSearch={handleVoicePartialSearch}
+            notificationsCount={notifications.filter((n) => !n.isRead).length}
+            onNotificationClick={() => setShowNotificationTray(!showNotificationTray)}
             onTabHover={prefetchFeed}
           />
         </View>
@@ -423,6 +440,9 @@ export default function HomeScreen() {
             currentTab={activeTab}
             onTabChange={setActiveTab}
             onVoiceSearch={handleVoiceSearch}
+            onVoicePartialSearch={handleVoicePartialSearch}
+            notificationsCount={notifications.filter((n) => !n.isRead).length}
+            onNotificationClick={() => setShowNotificationTray(!showNotificationTray)}
             onTabHover={prefetchSaved}
           />
         </View>
@@ -446,6 +466,9 @@ export default function HomeScreen() {
             currentTab={activeTab}
             onTabChange={setActiveTab}
             onVoiceSearch={handleVoiceSearch}
+            onVoicePartialSearch={handleVoicePartialSearch}
+            notificationsCount={notifications.filter((n) => !n.isRead).length}
+            onNotificationClick={() => setShowNotificationTray(!showNotificationTray)}
             onTabHover={prefetchForum}
           />
         </View>
@@ -463,19 +486,23 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
 
-      <View 
+      <LocationErrorNotifier showNotification={showNotification} />
+
+      <View
         pointerEvents={activeTab === 'map' ? 'auto' : 'none'}
         style={[
           styles.mapContainer,
-          isDesktop && activeTab !== 'map' && {
-            // Blur y escala en Web
+          activeTab !== 'map' && {
             ...Platform.select({
               web: {
                 filter: 'blur(12px) brightness(0.65)',
                 transform: 'scale(1.025)',
-              } as any
-            })
-          }
+              } as any,
+              default: {
+                opacity: 0.8,
+              },
+            }),
+          },
         ]}
       >
         <MapContainer
@@ -483,110 +510,313 @@ export default function HomeScreen() {
           selectedEvent={selectedEvent}
           onSelectEvent={handleSelectEvent}
           mapLayer={mapLayer}
-          userLocation={userLocation}
           centerTrigger={centerTrigger}
           tacticalMode={isTacticalModeActive}
           onTacticalLocationChange={setTacticalLocation}
+          onMapPincho={handleMapPincho}
+          mapPincho={mapPincho}
           zoom={zoom}
           onZoomChange={setZoom}
+          onBoundsChange={setMapBounds}
+          activeFloor={activeFloor}
           showTraffic={showTraffic}
+          showCycleways={showCycleways}
+          cyclewaysData={cycleways}
+          showSectors={showSectors}
+          sectorsData={sectors}
+          visibleSectorIds={visibleSectorIds}
+          onSectorPress={handleSectorPress}
+          showWeather={showWeather}
+          weatherType={weatherType}
           isFrozen={activeTab !== 'map'}
+          onSaveLocation={handleSaveLocation}
+          isRoutingActive={isRoutingActive}
+          routingType={routingType}
+          draftRoutePoints={draftRoutePoints}
+          onMapClickForRouting={handleMapClickForRouting}
+          isRouteFinished={isRouteFinished}
+          savedRoutes={showSavedRoutes ? savedRoutes : []}
+          onRateRoute={rateRoute}
+          activeNestedZone={activeNestedZone}
         />
       </View>
 
-      <View style={styles.topBarWrapper}>
-        <TopAppBar 
-          currentTab={activeTab} 
-          onTabChange={setActiveTab} 
-          onVoiceSearch={handleVoiceSearch} 
-        />
-      </View>
+      {showMainUI && mapPincho && !isDesktop && (
+        <View pointerEvents="box-none" style={styles.sidePanelOverlay}>
+          <Animated.View
+            // Prevent map interactions when interacting with the modal
+            onStartShouldSetResponder={() => true}
+            onTouchStart={(e) => e.stopPropagation()}
+            // @ts-ignore - Web specific
+            onWheel={(e: any) => e.stopPropagation()}
+            // @ts-ignore - Web specific
+            onPointerDown={(e: any) => e.stopPropagation()}
+            style={[
+              styles.sidePanel,
+              {
+                width: isDesktop ? 520 : '100%',
+                maxWidth: isDesktop ? 520 : '100%',
+                height: isDesktop ? 'auto' : 'auto', // Adjust height strategy if needed
+                bottom: isDesktop ? 20 : 0,
+                // On desktop, keep it floating in the center but respect vertical spacing
+                left: 'auto',
+                right: 'auto',
+                alignSelf: 'center',
+                top: isDesktop ? (Platform.OS === 'ios' ? 56 : 16) : 'auto',
+                borderTopLeftRadius: 22,
+                borderTopRightRadius: 22,
+                borderBottomLeftRadius: isDesktop ? 22 : 0,
+                borderBottomRightRadius: isDesktop ? 22 : 0,
+                paddingBottom: Math.max(insets.bottom, 20),
+                paddingTop: 14,
+                paddingHorizontal: 14,
+                opacity: pinchoSlide,
+                transform: [
+                  {
+                    translateY: pinchoSlide.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [300, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <View style={styles.pinchoCard}>
+              <View style={styles.pinchoImageColumn}>
+                <View style={styles.pinchoImageFrame}>
+                  <Image
+                    source={{ uri: mapPincho.imageUrl }}
+                    style={styles.pinchoImage}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.pinchoImageOverlay} />
+                  <View style={styles.pinchoStreetViewBadge}>
+                    <Ionicons name="globe-outline" size={12} color="#FFFFFF" />
+                    <Text style={styles.pinchoStreetViewText}>Street View</Text>
+                  </View>
+                  <View style={styles.pinchoSourceBadge}>
+                    <Text style={styles.pinchoSourceBadgeText}>
+                      {mapPincho.isResolving ? 'RESOLVIENDO' : 'LISTO'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
 
-      {toastMessage && (
-        <Animated.View style={[styles.toast, { transform: [{ translateY: toastY }] }]}>
-          <Text style={styles.toastText}>{toastMessage}</Text>
+              <View style={styles.pinchoBody}>
+                <View style={styles.pinchoHeaderRow}>
+                  <View style={styles.pinchoHeaderTextBlock}>
+                    <Text style={styles.pinchoTitle} numberOfLines={1}>
+                      {mapPincho.address}
+                    </Text>
+                    <Text style={styles.pinchoSubtitle} numberOfLines={1}>
+                      {mapPincho.surface === 'water'
+                        ? 'Zona sobre agua · navegable / costanera'
+                        : 'Zona sobre tierra · dirección aproximada'}
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    onPress={clearMapPincho}
+                    style={styles.pinchoCloseButton}
+                    activeOpacity={0.7}
+                    accessibilityLabel="Cerrar pincho"
+                  >
+                    <Ionicons name="close" size={18} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.pinchoMetaRow}>
+                  <View style={styles.pinchoMetaChipPrimary}>
+                    <Text style={styles.pinchoMetaChipTextPrimary}>
+                      {mapPincho.latitude.toFixed(5)}, {mapPincho.longitude.toFixed(5)}
+                    </Text>
+                  </View>
+                  <View style={styles.pinchoMetaChipSecondary}>
+                    <Text style={styles.pinchoMetaChipTextSecondary}>
+                      {mapPincho.surface === 'water' ? 'Agua' : 'Tierra'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.pinchoActionsColumn}>
+                <TouchableOpacity
+                  activeOpacity={0.86}
+                  onPress={() => {
+                    handleSaveLocation({
+                      locationType: 'custom_pin',
+                      latitude: mapPincho.latitude,
+                      longitude: mapPincho.longitude,
+                      title: mapPincho.address || 'Ubicación seleccionada',
+                      notes: `Coordenadas: ${mapPincho.latitude.toFixed(5)}, ${mapPincho.longitude.toFixed(5)}`,
+                    });
+                  }}
+                  style={styles.pinchoActionButtonSecondary}
+                  accessibilityLabel="Guardar en colecciones"
+                >
+                  <MaterialIcons name="bookmark-outline" size={18} color="#34D399" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  activeOpacity={0.86}
+                  onPress={() => void handleSharePincho()}
+                  style={styles.pinchoActionButtonSecondary}
+                  accessibilityLabel="Compartir pincho"
+                >
+                  <Ionicons name="share-social" size={18} color="#34D399" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  activeOpacity={0.86}
+                  onPress={() => void Linking.openURL(mapPincho.googleMapsUrl)}
+                  style={styles.pinchoActionButtonPrimary}
+                  accessibilityLabel="Abrir en Google Maps"
+                >
+                  <Ionicons name="navigate" size={18} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Animated.View>
+        </View>
+      )}
+
+      {isDesktop && activeTab !== 'map' && (
+        <Animated.View
+          style={{
+            position: 'absolute',
+            top: Platform.OS === 'ios' ? 56 : 16,
+            bottom: 20,
+            right: 16,
+            left: modalShiftAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [16, 104] // 104px avoids the 88px expanded sidebar + 16px gap
+            }),
+            zIndex: 4000,
+          }}
+        >
+          <FloatingIsland
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            onClose={() => setActiveTab('map')}
+            showSidebar={false}
+          />
         </Animated.View>
       )}
 
-      {/* PANEL DE CONTROL UNIFICADO DE NAVEGACIÓN (Diseño Obsidian Glassmorphism) */}
+      {/* ZONA DE ACTIVACIÓN (HITBOX) PARA EL SIDEBAR (Elevada) */}
+      <View
+        style={[
+          styles.topBarWrapper,
+          isDesktop && isModalOpen && { left: 0, paddingLeft: 16 },
+          { zIndex: 6000 } // Elevate TopAppBar above FloatingIsland to keep navigation accessible
+        ]}
+        pointerEvents="box-none"
+      >
+        {isDesktop && isModalOpen && (
+          <Pressable
+            //@ts-ignore
+            onMouseEnter={() => isDesktop && isModalOpen && setIsSidebarHovered(true)}
+            onMouseLeave={() => isDesktop && isModalOpen && setIsSidebarHovered(false)}
+            style={[{
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              left: 0,
+              width: isSidebarVisible ? 120 : 24, // 24px invisible edge. When open, cover sidebar area to keep it hovered.
+              zIndex: 1, // Just behind TopAppBar
+              backgroundColor: isSidebarVisible ? 'transparent' : 'rgba(30,30,30,0.4)', // Subtle hint when hidden
+              borderRightWidth: isSidebarVisible ? 0 : 1,
+              borderRightColor: 'rgba(255,255,255,0.08)',
+              borderTopRightRadius: isSidebarVisible ? 0 : 16,
+              borderBottomRightRadius: isSidebarVisible ? 0 : 16,
+            }, { cursor: isSidebarPinned ? 'default' : 'pointer' } as any]}
+            onPress={() => setIsSidebarPinned(!isSidebarPinned)}
+          >
+            {/* Visual cue indicator */}
+            {!isSidebarVisible && (
+              <View style={{
+                position: 'absolute',
+                top: '50%',
+                marginTop: -20,
+                left: 8,
+                width: 4,
+                height: 40,
+                borderRadius: 2,
+                backgroundColor: 'rgba(255,255,255,0.3)',
+              }} />
+            )}
+          </Pressable>
+        )}
+
+        <View style={{ flex: 1, zIndex: 10 }} pointerEvents="box-none">
+          <TopAppBar
+            currentTab={activeTab}
+            onTabChange={setActiveTab}
+            onVoiceSearch={handleVoiceSearch}
+            onVoicePartialSearch={handleVoicePartialSearch}
+            notificationsCount={notifications.filter((n) => !n.isRead).length}
+            onNotificationClick={() => setShowNotificationTray(!showNotificationTray)}
+            isModalOpen={isModalOpen}
+            forceSidebarVisible={isSidebarHovered || isSidebarPinned}
+            onSearchFocus={() => {
+              if (selectedEvent) handleSelectEvent(null);
+              if (mapPincho) clearMapPincho();
+            }}
+          />
+        </View>
+      </View>
       {showMainUI && (
-        <View style={styles.unifiedControlsContainer}>
-          {/* Zoom In */}
+        <View
+          style={[
+            styles.unifiedControlsContainer,
+            { bottom: isDesktop ? 20 : Math.max(insets.bottom, 20) },
+          ]}
+        >
+          {/* Botón único de Zoom */}
           <TouchableOpacity
-            style={styles.controlButton}
-            onPress={() => setZoom((z) => Math.min(z + 1, currentMaxZoom))}
+            style={[styles.controlButton, showZoomSlider && styles.controlButtonActive]}
+            onPress={() => setShowZoomSlider(!showZoomSlider)}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Zoom"
           >
-            <MaterialIcons name="add" size={20} color="#9CA3AF" />
-          </TouchableOpacity>
-
-          <View style={styles.controlDivider} />
-
-          {/* Zoom Out */}
-          <TouchableOpacity
-            style={styles.controlButton}
-            onPress={() => setZoom((z) => Math.max(z - 1, 1))}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons name="remove" size={20} color="#9CA3AF" />
+            <MaterialIcons
+              name="zoom-in"
+              size={isDesktop ? 20 : 24}
+              color={showZoomSlider ? '#34D399' : '#9CA3AF'}
+            />
           </TouchableOpacity>
 
           <View style={styles.controlDivider} />
 
           {/* Ubicarme (Location) */}
-          <TouchableOpacity
-            style={[styles.controlButton, userLocation && styles.controlButtonActive]}
-            onPress={() => {
-              if (userLocation) {
-                setCenterTrigger((prev) => prev + 1);
-              } else {
-                retryLocation();
-                showNotification('📍 Obteniendo tu ubicación...');
-              }
-            }}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons
-              name="my-location"
-              size={18}
-              color={userLocation ? '#34D399' : isLoadingLocation ? '#A0AEC0' : '#EF4444'}
-            />
-          </TouchableOpacity>
+          <MyLocationButton
+            isDesktop={isDesktop}
+            onCenterPress={() => setCenterTrigger((prev) => prev + 1)}
+          />
 
           <View style={styles.controlDivider} />
 
           {/* Modo Precisión (Modo Táctico) */}
           <TouchableOpacity
-            style={[styles.controlButton, isTacticalModeActive && styles.controlButtonActive]}
+            style={[
+              styles.controlButton,
+              isTacticalModeActive && { backgroundColor: 'rgba(52, 211, 153, 0.12)' },
+            ]}
             onPress={() => {
-              setIsTacticalModeActive(!isTacticalModeActive);
-              if (!isTacticalModeActive) {
-                showNotification('🎯 Modo Táctico activado');
-              }
+              const nextState = !isTacticalModeActive;
+              setIsTacticalModeActive(nextState);
             }}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Modo Táctico"
           >
             <MaterialIcons
               name="center-focus-strong"
-              size={18}
+              size={isDesktop ? 18 : 22}
               color={isTacticalModeActive ? '#34D399' : '#9CA3AF'}
             />
-          </TouchableOpacity>
-
-          <View style={styles.controlDivider} />
-
-          {/* Tráfico (Real-time) */}
-          <TouchableOpacity
-            style={[styles.controlButton, showTraffic && styles.controlButtonActive]}
-            onPress={() => {
-              setShowTraffic(!showTraffic);
-              if (!showTraffic) {
-                showNotification('🚗 Tráfico en vivo activado');
-              }
-            }}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons name="traffic" size={18} color={showTraffic ? '#34D399' : '#9CA3AF'} />
           </TouchableOpacity>
 
           <View style={styles.controlDivider} />
@@ -597,265 +827,554 @@ export default function HomeScreen() {
             onPress={() => setShowFilters(!showFilters)}
             activeOpacity={0.7}
           >
-            <MaterialIcons name="tune" size={18} color={showFilters ? '#34D399' : '#9CA3AF'} />
+            <MaterialIcons
+              name="tune"
+              size={isDesktop ? 18 : 22}
+              color={showFilters ? '#34D399' : '#9CA3AF'}
+            />
           </TouchableOpacity>
+
+          <View style={styles.controlDivider} />
+
+          {/* Selector de Modo Vista (Local / Turista) */}
+          <TouchableOpacity
+            style={[
+              styles.controlButton,
+              viewMode === 'tourist' && { backgroundColor: 'rgba(245, 158, 11, 0.15)' },
+              viewMode === 'local' && { backgroundColor: 'rgba(16, 185, 129, 0.15)' },
+            ]}
+            onPress={() => {
+              handleToggleViewMode();
+              showNotification(
+                viewMode === 'local' ? 'Modo Explorador (Turismo) activado.' : 'Modo Ciudadano (Local) activado.',
+                'info'
+              );
+            }}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={viewMode === 'local' ? "Modo Local activo" : "Modo Turista activo"}
+          >
+            <MaterialIcons
+              name={viewMode === 'tourist' ? 'explore' : 'home'}
+              size={isDesktop ? 18 : 22}
+              color={viewMode === 'tourist' ? '#F59E0B' : '#10B981'}
+            />
+          </TouchableOpacity>
+
         </View>
       )}
 
-      {/* HUD Táctico */}
-      {showMainUI && isTacticalModeActive && tacticalLocation && (
+      {/* Zoom Slider Flotante */}
+      {showMainUI && showZoomSlider && (
         <View
           style={[
-            styles.tacticalHudContainer,
-            tacticalLocation.x !== undefined && tacticalLocation.y !== undefined
-              ? {
-                  left: tacticalLocation.x + 20,
-                  top: tacticalLocation.y + 20,
-                  // Prevent tooltip from going off-screen (basic handling)
-                  transform: [
-                    { translateX: tacticalLocation.x > screenWidth - 250 ? -260 : 0 },
-                    {
-                      translateY:
-                        tacticalLocation.y > Dimensions.get('window').height - 150 ? -150 : 0,
-                    },
-                  ],
-                }
-              : {
-                  top: Platform.OS === 'ios' ? 120 : 90,
-                  alignSelf: 'center',
-                },
+            styles.zoomSliderContainer,
+            { bottom: isDesktop ? 20 : Math.max(insets.bottom, 20) },
           ]}
-          pointerEvents="none"
         >
-          <View style={styles.tacticalHudGlass}>
-            <View style={styles.hudHeader}>
-              <View style={styles.hudDot} />
-              <Text style={styles.hudTitle}>COORDENADAS</Text>
+          <View style={styles.zoomSliderGlass}>
+            <TouchableOpacity
+              style={styles.zoomControlBtn}
+              onPress={() => setZoom((z) => Math.min(z + 1, currentMaxZoom))}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Acercar mapa"
+            >
+              <MaterialIcons name="add" size={16} color="#FFFFFF" />
+            </TouchableOpacity>
+
+            <View style={styles.zoomTrackWrapper}>
+              <View style={styles.zoomTrackLine}>
+                <View
+                  style={[
+                    styles.zoomTrackFill,
+                    { height: `${((zoom - 1) / (currentMaxZoom - 1)) * 100}%` },
+                  ]}
+                />
+              </View>
+
+              {Array.from({ length: 5 }).map((_, idx) => {
+                const level = Math.round(1 + (idx * (currentMaxZoom - 1)) / 4);
+                const isSelected = zoom === level;
+                return (
+                  <TouchableOpacity
+                    key={idx}
+                    style={[
+                      styles.zoomTickDot,
+                      { bottom: `${(idx / 4) * 100}%` },
+                      isSelected && styles.zoomTickDotActive,
+                    ]}
+                    onPress={() => setZoom(level)}
+                    activeOpacity={0.7}
+                  />
+                );
+              })}
             </View>
-            <View style={styles.hudDataRow}>
-              <Text style={styles.hudLabel}>LAT</Text>
-              <Text style={styles.hudValue}>{tacticalLocation.latitude.toFixed(6)}°</Text>
-            </View>
-            <View style={styles.hudDataRow}>
-              <Text style={styles.hudLabel}>LNG</Text>
-              <Text style={styles.hudValue}>{tacticalLocation.longitude.toFixed(6)}°</Text>
-            </View>
-            <View style={styles.hudDataRow}>
-              <Text style={styles.hudLabel}>ALT</Text>
-              <Text style={styles.hudValue}>
-                {userLocation?.altitude !== null && userLocation?.altitude !== undefined
-                  ? `${userLocation.altitude} msnm`
-                  : '-- msnm'}
-              </Text>
+
+            <TouchableOpacity
+              style={styles.zoomControlBtn}
+              onPress={() => setZoom((z) => Math.max(z - 1, 1))}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Alejar mapa"
+            >
+              <MaterialIcons name="remove" size={16} color="#FFFFFF" />
+            </TouchableOpacity>
+
+            <View style={styles.zoomBadge}>
+              <Text style={styles.zoomBadgeText}>{zoom}x</Text>
             </View>
           </View>
         </View>
+      )}
+
+      {/* Menú de Herramientas Flotante (State-based) */}
+      {showMainUI && !activeNestedZone && <WeatherForecastWidget isDark={mapLayer === 'dark'} />}
+
+
+      
+      {/* HUD for Nested Zone Exit with Vertical Floor Selector */}
+      {activeNestedZone && (
+        <View style={{
+          position: 'absolute',
+          top: insets.top + (isDesktop ? 20 : 70), // On desktop, keep it high up; mobile needs space for notch
+          left: isDesktop ? 104 : 20, // Prevents overlap with the sidebar
+          right: 20,
+          zIndex: 999,
+        }}>
+          <View style={{
+            backgroundColor: 'rgba(15, 23, 42, 0.85)', // Glassmorphism base
+            borderRadius: 16,
+            padding: 16,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            borderWidth: 1,
+            borderColor: 'rgba(255, 255, 255, 0.1)', // Subtle border matching sidebar
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 10 },
+            shadowOpacity: 0.4,
+            shadowRadius: 20,
+            elevation: 10,
+            ...Platform.select({ web: { backdropFilter: 'blur(12px)' } as any }) // Glassmorphism blur
+          }}>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View style={{ 
+                width: 4, 
+                height: 30, 
+                backgroundColor: '#38BDF8', 
+                borderRadius: 2,
+              }} />
+              <View>
+                <Text style={{ color: '#9CA3AF', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: '600', marginBottom: 2 }}>Estás viendo</Text>
+                <Text style={{ color: '#F8FAFC', fontSize: 18, fontWeight: '800', letterSpacing: 0.5 }}>{activeNestedZone.name}</Text>
+              </View>
+            </View>
+            <TouchableOpacity 
+              onPress={() => { setActiveNestedZone(null); setActiveFloor(null); }}
+              style={{
+                backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                paddingHorizontal: 20,
+                paddingVertical: 10,
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: 'rgba(239, 68, 68, 0.5)',
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8
+              }}
+            >
+              <Text style={{ color: '#EF4444', fontWeight: '700', letterSpacing: 0.5 }}>Salir del Edificio</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Selector Vertical de Pisos */}
+          <View style={{
+            position: 'absolute',
+            top: 80, // Below the HUD
+            right: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.85)',
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: 'rgba(255, 255, 255, 0.1)',
+            paddingVertical: 8,
+            alignItems: 'center',
+            ...Platform.select({ web: { backdropFilter: 'blur(10px)' } as any })
+          }}>
+            <Text style={{ color: '#9CA3AF', fontSize: 9, fontWeight: 'bold', marginBottom: 4, textTransform: 'uppercase' }}>Pisos</Text>
+            {[4, 3, 2, 1, 0].map(floor => {
+              const isActive = activeFloor === floor;
+              return (
+                <TouchableOpacity
+                  key={floor}
+                  onPress={() => setActiveFloor(isActive ? null : floor)}
+                  style={{
+                    paddingVertical: 10,
+                    backgroundColor: isActive ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
+                    borderLeftWidth: 3,
+                    borderLeftColor: isActive ? '#38BDF8' : 'transparent',
+                    width: 50,
+                    alignItems: 'center'
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={{ color: isActive ? '#38BDF8' : '#D1D5DB', fontWeight: isActive ? 'bold' : '600', fontSize: 13 }}>
+                    {floor === 0 ? 'PB' : `P${floor}`}
+                  </Text>
+                </TouchableOpacity>
+              )
+            })}
+          </View>
+
+          {/* Galería multimedia del edificio */}
+          <BuildingGallery
+            zoneId={activeNestedZone.id}
+            activeFloor={activeFloor}
+            isDesktop={isDesktop}
+            visible={!!activeNestedZone}
+          />
+        </View>
+      )}
+
+      {/* --- Tactical Mode Overlay --- */}
+      {showMainUI && isTacticalModeActive && tacticalLocation && isDesktop && (
+        <TacticalHUD
+          tacticalLocation={tacticalLocation}
+          isResolvingAddress={isResolvingAddress}
+          resolvedAddress={resolvedAddress}
+          screenWidth={screenWidth}
+          isLightMode={mapLayer === 'light' || mapLayer === 'streets'}
+        />
+      )}
+
+      {/* HUD de Rutas (Geo-Router) */}
+      {showMainUI && isRoutingActive && (
+        <>
+          <RouterHUD
+            isRoutingActive={isRoutingActive}
+            routingType={routingType}
+            setRoutingType={setRoutingType}
+            routeCategory={routeCategory}
+            setRouteCategory={setRouteCategory}
+            draftRoutePoints={draftRoutePoints}
+            setDraftRoutePoints={setDraftRoutePoints}
+            draftRouteName={draftRouteName}
+            setDraftRouteName={setDraftRouteName}
+            isRouteFinished={isRouteFinished}
+            onFinishSingleTarget={finishSingleTargetRoute}
+            onSave={saveRoute}
+            onCancel={cancelRouting}
+            hideSaveBlock={routingType === 'sector'}
+          />
+
+          {isRouteFinished && routingType === 'sector' && (
+            <CreateSectorModal
+              visible={true}
+              onClose={() => cancelRouting()}
+              draftRoutePoints={draftRoutePoints}
+              showNotification={showNotification}
+              onSuccess={() => {
+                cancelRouting();
+              }}
+            />
+          )}
+        </>
       )}
 
       {/* Dashboard de Telemetría (Live Telemetry HUD) */}
-      {showMainUI && Platform.OS !== 'web' && userLocation && (
-        <View style={styles.telemetryHudContainer} pointerEvents="box-none">
-          <View style={styles.telemetryHudGlass}>
-            {/* Cabecera / Status */}
-            <View style={styles.telemetryHeader}>
-              <View style={styles.telemetryDot} />
-              <Text style={styles.telemetryTitle}>TELEMETRÍA EN VIVO</Text>
-            </View>
+      <TelemetryHUD isDesktop={isDesktop} />
 
-            <View style={styles.telemetryMainRow}>
-              {/* Brújula Analógica */}
-              <View style={styles.compassWrapper}>
-                <View
-                  style={[
-                    styles.compassRing,
-                    {
-                      transform: [
-                        {
-                          rotate:
-                            userLocation.heading !== null ? `${-userLocation.heading}deg` : '0deg',
-                        },
-                      ],
-                    },
-                  ]}
-                >
-                  <Text style={[styles.compassText, styles.compassTextN]}>N</Text>
-                  <Text style={[styles.compassText, styles.compassTextE]}>E</Text>
-                  <Text style={[styles.compassText, styles.compassTextS]}>S</Text>
-                  <Text style={[styles.compassText, styles.compassTextO]}>O</Text>
-                </View>
-                <View style={styles.compassNeedle} />
-                <View style={styles.compassCenterDot} />
-              </View>
-
-              {/* Datos de Telemetría */}
-              <View style={styles.telemetryDataColumn}>
-                <View style={styles.telemetryDetailRow}>
-                  <MaterialIcons name="explore" size={10} color="#A0AEC0" />
-                  <Text style={styles.telemetryDetailLabel}>RUMBO</Text>
-                  <Text style={styles.telemetryDetailValue}>
-                    {userLocation.heading !== null
-                      ? `${Math.round(userLocation.heading)}° ${userLocation.headingDirection || ''}`
-                      : '--'}
-                  </Text>
-                </View>
-                <View style={styles.telemetryDetailRow}>
-                  <MaterialIcons name="speed" size={10} color="#A0AEC0" />
-                  <Text style={styles.telemetryDetailLabel}>VELOCIDAD</Text>
-                  <Text style={styles.telemetryDetailValue}>
-                    {userLocation.speed !== null ? `${userLocation.speed} km/h` : '0 km/h'}
-                  </Text>
-                </View>
-                <View style={styles.telemetryDetailRow}>
-                  <MaterialIcons name="filter-hdr" size={10} color="#A0AEC0" />
-                  <Text style={styles.telemetryDetailLabel}>ALTITUD</Text>
-                  <Text style={styles.telemetryDetailValue}>
-                    {userLocation.altitude !== null ? `${userLocation.altitude} m` : '-- m'}
-                  </Text>
-                </View>
-                <View style={styles.telemetryDetailRow}>
-                  <MaterialIcons name="gps-fixed" size={10} color="#A0AEC0" />
-                  <Text style={styles.telemetryDetailLabel}>EXACTITUD</Text>
-                  <Text style={styles.telemetryDetailValue}>
-                    {userLocation.accuracy !== null ? `±${userLocation.accuracy}m` : '--'}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          </View>
+      {showMainUI && showNearbyEvents && (
+        <View style={styles.sidePanelOverlay} pointerEvents="box-none">
+          <Pressable style={styles.sidePanelBackdrop} onPress={() => setShowNearbyEvents(false)} />
+          <NearbyEventsPanel
+            events={events}
+            onSelectEvent={handleSelectEvent}
+            onClose={() => setShowNearbyEvents(false)}
+            isDesktop={isDesktop}
+            containerStyle={[
+              styles.filterOverlay,
+              isDesktop
+                ? { right: 72, bottom: 20, width: 320, paddingVertical: 0 }
+                : {
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    width: '100%',
+                    borderBottomLeftRadius: 0,
+                    borderBottomRightRadius: 0,
+                    paddingBottom: Math.max(insets.bottom, 20),
+                  },
+            ]}
+          />
         </View>
       )}
 
       {showMainUI && showFilters && (
-        <View
-          style={[
-            styles.filterOverlay,
-            isDesktop ? { right: 56, width: 300 } : { left: 12, right: 68, width: 'auto' }, // Deja espacio libre para la barra de control en pantallas móviles
-          ]}
-        >
-          <Text style={styles.filterSectionTitle}>Categorías</Text>
-          <View style={styles.categoriesWrapper}>
-            {(
-              [
-                'todos',
-                'gastronomia',
-                'cultura',
-                'naturaleza',
-                'musica',
-                'deportes',
-                'publico',
-              ] as CategoryFilter[]
-            ).map((cat) => {
-              const iconData = CATEGORY_ICONS[cat];
-              const IconComponent = iconData.family === 'Ionicons' ? Ionicons : MaterialIcons;
-              const isActive = selectedCategory === cat;
-              return (
+        <View style={styles.sidePanelOverlay} pointerEvents="box-none">
+          <Pressable style={styles.sidePanelBackdrop} onPress={() => setShowFilters(false)} />
+          <View
+            style={[
+              styles.filterOverlay,
+              isDesktop
+                ? { right: 72, bottom: 20, width: 300 }
+                : {
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    width: '100%',
+                    borderBottomLeftRadius: 0,
+                    borderBottomRightRadius: 0,
+                    paddingBottom: Math.max(insets.bottom, 20),
+                  },
+            ]}
+          >
+            {!isDesktop && <View style={styles.sheetHandle} />}
+            <View style={styles.filterHeader}>
+              <Text style={styles.filterSectionTitle}>Explorar</Text>
+              {!isDesktop && (
                 <TouchableOpacity
-                  key={cat}
-                  style={[styles.categoryChip, isActive && styles.activeCategoryChip]}
-                  onPress={() => setSelectedCategory(cat)}
+                  onPress={() => setShowFilters(false)}
+                  style={styles.closeButtonCompact}
                 >
-                  <IconComponent 
-                    name={iconData.name} 
-                    size={14} 
-                    color={isActive ? '#FFFFFF' : '#CBD5E0'} 
-                    style={{ marginRight: 6 }}
-                  />
-                  <Text
-                    style={[
-                      styles.categoryText,
-                      isActive && styles.activeCategoryText,
-                    ]}
-                  >
-                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                  </Text>
+                  <Ionicons name="close" size={20} color="#A0AEC0" />
                 </TouchableOpacity>
-              );
-            })}
-          </View>
+              )}
+            </View>
+            
+            <ScrollView 
+              style={{ flexShrink: 1, maxHeight: isDesktop ? 600 : '70%' }}
+              contentContainerStyle={{ paddingBottom: 20 }}
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+            >
+              <Text style={[styles.filterSectionTitle, { marginTop: 0 }]}>Categorías</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, marginBottom: 8 }}>
+              {(
+                [
+                  'todos',
+                  'ninguno',
+                  'gastronomia',
+                  'cultura',
+                  'naturaleza',
+                  'musica',
+                  'deportes',
+                  'publico',
+                  'emergencia',
+                  'embarcacion',
+                  'tienda',
+                ] as CategoryFilter[]
+              ).map((cat) => {
+                const iconData = CATEGORY_ICONS[cat];
+                const IconComponent = iconData.family === 'Ionicons' ? Ionicons : MaterialIcons;
+                const isActive = selectedCategory === cat;
+                return (
+                  <TouchableOpacity
+                    key={cat}
+                    style={[styles.categoryChip, isActive && styles.activeCategoryChip]}
+                    onPress={() => setSelectedCategory(cat)}
+                  >
+                    <IconComponent
+                      name={iconData.name}
+                      size={14}
+                      color={isActive ? '#FFFFFF' : '#CBD5E0'}
+                      style={{ marginRight: 6 }}
+                    />
+                    <Text style={[styles.categoryText, isActive && styles.activeCategoryText]}>
+                      {cat === 'ninguno'
+                        ? 'Ocultar Pines'
+                        : cat === 'embarcacion'
+                        ? 'Embarcaciones'
+                        : cat === 'emergencia'
+                          ? 'Emergencias'
+                          : cat.charAt(0).toUpperCase() + cat.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+              </View>
 
-          <Text style={styles.filterSectionTitle}>Capa del Mapa</Text>
-          <View style={styles.layersWrapper}>
-            {MAP_LAYER_OPTIONS.map((layer) => {
-              const IconComponent = layer.iconFamily === 'Ionicons' ? Ionicons : MaterialIcons;
-              const isActive = mapLayer === layer.key;
-              return (
+              <Text style={styles.filterSectionTitle}>Herramientas</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, marginBottom: 8 }}>
+              <TouchableOpacity
+                style={[styles.toolChip, showNearbyEvents && styles.activeToolChip, { paddingHorizontal: 12 }]}
+                onPress={() => {
+                  setShowNearbyEvents(!showNearbyEvents);
+                  showNotification(!showNearbyEvents ? 'Calendario activado' : 'Calendario desactivado');
+                }}
+              >
+                <MaterialIcons name="calendar-today" size={16} color={showNearbyEvents ? '#34D399' : '#9CA3AF'} />
+                <Text style={[styles.toolChipText, showNearbyEvents && styles.activeToolChipText]}>Eventos</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.toolChip, showTraffic && styles.activeToolChip, { paddingHorizontal: 12 }]}
+                onPress={() => {
+                  setShowTraffic(!showTraffic);
+                  showNotification(!showTraffic ? 'Tráfico en vivo activado' : 'Tráfico desactivado');
+                }}
+              >
+                <MaterialIcons name="traffic" size={16} color={showTraffic ? '#34D399' : '#9CA3AF'} />
+                <Text style={[styles.toolChipText, showTraffic && styles.activeToolChipText]}>Tráfico</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.toolChip, showCycleways && styles.activeToolChip, { paddingHorizontal: 12 }]}
+                onPress={() => {
+                  setShowCycleways(!showCycleways);
+                  showNotification(!showCycleways ? '🚲 Ciclovías activadas' : 'Ciclovías desactivadas');
+                }}
+              >
+                <MaterialIcons name="directions-bike" size={16} color={showCycleways ? '#34D399' : '#9CA3AF'} />
+                <Text style={[styles.toolChipText, showCycleways && styles.activeToolChipText]}>Ciclovías</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.toolChip, showSectors && styles.activeToolChip, { paddingHorizontal: 12 }]}
+                onPress={() => {
+                  setShowSectors(true);
+                  setShowSectorsConfig(true);
+                  setShowFilters(false);
+                }}
+              >
+                <MaterialIcons name="layers" size={16} color={showSectors ? '#34D399' : '#9CA3AF'} />
+                <Text style={[styles.toolChipText, showSectors && styles.activeToolChipText]}>Sectores</Text>
+              </TouchableOpacity>
+
+              {userProfile?.userType && ['partner_owner', 'partner_worker'].includes(userProfile.userType) && (
                 <TouchableOpacity
-                  key={layer.key}
-                  style={[styles.layerChip, isActive && styles.activeLayerChip]}
-                  onPress={() => setMapLayer(layer.key)}
+                  style={[styles.toolChip, isRoutingActive && styles.activeToolChip, { paddingHorizontal: 12 }]}
+                  onPress={() => {
+                    setIsRoutingActive(!isRoutingActive);
+                    setShowFilters(false);
+                    if (!isRoutingActive) showNotification('Modo Geo-Router activado.');
+                  }}
                 >
-                  <IconComponent 
-                    name={layer.iconName} 
-                    size={14} 
-                    color={isActive ? '#34D399' : '#CBD5E0'} 
-                    style={{ marginRight: 6 }}
-                  />
-                  <Text
-                    style={[
-                      styles.layerChipText,
-                      isActive && styles.activeLayerChipText,
-                    ]}
-                  >
-                    {layer.label}
-                  </Text>
+                  <MaterialIcons name="route" size={16} color={isRoutingActive ? '#34D399' : '#9CA3AF'} />
+                  <Text style={[styles.toolChipText, isRoutingActive && styles.activeToolChipText]}>Geo-Router</Text>
                 </TouchableOpacity>
-              );
-            })}
+              )}
+              </View>
+
+              <MapLayerMenu
+                currentLayer={mapLayer}
+                onSelectLayer={setMapLayer}
+                isReady={mapLayerReady}
+              />
+            </ScrollView>
           </View>
         </View>
       )}
 
-      {showMainUI && selectedEvent && (
-        <View style={styles.sidePanelOverlay}>
-          {/* Tap-to-dismiss backdrop (transparent, covers full area behind) */}
-          <Pressable style={styles.sidePanelBackdrop} onPress={() => setSelectedEvent(null)} />
+      {showMainUI && selectedEvent && !isInformative && (
+        <View style={styles.sidePanelOverlay} pointerEvents="box-none">
+          {/* Tap-to-dismiss backdrop */}
+          <Pressable style={styles.sidePanelBackdrop} onPress={closeEventPanel} />
 
           <Animated.View
+            // Prevent map interactions when interacting with the modal
+            onStartShouldSetResponder={() => true}
+            onTouchStart={(e) => e.stopPropagation()}
+            // @ts-ignore - Web specific
+            onWheel={(e: any) => e.stopPropagation()}
+            // @ts-ignore - Web specific
+            onPointerDown={(e: any) => e.stopPropagation()}
             style={[
               styles.sidePanel,
               {
-                width: panelWidth,
+                width: isDesktop ? panelWidth : '100%',
+                maxWidth: isDesktop ? panelWidth : '100%',
+                height: isDesktop ? 'auto' : '82%',
+                // Use the same top and bottom anchors as topBarWrapper
+                bottom: isDesktop ? 20 : 0,
+                // Base position aligns with the sidebar container when hidden
+                left: isDesktop ? 16 : 0,
+                right: isDesktop ? 'auto' : 0,
+                top: isDesktop ? (Platform.OS === 'ios' ? 56 : 16) : 'auto',
+                borderTopLeftRadius: 32,
+                borderTopRightRadius: 32,
+                borderBottomLeftRadius: isDesktop ? 32 : 0,
+                borderBottomRightRadius: isDesktop ? 32 : 0,
+                paddingBottom: 0,
                 transform: [
                   {
-                    translateX: panelSlide.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [-panelWidth - 16, 0],
-                    }),
+                    translateX: isDesktop
+                      ? panelSlide.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [-panelWidth - 32, 0],
+                        })
+                      : 0,
+                  },
+                  {
+                    translateX: isDesktop
+                      ? modalShiftAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0, 88], // Fluidly shift right when sidebar expands, left when it hides
+                        })
+                      : 0,
+                  },
+                  {
+                    translateY: !isDesktop
+                      ? panelSlide.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [800, 0],
+                        })
+                      : 0,
                   },
                 ],
                 opacity: panelSlide,
               },
             ]}
           >
+            {!isDesktop && (
+              <View style={styles.premiumHandleContainer}>
+                <View style={styles.premiumHandle} />
+              </View>
+            )}
             <ScrollView
               style={styles.panelScroll}
-              contentContainerStyle={
+              contentContainerStyle={[
                 selectedEvent.imageUrl
                   ? styles.panelScrollContentWithBanner
-                  : styles.panelScrollContent
-              }
+                  : styles.panelScrollContent,
+                { paddingBottom: isDesktop ? 32 : Math.max(insets.bottom + 40, 60) },
+              ]}
               showsVerticalScrollIndicator={false}
-              bounces={false}
+              bounces={true}
             >
               {selectedEvent.imageUrl ? (
                 <View style={styles.bannerContainer}>
                   <Image source={{ uri: selectedEvent.imageUrl }} style={styles.bannerImage} />
                   <View style={styles.bannerOverlay} />
+                  <View style={styles.bannerFadeBottom} />
 
                   <View style={styles.bannerHeader}>
                     <View
                       style={[
-                        styles.cardBadge,
-                        { backgroundColor: getCategoryColor(selectedEvent.category) },
+                        styles.cardBadgePremium,
+                        {
+                          borderColor: 'rgba(255, 255, 255, 0.15)',
+                          backgroundColor: 'rgba(18, 22, 30, 0.75)',
+                        },
                       ]}
                     >
-                      <Text style={styles.cardBadgeText}>
-                        {selectedEvent.category.toUpperCase()}
+                      <MaterialIcons
+                        name={getCategoryIcon(selectedEvent.category, selectedEvent.musicStyle)}
+                        size={12}
+                        color={getCategoryColor(selectedEvent.category, selectedEvent.musicStyle)}
+                        style={{ marginRight: 5 }}
+                      />
+                      <Text style={styles.cardBadgeTextPremium}>
+                        {isEmergencyEvent
+                          ? selectedEvent.category.toUpperCase().replace('_', ' ')
+                          : isInformative
+                            ? 'INFORMACIÓN'
+                            : selectedEvent.category.toUpperCase()}
                       </Text>
                     </View>
                     <TouchableOpacity
-                      onPress={() => setSelectedEvent(null)}
-                      style={styles.closeButtonLight}
+                      onPress={closeEventPanel}
+                      style={styles.closeButtonPremium}
                       activeOpacity={0.7}
                     >
                       <Ionicons name="close" size={20} color="#FFFFFF" />
@@ -863,18 +1382,33 @@ export default function HomeScreen() {
                   </View>
                 </View>
               ) : (
-                <View style={styles.cardHeader}>
+                <View style={styles.cardHeaderPremium}>
                   <View
                     style={[
-                      styles.cardBadge,
-                      { backgroundColor: getCategoryColor(selectedEvent.category) },
+                      styles.cardBadgePremium,
+                      {
+                        borderColor: 'rgba(255, 255, 255, 0.08)',
+                        backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                      },
                     ]}
                   >
-                    <Text style={styles.cardBadgeText}>{selectedEvent.category.toUpperCase()}</Text>
+                    <MaterialIcons
+                      name={getCategoryIcon(selectedEvent.category, selectedEvent.musicStyle)}
+                      size={12}
+                      color={getCategoryColor(selectedEvent.category, selectedEvent.musicStyle)}
+                      style={{ marginRight: 5 }}
+                    />
+                    <Text style={styles.cardBadgeTextPremium}>
+                      {isEmergencyEvent
+                        ? selectedEvent.category.toUpperCase().replace('_', ' ')
+                        : isInformative
+                          ? 'INFORMACIÓN'
+                          : selectedEvent.category.toUpperCase()}
+                    </Text>
                   </View>
                   <TouchableOpacity
-                    onPress={() => setSelectedEvent(null)}
-                    style={styles.closeButton}
+                    onPress={closeEventPanel}
+                    style={styles.closeButtonPremium}
                     activeOpacity={0.7}
                   >
                     <Ionicons name="close" size={20} color="#A0AEC0" />
@@ -889,858 +1423,572 @@ export default function HomeScreen() {
                     : styles.panelContentWrapper
                 }
               >
-                {selectedEvent.isRealTime && (
-                  <View style={styles.liveIndicator}>
-                    <View style={styles.liveDot} />
-                    <Text style={styles.liveText}>EN VIVO</Text>
+                <View style={styles.titleRowPremium}>
+                  {selectedEvent.isRealTime && (
+                    <View style={styles.liveIndicatorPremium}>
+                      <View style={styles.liveDot} />
+                      <Text style={styles.liveText}>VIVO</Text>
+                    </View>
+                  )}
+                  <Text style={styles.cardTitlePremium} numberOfLines={2}>
+                    {selectedEvent.title}
+                  </Text>
+                </View>
+
+                {/* Subcabecera de Organizador Compacta */}
+                <View style={styles.subHeaderRowPremium}>
+                  <Text style={styles.subHeaderTextPremium}>
+                    {isEmergencyEvent
+                      ? '⚠️ Reportado por'
+                      : isInformative
+                        ? '📍 Punto de Interés'
+                        : '👤 Organizado por'}
+                    <Text
+                      style={[
+                        styles.subHeaderOrganizerPremium,
+                        {
+                          color: getCategoryColor(selectedEvent.category, selectedEvent.musicStyle),
+                        },
+                      ]}
+                    >
+                      {' '}
+                      {selectedEvent.organizer}
+                    </Text>
+                  </Text>
+                </View>
+
+                <Text style={styles.cardDescPremium}>{selectedEvent.description}</Text>
+
+                {/* Micro-Timeline de Progreso (Sleek LED Tracker) - Hidden for informative */}
+                {!isInformative && (
+                  <View style={styles.microTimelineContainer}>
+                    {['agendado', 'en_proceso', 'finalizado'].map((status, index) => {
+                      const eventStatus =
+                        selectedEvent.status ||
+                        (selectedEvent.isRealTime ? 'en_proceso' : 'agendado');
+                      const isActive = eventStatus === status;
+                      const isPast =
+                        ['agendado', 'en_proceso', 'finalizado'].indexOf(eventStatus) > index;
+                      const isCompleted = isActive || isPast;
+
+                      const getLabel = (s: string) => {
+                        if (s === 'agendado') return 'Agendado';
+                        if (s === 'en_proceso') return 'En proceso';
+                        return 'Finalizado';
+                      };
+
+                      const activeColor = getCategoryColor(
+                        selectedEvent.category,
+                        selectedEvent.musicStyle,
+                      );
+
+                      return (
+                        <React.Fragment key={status}>
+                          <View style={styles.microNodeWrapper}>
+                            {isActive ? (
+                              <View style={styles.microNodeActiveContainer}>
+                                <View
+                                  style={[
+                                    styles.microNodeActiveShadow,
+                                    { backgroundColor: activeColor },
+                                  ]}
+                                />
+                                <View
+                                  style={[
+                                    styles.microNodeActiveCore,
+                                    { backgroundColor: activeColor },
+                                  ]}
+                                />
+                              </View>
+                            ) : (
+                              <View
+                                style={[
+                                  styles.microNode,
+                                  isPast && {
+                                    backgroundColor: activeColor,
+                                    borderColor: activeColor,
+                                  },
+                                ]}
+                              />
+                            )}
+                            <Text
+                              style={[
+                                styles.microLabel,
+                                isCompleted && styles.microLabelCompleted,
+                                isActive && { color: activeColor },
+                              ]}
+                            >
+                              {getLabel(status)}
+                            </Text>
+                          </View>
+                          {index < 2 && (
+                            <View
+                              style={[styles.microLine, isPast && { backgroundColor: activeColor }]}
+                            />
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
                   </View>
                 )}
 
-                <Text style={styles.cardTitle}>{selectedEvent.title}</Text>
-                <Text style={styles.cardOrganizer}>Organizado por: {selectedEvent.organizer}</Text>
-                <Text style={styles.cardDesc}>{selectedEvent.description}</Text>
-
-                {/* Status Bar */}
-                <View style={styles.statusBarContainer}>
-                  {['agendado', 'en_proceso', 'finalizado'].map((status, index) => {
-                    const eventStatus =
-                      selectedEvent.status ||
-                      (selectedEvent.isRealTime ? 'en_proceso' : 'agendado');
-                    const isActive = eventStatus === status;
-                    const isPast =
-                      ['agendado', 'en_proceso', 'finalizado'].indexOf(eventStatus) > index;
-                    const isCompleted = isActive || isPast;
-
-                    const getLabel = (s: string) => {
-                      if (s === 'agendado') return 'Agendado';
-                      if (s === 'en_proceso') return 'En proceso';
-                      return 'Finalizado';
-                    };
-
-                    return (
-                      <React.Fragment key={status}>
-                        <View style={styles.statusNodeWrapper}>
-                          <View style={[styles.statusNode, isCompleted && styles.statusNodeActive]}>
-                            {isCompleted && <Ionicons name="checkmark" size={12} color="#FFFFFF" />}
-                          </View>
-                          <Text
-                            style={[styles.statusLabel, isCompleted && styles.statusLabelActive]}
-                          >
-                            {getLabel(status)}
-                          </Text>
-                        </View>
-                        {index < 2 && (
-                          <View style={[styles.statusLine, isPast && styles.statusLineActive]} />
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
-                </View>
-
-                <View style={styles.actionBarContainer}>
-                  <View style={styles.actionInfoContainer}>
-                    <View style={styles.actionInfoItem}>
+                {/* Rejilla Horizontal de Metadatos (Info Hub) */}
+                <View style={styles.metaInfoGrid}>
+                  {!isInformative && (
+                    <View style={styles.metaGridItem}>
                       <Ionicons name="time-outline" size={14} color="#A0AEC0" />
-                      <Text style={styles.actionInfoText}>{selectedEvent.time}</Text>
-                    </View>
-                    <View style={styles.actionInfoItem}>
-                      <Ionicons name="pricetag-outline" size={14} color="#A0AEC0" />
-                      <Text style={styles.actionInfoText}>
-                        {selectedEvent.category.toUpperCase()}
+                      <Text style={styles.metaGridText} numberOfLines={1}>
+                        {selectedEvent.time}
                       </Text>
                     </View>
+                  )}
+
+                  {!isInformative && <View style={styles.metaGridDivider} />}
+
+                  <View style={styles.metaGridItem}>
+                    <MaterialIcons
+                      name={getCategoryIcon(selectedEvent.category, selectedEvent.musicStyle)}
+                      size={14}
+                      color={getCategoryColor(selectedEvent.category, selectedEvent.musicStyle)}
+                    />
+                    <Text style={styles.metaGridText} numberOfLines={1}>
+                      {isEmergencyEvent
+                        ? 'ALERTA'
+                        : isInformative
+                          ? 'PATRIMONIO'
+                          : selectedEvent.category.toUpperCase()}
+                    </Text>
                   </View>
-                  <View style={styles.actionButtonsContainer}>
-                    <TouchableOpacity
-                      style={[
-                        styles.actionBtn,
-                        { backgroundColor: getCategoryColor(selectedEvent.category) },
-                      ]}
-                    >
-                      <Ionicons name="calendar-outline" size={20} color="#FFFFFF" />
-                      <Text style={styles.actionBtnText}>Asistir</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.iconBtn}>
-                      <Ionicons name="share-social-outline" size={22} color="#FFFFFF" />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.iconBtn}>
-                      <Ionicons name="bookmark-outline" size={22} color="#FFFFFF" />
-                    </TouchableOpacity>
-                  </View>
+
+                  {!isInformative && <View style={styles.metaGridDivider} />}
+
+                  {!isInformative && (
+                    <View style={styles.metaGridItem}>
+                      <Ionicons name="people-outline" size={14} color="#A0AEC0" />
+                      <Text style={styles.metaGridText} numberOfLines={1}>
+                        {selectedEvent.attendeesCount || 24} asistirán
+                      </Text>
+                    </View>
+                  )}
+
+                  {isInformative && (
+                    <>
+                      <View style={styles.metaGridDivider} />
+                      <View style={styles.metaGridItem}>
+                        <Ionicons name="calendar-outline" size={14} color="#A0AEC0" />
+                        <Text style={styles.metaGridText} numberOfLines={1}>
+                          {selectedEvent.time}
+                        </Text>
+                      </View>
+                    </>
+                  )}
                 </View>
+
+                {/* Dirección Física */}
+                {selectedEvent.address && (
+                  <View style={styles.addressRowContainer}>
+                    <Ionicons
+                      name="location-sharp"
+                      size={16}
+                      color={getCategoryColor(selectedEvent.category, selectedEvent.musicStyle)}
+                    />
+                    <Text style={styles.addressText} numberOfLines={2}>
+                      {selectedEvent.address}
+                    </Text>
+                  </View>
+                )}
+
+                {/* Botonera de Acciones con Check-in Inteligente */}
+                <EventCheckInSection
+                  selectedEvent={selectedEvent}
+                  setCheckInModalRecord={setCheckInModalRecord}
+                  setShowCheckInModal={setShowCheckInModal}
+                />
+
+                {isDesktop && !isInformative && (
+                  <View style={styles.desktopToolsContainerPremium}>
+                    <Text style={styles.desktopToolsTitlePremium}>COMPLEMENTOS EN VIVO</Text>
+                    <TouchableOpacity
+                      onPress={openRightSheet}
+                      style={styles.desktopToolsBtnPremium}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons
+                        name="chatbubbles-outline"
+                        size={16}
+                        color="#A78BFA"
+                        style={{ marginRight: 8 }}
+                      />
+                      <Text style={styles.desktopToolsBtnTextPremium}>
+                        Foro y Comentarios en Vivo
+                      </Text>
+                      <Ionicons
+                        name="chevron-forward-outline"
+                        size={14}
+                        color="#A78BFA"
+                        style={{ marginLeft: 'auto' }}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             </ScrollView>
+
+            {/* Minimalist absolute bottom coordinates footer */}
+            <View
+              style={[
+                styles.coordinatesBadgeFooter,
+                { paddingBottom: isDesktop ? 12 : Math.max(insets.bottom, 12) },
+              ]}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={styles.coordinatesBadgeFooterText} selectable={true}>
+                  GPS: {selectedEvent.latitude.toFixed(6)}, {selectedEvent.longitude.toFixed(6)}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    copyToClipboard(
+                      `${selectedEvent.latitude.toFixed(6)}, ${selectedEvent.longitude.toFixed(6)}`,
+                    );
+                  }}
+                  style={{
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 6,
+                    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                    borderWidth: 1,
+                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <MaterialIcons name="content-copy" size={10} color="#94A3B8" />
+                </TouchableOpacity>
+              </View>
+            </View>
           </Animated.View>
         </View>
       )}
 
-      {isDesktop && activeTab !== 'map' && (
-        <FloatingIsland
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          onClose={() => setActiveTab('map')}
+      {/* --- MiniModal for Informative Landmarks --- */}
+      {showMainUI && selectedEvent && isInformative && (
+        <Animated.View
+          style={[
+            styles.miniModalContainer,
+            {
+              width: isDesktop ? 380 : '90%',
+              left: isDesktop ? 100 : '5%', // Sidebar width + offset on desktop
+              bottom: isDesktop ? 32 : 40,
+              transform: [
+                {
+                  translateY: panelSlide.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [600, 0],
+                  }),
+                },
+              ],
+              opacity: panelSlide,
+            },
+          ]}
+        >
+          {/* Header/Banner Section */}
+          <View style={styles.miniBannerContainer}>
+            {selectedEvent.imageUrl && (
+              <Image source={{ uri: selectedEvent.imageUrl }} style={styles.miniBannerImage} />
+            )}
+            <View style={styles.miniBannerOverlay} />
+            <TouchableOpacity
+              onPress={closeEventPanel}
+              style={styles.miniCloseButton}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close" size={18} color="#FFFFFF" />
+            </TouchableOpacity>
+            
+            <View style={styles.miniBadgeContainer}>
+              <View style={[styles.miniBadge, { backgroundColor: 'rgba(18, 22, 30, 0.8)' }]}>
+                <MaterialIcons name="pets" size={12} color="#A0AEC0" />
+                <Text style={styles.miniBadgeText}>LANDMARK PATRIMONIAL</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Info Section */}
+          <View style={styles.miniContent}>
+            <Text style={styles.miniTitle}>{selectedEvent.title}</Text>
+            <Text style={styles.miniOrganizer}>📍 {selectedEvent.organizer}</Text>
+            
+            <Text style={styles.miniDescription} numberOfLines={4}>
+              {selectedEvent.description}
+            </Text>
+
+            {/* Meta Grid Section */}
+            <View style={styles.miniMetaGrid}>
+              <View style={styles.miniMetaItem}>
+                <Ionicons name="calendar-outline" size={14} color="#A0AEC0" />
+                <Text style={styles.miniMetaText}>{selectedEvent.time}</Text>
+              </View>
+              <View style={styles.miniMetaDivider} />
+              <View style={styles.miniMetaItem}>
+                <Ionicons name="location-outline" size={14} color="#A0AEC0" />
+                <Text style={styles.miniMetaText} numberOfLines={1}>Feria Fluvial</Text>
+              </View>
+            </View>
+
+            {/* Action Buttons Section */}
+            <View style={styles.miniActionRow}>
+              <TouchableOpacity
+                style={[styles.miniPrimaryBtn, { backgroundColor: getCategoryColor(selectedEvent.category) }]}
+                activeOpacity={0.8}
+                onPress={() => {
+                  const url = `https://www.google.com/maps/dir/?api=1&destination=${selectedEvent.latitude},${selectedEvent.longitude}`;
+                  Linking.openURL(url);
+                }}
+              >
+                <Ionicons name="navigate" size={16} color="#FFFFFF" />
+                <Text style={styles.miniPrimaryBtnText}>Cómo llegar</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.miniIconBtn} activeOpacity={0.7}>
+                <Ionicons name="share-social-outline" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Animated.View>
+      )}
+
+      {/* --- Sector Info Card (Before Exploring) --- */}
+      {showMainUI && selectedSector && !activeNestedZone && (
+        <Animated.View
+          style={[
+            styles.miniModalContainer,
+            {
+              width: isDesktop ? 380 : '90%',
+              left: isDesktop ? 100 : '5%', // Sidebar width + offset on desktop
+              bottom: isDesktop ? 32 : 40,
+            },
+          ]}
+        >
+          {/* Header/Banner Section */}
+          <View style={[styles.miniBannerContainer, { height: 100, backgroundColor: '#1E293B' }]}>
+            <View style={styles.miniBannerOverlay} />
+            <TouchableOpacity
+              onPress={closeSectorPanel}
+              style={styles.miniCloseButton}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close" size={18} color="#FFFFFF" />
+            </TouchableOpacity>
+            
+            <View style={styles.miniBadgeContainer}>
+              <View style={[styles.miniBadge, { backgroundColor: 'rgba(56, 189, 248, 0.2)' }]}>
+                <Ionicons name="business" size={12} color="#38BDF8" />
+                <Text style={[styles.miniBadgeText, { color: '#38BDF8' }]}>{selectedSector.category.toUpperCase()}</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Info Section */}
+          <View style={styles.miniContent}>
+            <Text style={styles.miniTitle}>{selectedSector.name}</Text>
+            
+            <Text style={styles.miniDescription} numberOfLines={3}>
+              {selectedSector.description || 'Sector delimitado de la ciudad. Haz clic en explorar para ver su interior.'}
+            </Text>
+
+            {/* Action Buttons Section */}
+            <View style={styles.miniActionRow}>
+              <TouchableOpacity
+                style={[styles.miniPrimaryBtn, { backgroundColor: '#38BDF8', flex: 1, marginRight: 0 }]}
+                activeOpacity={0.8}
+                onPress={handleExploreSector}
+              >
+                <Ionicons name="enter-outline" size={18} color="#0F172A" />
+                <Text style={[styles.miniPrimaryBtnText, { color: '#0F172A', fontWeight: 'bold', fontSize: 14 }]}>
+                  Explorar Interior
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Animated.View>
+      )}
+
+      {/* Modal de Check-in Exitoso */}
+      {showCheckInModal && (
+        <CheckInModal
+          record={checkInModalRecord}
+          onClose={() => {
+            setShowCheckInModal(false);
+            setCheckInModalRecord(null);
+          }}
         />
+      )}
+
+      {/* Modal de Creación de Evento Pinado */}
+      <CreatePointModal
+        visible={showCreateEventModal}
+        onClose={() => setShowCreateEventModal(false)}
+        tacticalLocation={tacticalLocation}
+        formAddress={formAddress}
+        setFormAddress={setFormAddress}
+        handleCreateNewEvent={handleCreateNewEvent}
+        showNotification={showNotification}
+      />
+
+      {isDesktop && showRightSheet && (
+        <Animated.View
+          style={[
+            styles.sidePanel,
+            {
+              position: 'absolute',
+              width: panelWidth,
+              maxWidth: panelWidth,
+              top: 16,
+              bottom: 16,
+              right: 16,
+              left: 'auto',
+              borderRadius: 32,
+              zIndex: 3005,
+              transform: [
+                {
+                  translateX: rightSheetSlide.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [panelWidth + 32, 0],
+                  }),
+                },
+              ],
+              opacity: rightSheetSlide,
+            },
+          ]}
+        >
+          <View style={styles.rightSheetHeader}>
+            <Ionicons name="chatbubbles" size={20} color="#A78BFA" style={{ marginRight: 8 }} />
+            <Text style={styles.rightSheetTitle}>Foro en Vivo</Text>
+            <TouchableOpacity
+              onPress={closeRightSheet}
+              style={styles.rightSheetCloseButton}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close" size={20} color="#A0AEC0" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            style={styles.panelScroll}
+            contentContainerStyle={{ padding: 24, gap: 16 }}
+            showsVerticalScrollIndicator={false}
+          >
+            <Text style={styles.rightSheetSubTitle}>
+              Comunidad activa en "{selectedEvent ? selectedEvent.title : ''}"
+            </Text>
+
+            <View style={styles.commentBox}>
+              <View style={styles.commentHeader}>
+                <Text style={styles.commentAuthor}>Carlos Espinoza</Text>
+                <Text style={styles.commentTime}>Hace 5 min</Text>
+              </View>
+              <Text style={styles.commentText}>
+                ¡El ambiente está increíble! La música se escucha espectacular y hay mucha gente
+                disfrutando del evento. ¡Muy recomendado!
+              </Text>
+            </View>
+
+            <View style={styles.commentBox}>
+              <View style={styles.commentHeader}>
+                <Text style={styles.commentAuthor}>María José Valenzuela</Text>
+                <Text style={styles.commentTime}>Hace 12 min</Text>
+              </View>
+              <Text style={styles.commentText}>
+                ¿Alguien sabe si todavía quedan entradas en puerta o si el acceso es completamente
+                liberado?
+              </Text>
+            </View>
+
+            <View style={styles.commentBox}>
+              <View style={styles.commentHeader}>
+                <Text style={styles.commentAuthor}>Tomás Schmidt</Text>
+                <Text style={styles.commentTime}>Hace 20 min</Text>
+              </View>
+              <Text style={styles.commentText}>
+                Acabo de llegar, el estacionamiento cerca del sector está un poco lleno pero hay
+                guardias orientando. ¡Vengan con tiempo!
+              </Text>
+            </View>
+
+            {/* Form to leave a message */}
+            <View style={styles.commentInputContainer}>
+              <Text style={styles.commentInputLabel}>Deja un comentario en el foro</Text>
+              <View style={styles.commentInputWrapper}>
+                <Text style={styles.commentInputPlaceholder}>Escribe algo...</Text>
+                <TouchableOpacity style={styles.sendCommentBtn}>
+                  <Ionicons name="send" size={14} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ScrollView>
+        </Animated.View>
+      )}
+
+      {showNotificationTray && (
+        <NotificationTray
+          notifications={notifications}
+          onClose={() => setShowNotificationTray(false)}
+          onClearAll={() => setNotifications([])}
+          onMarkAsRead={(id) => {
+            setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
+          }}
+        />
+      )}
+
+      {/* Modal para Guardar Ubicaciones en Colecciones */}
+      <SaveToCollectionModal
+        visible={collectionModalVisible}
+        onClose={() => setCollectionModalVisible(false)}
+        locationData={locationToSave}
+      />
+
+      {showSectorsConfig && (
+        <SectorConfigPanel
+          sectors={sectors}
+          visibleSectorIds={visibleSectorIds}
+          onToggleSector={handleToggleSector}
+          showSectors={showSectors}
+          onToggleAll={setShowSectors}
+          onClose={() => setShowSectorsConfig(false)}
+        />
+      )}
+
+      {/* Floating On-Screen Toast Notifier */}
+      {activeToast && (
+        <View style={styles.toastContainer}>
+          <View style={[styles.toastCard, styles[`toastCard_${activeToast.type}` as keyof typeof styles]]}>
+            <MaterialIcons
+              name={
+                activeToast.type === 'success'
+                  ? 'check-circle'
+                  : activeToast.type === 'error'
+                  ? 'error'
+                  : activeToast.type === 'warning'
+                  ? 'warning'
+                  : 'info'
+              }
+              size={20}
+              color={
+                activeToast.type === 'success'
+                  ? '#34D399'
+                  : activeToast.type === 'error'
+                  ? '#EF4444'
+                  : activeToast.type === 'warning'
+                  ? '#F59E0B'
+                  : '#60A5FA'
+              }
+            />
+            <Text style={styles.toastMessage}>{activeToast.message}</Text>
+          </View>
+        </View>
       )}
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0B0F19',
-  },
-  profileContainer: {
-    flex: 1,
-    backgroundColor: '#0B0F19',
-    paddingTop: 72,
-  },
-  topBarWrapper: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 45 : 0, // Ajuste para SafeArea si es absolute
-    left: 0,
-    right: 0,
-    zIndex: 2000,
-  },
-  mapContainer: {
-    ...StyleSheet.absoluteFill,
-    ...Platform.select({
-      web: {
-        transition: 'filter 0.5s cubic-bezier(0.16, 1, 0.3, 1), transform 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
-      } as any,
-    }),
-  },
-  topOverlay: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 65 : 70,
-    left: 0,
-    right: 0,
-    paddingTop: 10,
-    zIndex: 100,
-    // Sombra suave en móviles
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 5,
-      },
-      android: {
-        elevation: 5,
-      },
-      web: {
-        boxShadow: '0px 4px 5px rgba(0, 0, 0, 0.3)',
-      },
-    }),
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 10,
-    paddingHorizontal: 20,
-  },
-  brandTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    ...Platform.select({
-      ios: {
-        textShadowColor: 'rgba(0, 0, 0, 0.75)',
-        textShadowOffset: { width: -1, height: 1 },
-        textShadowRadius: 10,
-      },
-      android: {
-        textShadowColor: 'rgba(0, 0, 0, 0.75)',
-        textShadowOffset: { width: -1, height: 1 },
-        textShadowRadius: 10,
-      },
-      web: {
-        textShadow: '-1px 1px 10px rgba(0, 0, 0, 0.75)',
-      },
-    }),
-  },
-  brandSubtitle: {
-    fontSize: 12,
-    color: '#34D399',
-    fontWeight: '600',
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-    marginTop: 4,
-  },
-  searchBarContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  searchInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 25,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    color: '#FFFFFF',
-    fontSize: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  categoriesWrapper: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 16,
-    marginBottom: 12,
-  },
-  categoryChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 8,
-    marginBottom: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-  },
-  activeCategoryChip: {
-    backgroundColor: '#FF6B6B',
-    borderColor: '#FF6B6B',
-  },
-  categoryText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  activeCategoryText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  layersWrapper: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 16,
-    marginBottom: 8,
-  },
-  layersLabel: {
-    color: '#A0AEC0',
-    fontSize: 11,
-    fontWeight: '600',
-    marginRight: 8,
-    marginLeft: 4,
-  },
-  layerChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 8,
-    marginBottom: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  activeLayerChip: {
-    backgroundColor: 'rgba(52, 211, 153, 0.3)',
-    borderColor: '#34D399',
-  },
-  layerChipText: {
-    color: '#CBD5E0',
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  activeLayerChipText: {
-    color: '#34D399',
-    fontWeight: '600',
-  },
-  toast: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 60 : 40,
-    alignSelf: 'center',
-    zIndex: 200,
-    backgroundColor: 'rgba(15, 20, 28, 0.95)',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 30,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 10,
-      },
-      android: { elevation: 8 },
-      web: {
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-        boxShadow: '0px 8px 24px rgba(0, 0, 0, 0.5)',
-      },
-    }),
-  },
-  toastText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: 0.3,
-  },
-  sidePanelOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 150,
-  },
-  sidePanelBackdrop: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0, 0, 0, 0.01)',
-  },
-  sidePanel: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
-    bottom: 16,
-    zIndex: 151,
-    // ─── High Contrast Obsidian Glassmorphism ───
-    backgroundColor: 'rgba(15, 20, 28, 0.88)', // Más oscuro y premium para excelente legibilidad sobre el mapa
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.4,
-        shadowRadius: 12,
-      },
-      android: {
-        elevation: 10,
-      },
-      web: {
-        backdropFilter: 'blur(20px)', // Blur más fuerte para difuminar las calles del mapa detrás del texto
-        WebkitBackdropFilter: 'blur(20px)',
-        boxShadow: '0px 8px 32px rgba(0, 0, 0, 0.5)',
-        transition: 'transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
-      },
-    }),
-  },
-  panelScroll: {
-    flex: 1,
-  },
-  panelScrollContent: {
-    paddingHorizontal: 24, // Espacio interno más amplio y premium
-    paddingTop: 24,
-    paddingBottom: 32,
-  },
-  panelScrollContentWithBanner: {
-    paddingBottom: 32,
-  },
-  liveIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-  },
-  liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#EF4444',
-    marginRight: 6,
-  },
-  liveText: {
-    color: '#EF4444',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  bannerContainer: {
-    width: '100%',
-    height: 180,
-    position: 'relative',
-    marginBottom: 16,
-  },
-  bannerImage: {
-    width: '100%',
-    height: '100%',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    resizeMode: 'cover',
-  },
-  bannerOverlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-  },
-  bannerHeader: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
-    right: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  closeButtonLight: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  cardBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  cardBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  closeButtonText: {
-    color: '#A0AEC0',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  panelContentWrapper: {},
-  panelContentWrapperWithPadding: {
-    paddingHorizontal: 24,
-  },
-  cardTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 4,
-    lineHeight: 24,
-  },
-  cardOrganizer: {
-    color: '#A0AEC0',
-    fontSize: 12,
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  cardDesc: {
-    color: '#CBD5E0',
-    fontSize: 13,
-    lineHeight: 18,
-    marginBottom: 12,
-  },
-  cardDivider: {
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    marginVertical: 12,
-  },
-  actionBarContainer: {
-    marginTop: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 16,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  actionInfoContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-    paddingHorizontal: 4,
-  },
-  actionInfoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  actionInfoText: {
-    color: '#CBD5E0',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  statusBarContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-    marginBottom: 16,
-    marginTop: 8,
-  },
-  statusNodeWrapper: {
-    alignItems: 'center',
-    width: 75,
-  },
-  statusNode: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-    zIndex: 2,
-  },
-  statusNodeActive: {
-    backgroundColor: '#34D399',
-    borderColor: '#34D399',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#34D399',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.6,
-        shadowRadius: 6,
-      },
-      android: { elevation: 6 },
-      web: { boxShadow: '0px 0px 10px rgba(52, 211, 153, 0.5)' },
-    }),
-  },
-  statusLabel: {
-    color: '#A0AEC0',
-    fontSize: 10,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  statusLabelActive: {
-    color: '#34D399',
-    fontWeight: '700',
-  },
-  statusLine: {
-    flex: 1,
-    height: 2,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    marginTop: 10,
-    marginHorizontal: -10,
-    zIndex: 1,
-  },
-  statusLineActive: {
-    backgroundColor: '#34D399',
-  },
-  actionButtonsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  actionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    flex: 1,
-    marginRight: 8,
-  },
-  actionBtnText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
-    marginLeft: 6,
-  },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 8,
-  },
-  unifiedControlsContainer: {
-    position: 'absolute',
-    bottom: 20,
-    right: 12,
-    zIndex: 110,
-    backgroundColor: 'rgba(30, 30, 30, 0.6)', // Glassmorphism premium
-    borderRadius: 24, // Mismo radio de borde que los paneles principales
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    flexDirection: 'column',
-    alignItems: 'center',
-    paddingVertical: 4,
-    paddingHorizontal: 3,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-      },
-      android: { elevation: 6 },
-      web: {
-        backdropFilter: 'blur(12px)', // Efecto cristal más pronunciado
-        WebkitBackdropFilter: 'blur(12px)',
-        boxShadow: '0px 8px 32px rgba(0, 0, 0, 0.2)',
-      },
-    }),
-  },
-  controlButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginVertical: 1,
-  },
-  controlButtonActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)', // Coincide con active NavLink
-  },
-  controlDivider: {
-    width: 20,
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    marginVertical: 2,
-  },
-  filterOverlay: {
-    position: 'absolute',
-    bottom: 20,
-    right: 76, // Separación clara de los controles de zoom (right: 12 + width ~44 + margen 20)
-    width: 300,
-    zIndex: 110,
-    backgroundColor: 'rgba(30, 30, 30, 0.6)', // Glassmorphism premium unificado
-    borderRadius: 24, // Mismo radio de borde
-    paddingVertical: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.5,
-        shadowRadius: 20,
-      },
-      android: { elevation: 12 },
-      web: {
-        backdropFilter: 'blur(12px)', // Efecto cristal más pronunciado
-        WebkitBackdropFilter: 'blur(12px)',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
-      },
-    }),
-  },
-  filterSectionTitle: {
-    color: '#A0AEC0',
-    fontSize: 12,
-    fontWeight: '700',
-    marginBottom: 8,
-    marginTop: 4,
-    paddingHorizontal: 16,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  tacticalHudContainer: {
-    position: 'absolute',
-    zIndex: 140,
-  },
-  tacticalHudGlass: {
-    backgroundColor: 'rgba(34, 34, 34, 0.65)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 24,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    minWidth: 180,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 10,
-      },
-      android: { elevation: 8 },
-      web: {
-        backdropFilter: 'blur(10px)',
-        WebkitBackdropFilter: 'blur(10px)',
-        boxShadow: '0px 4px 10px rgba(0, 0, 0, 0.3)',
-      },
-    }),
-  },
-  hudHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  hudDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#10B981',
-    marginRight: 8,
-  },
-  hudTitle: {
-    color: '#34D399',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-  },
-  hudDataRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  hudLabel: {
-    color: '#A0AEC0',
-    fontSize: 10,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    marginRight: 16,
-  },
-  hudValue: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-  },
-  telemetryHudContainer: {
-    position: 'absolute',
-    bottom: 20,
-    left: 12,
-    zIndex: 110,
-  },
-  telemetryHudGlass: {
-    backgroundColor: 'rgba(34, 34, 34, 0.65)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 24,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    width: 250,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 10,
-      },
-      android: { elevation: 8 },
-      web: {
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-        boxShadow: '0px 4px 10px rgba(0, 0, 0, 0.3)',
-      },
-    }),
-  },
-  telemetryHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  telemetryDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#3B82F6',
-    marginRight: 8,
-  },
-  telemetryTitle: {
-    color: '#60A5FA',
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-  },
-  telemetryMainRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  compassWrapper: {
-    position: 'relative',
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  compassRing: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  compassText: {
-    position: 'absolute',
-    color: '#A0AEC0',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  compassTextN: {
-    top: 2,
-    color: '#EF4444',
-  },
-  compassTextS: {
-    bottom: 2,
-  },
-  compassTextE: {
-    right: 3,
-  },
-  compassTextO: {
-    left: 3,
-  },
-  compassNeedle: {
-    position: 'absolute',
-    top: 14,
-    width: 0,
-    height: 0,
-    borderStyle: 'solid',
-    borderLeftWidth: 4,
-    borderRightWidth: 4,
-    borderBottomWidth: 18,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderBottomColor: '#EF4444',
-  },
-  compassCenterDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#FFFFFF',
-    position: 'absolute',
-  },
-  telemetryDataColumn: {
-    flex: 1,
-    gap: 3,
-  },
-  telemetryDetailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: 4,
-  },
-  telemetryDetailLabel: {
-    color: '#A0AEC0',
-    fontSize: 8,
-    fontWeight: '700',
-    width: 60,
-  },
-  telemetryDetailValue: {
-    color: '#FFFFFF',
-    fontSize: 9.5,
-    fontWeight: '600',
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-  },
-});

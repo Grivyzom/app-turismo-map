@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal Administrativo</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style-business.css">
+</head>
+<body>
+    <div class="page-wrapper">
+        <div class="auth-card" id="auth-card">
+            <div class="card-header">
+                <div class="corporate-badge">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <h1 id="title">Portal Administrativo</h1>
+                <p id="subtitle">Acceso a la plataforma multi-producto con verificación de doble factor</p>
+            </div>
+
+            <form class="auth-form" id="auth-form">
+                
+                <div class="input-group">
+                    <i class="fa-regular fa-envelope input-icon"></i>
+                    <input type="email" placeholder="correo@empresa.com" required>
+                </div>
+
+                <div class="password-container">
+                    <div class="input-group">
+                        <i class="fa-solid fa-lock input-icon"></i>
+                        <input type="password" id="password-input" placeholder="Contraseña" required>
+                        <button type="button" class="password-toggle-btn" id="password-toggle-btn" aria-label="Mostrar contraseña" aria-pressed="false">
+                            <svg class="password-toggle-icon password-toggle-icon-show" viewBox="0 0 24 24" aria-hidden="true">
+                                <path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/>
+                                <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/>
+                            </svg>
+                            <svg class="password-toggle-icon password-toggle-icon-hide" viewBox="0 0 24 24" aria-hidden="true">
+                                <path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18"/>
+                                <path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M10.58 10.58A3 3 0 0 0 9 13c0 1.66 1.34 3 3 3a3 3 0 0 0 2.42-1.22"/>
+                                <path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M5.64 5.64C4.01 6.78 2.91 8.2 2.25 9.12A1.67 1.67 0 0 0 2 10c1.85 4.75 5.9 8 10 8 1.23 0 2.44-.22 3.58-.62"/>
+                                <path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M9.88 4.93A9.4 9.4 0 0 1 12 4c4.1 0 8.15 3.25 10 8a1.67 1.67 0 0 1-.25.88c-.35.49-.76 1.02-1.24 1.55"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <i class="fa-solid fa-key input-icon"></i>
+                    <input 
+                        type="text" 
+                        placeholder="Código de seguridad (2FA)" 
+                        inputmode="numeric" 
+                        pattern="[0-9]*" 
+                        maxlength="6" 
+                        required
+                    >
+                </div>
+
+                <div class="forgot-password-wrapper">
+                    <button type="button" class="forgot-password-link">¿Olvidaste tu contraseña? Recupérala aquí</button>
+                </div>
+
+                <button type="submit" class="btn-submit">Acceder al sistema</button>
+            </form>
+
+            <div class="card-footer">
+                <p>¿No tienes acceso? <a href="#" class="btn-text-link">Contacta a tu administrador</a></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        {
+            const passwordInput = document.getElementById('password-input');
+            const passwordToggleBtn = document.getElementById('password-toggle-btn');
+
+            function setPasswordVisibility(isVisible) {
+                passwordInput.type = isVisible ? 'text' : 'password';
+                passwordToggleBtn.setAttribute('aria-pressed', String(isVisible));
+                passwordToggleBtn.setAttribute('aria-label', isVisible ? 'Ocultar contraseña' : 'Mostrar contraseña');
+                passwordToggleBtn.classList.toggle('is-visible', isVisible);
+            }
+
+            passwordToggleBtn.addEventListener('click', () => {
+                setPasswordVisibility(passwordInput.type === 'password');
+            });
+        }
+    </script>
+</body>
+</html>

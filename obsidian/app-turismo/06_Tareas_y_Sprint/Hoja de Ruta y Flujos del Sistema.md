@@ -73,8 +73,8 @@ graph TD
 ### 🌐 Fase 2: Desarrollo del Backend (Endpoints en Go)
 *Objetivo: Desarrollar la lógica de negocio y las APIs transaccionales y de consulta.*
 
-- [ ] **2.1. Módulo de Perfiles y Preferencias:**
-  - [ ] Endpoint `PATCH /api/v1/profile/preferences` para actualizar el JSONB de preferencias del ciudadano.
+- [x] **2.1. Módulo de Perfiles y Preferencias:**
+  - [x] Endpoint `PATCH /api/v1/profile/preferences` para actualizar el JSONB de preferencias del ciudadano.
 - [ ] **2.2. Módulo de Favoritos y Guardados:**
   - [ ] Endpoint `POST /api/v1/favorites/lists` para crear nuevas listas de guardados.
   - [ ] Endpoint `POST /api/v1/favorites/places` para guardar sucursales o lugares externos en una lista.
@@ -97,9 +97,9 @@ graph TD
 ### 📱 Fase 3: Interfaz Móvil y Flujos UX (React Native / Expo)
 *Objetivo: Integrar los componentes del mapa y las pantallas con las nuevas APIs de manera interactiva.*
 
-- [ ] **3.1. Flujo de Onboarding de Preferencias:**
-  - [ ] Crear pantalla interactiva de bienvenida donde el usuario selecciona sus intereses principales en Valdivia (ej. Cerveza artesanal, Naturaleza, Chocolates, Historia).
-  - [ ] Conectar la pantalla con el endpoint de perfil.
+- [x] **3.1. Flujo de Onboarding de Preferencias:**
+  - [x] Crear pantalla interactiva de bienvenida donde el usuario selecciona sus intereses principales en Valdivia (ej. Cerveza artesanal, Naturaleza, Chocolates, Historia).
+  - [x] Conectar la pantalla con el endpoint de perfil.
 - [ ] **3.2. Panel de Guardados y Favoritos:**
   - [ ] Diseñar el panel flotante de "Mis Lugares Guardados".
   - [ ] Permitir la creación de colecciones personalizadas y añadir notas.

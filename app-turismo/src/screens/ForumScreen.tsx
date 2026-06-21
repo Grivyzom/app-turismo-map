@@ -102,7 +102,7 @@ export default function ForumScreen() {
           };
         }
         return thread;
-      })
+      }),
     );
   };
 
@@ -143,8 +143,10 @@ export default function ForumScreen() {
 
       {/* PUBLICADOR DE PREGUNTAS */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>❓ Haz una Consulta</Text>
-        <Text style={styles.cardSubtitle}>Pregunta sobre accesos, precios, clima o recomendaciones.</Text>
+        <Text style={styles.cardTitle}>Haz una Consulta</Text>
+        <Text style={styles.cardSubtitle}>
+          Pregunta sobre accesos, precios, clima o recomendaciones.
+        </Text>
 
         <TextInput
           style={styles.textInput}
@@ -174,7 +176,9 @@ export default function ForumScreen() {
                 ]}
               >
                 <View style={[styles.dot, { backgroundColor: catColor }]} />
-                <Text style={[styles.categoryChipText, isSelected && { color: catColor }]}>{label}</Text>
+                <Text style={[styles.categoryChipText, isSelected && { color: catColor }]}>
+                  {label}
+                </Text>
               </TouchableOpacity>
             );
           })}
@@ -190,7 +194,12 @@ export default function ForumScreen() {
             <ActivityIndicator size="small" color="#040914" />
           ) : (
             <>
-              <MaterialIcons name="add-comment" size={16} color="#040914" style={{ marginRight: 6 }} />
+              <MaterialIcons
+                name="add-comment"
+                size={16}
+                color="#040914"
+                style={{ marginRight: 6 }}
+              />
               <Text style={styles.postButtonText}>Publicar duda</Text>
             </>
           )}
@@ -212,7 +221,12 @@ export default function ForumScreen() {
                   <Text style={styles.authorName}>{thread.authorName}</Text>
                   <Text style={styles.timeAgo}>• {thread.timeAgo}</Text>
                 </View>
-                <View style={[styles.zoneBadge, { backgroundColor: `${catColor}15`, borderColor: `${catColor}35` }]}>
+                <View
+                  style={[
+                    styles.zoneBadge,
+                    { backgroundColor: `${catColor}15`, borderColor: `${catColor}35` },
+                  ]}
+                >
                   <Text style={[styles.zoneBadgeText, { color: catColor }]}>{thread.zone}</Text>
                 </View>
               </View>
@@ -237,7 +251,11 @@ export default function ForumScreen() {
                   onPress={() => handleVote(thread.id)}
                   style={[styles.voteButton, thread.hasVoted && styles.voteButtonActive]}
                 >
-                  <Ionicons name="arrow-up" size={14} color={thread.hasVoted ? '#34D399' : '#9CA3AF'} />
+                  <Ionicons
+                    name="arrow-up"
+                    size={14}
+                    color={thread.hasVoted ? '#34D399' : '#9CA3AF'}
+                  />
                   <Text style={[styles.voteText, thread.hasVoted && { color: '#34D399' }]}>
                     {thread.votes} {thread.votes === 1 ? 'Voto' : 'Votos'}
                   </Text>

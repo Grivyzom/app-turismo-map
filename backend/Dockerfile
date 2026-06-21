@@ -15,7 +15,7 @@ COPY . .
 
 # Build the application
 # We compile statically and disable CGO to ensure it runs inside a minimal container
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o backend main.go checkin_handler.go places_handler.go
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o backend .
 
 # Stage 2: Run the compiled binary in a lean Alpine image
 FROM alpine:latest

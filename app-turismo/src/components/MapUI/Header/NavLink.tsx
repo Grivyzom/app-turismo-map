@@ -1,14 +1,14 @@
-import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, View, Platform } from 'react-native';
+import React, { memo } from 'react';
+import { TouchableOpacity, Text, StyleSheet, Platform, useWindowDimensions } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { NavLinkProps } from '../types';
 
 const colors = {
-  'primary-container': 'rgba(255, 255, 255, 0.15)', // Light translucent for active tab
+  'primary-container': '#2E2E2E', // Obsidian active tab pane background
   'on-primary-container': '#FFFFFF', // White text/icon for active
-  'on-surface-variant': '#9CA3AF', // Light gray for inactive
-  'surface-variant': '#e1e3e4',
+  'on-surface-variant': '#A3A3A3', // Obsidian text-muted gray
+  'accent-color': '#7F6DF2', // Obsidian signature purple
 };
 
 const styles = StyleSheet.create({
@@ -16,63 +16,85 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 4, // altura reducida
-    borderRadius: 24,
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16, // Pill shape for navigation tabs
+    borderWidth: 1,
+    borderColor: 'transparent',
     ...Platform.select({
       web: {
         cursor: 'pointer',
-        transition: 'background-color 0.2s ease',
+        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
       },
     }),
   },
   active: {
     backgroundColor: colors['primary-container'],
+    borderColor: '#3E3E3E',
   },
   inactive: {
     backgroundColor: 'transparent',
   },
   activeText: {
     color: colors['on-primary-container'],
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
-    letterSpacing: 0.05,
+    letterSpacing: 0.1,
   },
   inactiveText: {
     color: colors['on-surface-variant'],
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.05,
+    fontSize: 13,
+    fontWeight: '500',
+    letterSpacing: 0.1,
   },
   iconOnly: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
   },
 });
 
-export const NavLink: React.FC<NavLinkProps & { onHover?: () => void }> = ({ icon, label, active = false, onClick, onHover }) => {
+const NavLinkComponent: React.FC<NavLinkProps & { onHover?: () => void }> = ({
+  icon,
+  label,
+  active = false,
+  onClick,
+  onHover,
+}) => {
   const [isHovered, setIsHovered] = React.useState(false);
+  const { width } = useWindowDimensions();
+  const isSmallScreen = width < 600;
 
   return (
     <TouchableOpacity
       onPress={onClick}
       activeOpacity={0.7}
       //@ts-ignore
-      onMouseEnter={() => { setIsHovered(true); if (onHover) onHover(); }}
+      onMouseEnter={() => {
+        setIsHovered(true);
+        if (onHover) onHover();
+      }}
       onMouseLeave={() => setIsHovered(false)}
       style={[
         styles.base,
         active ? styles.active : styles.inactive,
-        !label && styles.iconOnly,
-        isHovered && ({ backgroundColor: 'rgba(255, 255, 255, 0.15)' } as any),
+        (!label || isSmallScreen) && styles.iconOnly,
+        isSmallScreen && { paddingHorizontal: 8 },
+        isHovered &&
+          !active &&
+          ({ backgroundColor: 'rgba(255, 255, 255, 0.05)', borderColor: '#2E2E2E' } as any),
       ]}
     >
       <MaterialIcons
         name={icon as any}
-        size={24}
-        color={active ? colors['on-primary-container'] : colors['on-surface-variant']}
+        size={isSmallScreen ? 18 : 20} // Compact, sharp icons
+        color={active ? colors['accent-color'] : colors['on-surface-variant']}
       />
-      {label ? <Text style={active ? styles.activeText : styles.inactiveText}>{label}</Text> : null}
+      {label && !isSmallScreen ? (
+        <Text style={active ? styles.activeText : styles.inactiveText}>{label}</Text>
+      ) : null}
     </TouchableOpacity>
   );
 };
+
+NavLinkComponent.displayName = 'NavLink';
+export const NavLink = memo(NavLinkComponent);

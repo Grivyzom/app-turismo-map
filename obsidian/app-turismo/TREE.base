@@ -1,3 +1,70 @@
-views:
-  - type: table
-    name: Tabla
+obsidian/app-turismo/:
+01_Negocio_y_SaaS
+02_Diseño_y_UI
+03_Arquitectura
+04_Backend_Go
+05_Frontend_Expo
+06_Tareas_y_Sprint
+07_Bugs
+08 Entrevistas
+Estructura Tiempo Real.canvas
+Promp a seguir.md
+TREE.base
+
+obsidian/app-turismo/01_Negocio_y_SaaS:
+Brief del Producto.md
+DOCUMENTO-DE-TOMA-DE-REQUERIMIENTOS (3).pdf
+Modelo de Cuentas y Roles.md
+Plan_Red_Social_Hibrida_Valdivia.md
+
+obsidian/app-turismo/02_Diseño_y_UI:
+DESIGN.md
+Vistas
+
+obsidian/app-turismo/02_Diseño_y_UI/Vistas:
+Inicio.md
+Login.md
+Recuperar-contraseña.md
+Registro.md
+
+obsidian/app-turismo/03_Arquitectura:
+Algoritmos_Analitica_Recomendaciones.md
+Análisis de Flujo de Autenticación y Seguridad.md
+Arquitectura y Flujo de Usuarios.md
+Despliegue y Red.md
+Diagramas
+Diseño de Base de Datos.md
+Flujo Ideal de Registro y Onboarding de Preferencias.md
+Modelo_Datos_ERD.md
+Panel de Administracion.md
+Sistema de Colecciones y Ubicaciones Guardadas.md
+
+obsidian/app-turismo/03_Arquitectura/Diagramas:
+Geospatial Event Management-2026-05-22-224155.png
+casos-de-uso-general.png
+flujo-registro-mvp.png
+
+obsidian/app-turismo/04_Backend_Go:
+ACCOUNTS  TEST.md
+API_Analytics_Recomendaciones.md
+Arquitectura_Detallada_y_Funcionamiento.md
+STACK SELECCIONADO.md
+
+obsidian/app-turismo/05_Frontend_Expo:
+Arquitectura_Detallada_y_Funcionamiento.md
+CONFIGURACION GOOGLE MAPS.md
+STACK SELECCIONADO.md
+TELEMETRIA Y MAPLIBRE.md
+
+obsidian/app-turismo/06_Tareas_y_Sprint:
+Estado Actual del Software - Junio 2026.md
+Hoja de Ruta y Flujos del Sistema.md
+Plan_Implementacion_Geoespacial_Hibrido.md
+thomi escritura 22-05-2026.md
+
+obsidian/app-turismo/07_Bugs:
+01_expo_router_dependencias.md
+
+obsidian/app-turismo/08 Entrevistas:
+Entrevista_Analisis_Geoespacial.md
+Entrevista_SIG_y_Analisis_Espacial.md

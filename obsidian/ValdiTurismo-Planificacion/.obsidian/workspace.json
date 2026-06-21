@@ -1,0 +1,231 @@
+{
+  "main": {
+    "id": "479b782d755793d5",
+    "type": "split",
+    "children": [
+      {
+        "id": "d1978615ea55e37b",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "4d49c89e7afb0b04",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "04_Backend_Go/STACK SELECCIONADO.md.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "STACK SELECCIONADO.md"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "fdfa95ac48c16ea4",
+    "type": "split",
+    "children": [
+      {
+        "id": "8efab9365f474071",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "1f7c40ae363e4206",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Explorador de archivos"
+            }
+          },
+          {
+            "id": "7fdab54897f1e236",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Buscar"
+            }
+          },
+          {
+            "id": "98c82905d3fd3032",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Marcadores"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "078ec5d0073cdea2",
+    "type": "split",
+    "children": [
+      {
+        "id": "d07cf94c475741bc",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "fa808b2e92013f71",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "04_Backend_Go/STACK SELECCIONADO.md.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Enlaces entrantes de STACK SELECCIONADO.md"
+            }
+          },
+          {
+            "id": "2945435fe02bed8e",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "04_Backend_Go/STACK SELECCIONADO.md.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Enlaces salientes de STACK SELECCIONADO.md"
+            }
+          },
+          {
+            "id": "470cc21d88fbe64a",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Etiquetas"
+            }
+          },
+          {
+            "id": "738ee4e2a0b096af",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "Todas las propiedades"
+            }
+          },
+          {
+            "id": "8e17ce9a8d7b34ca",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "04_Backend_Go/STACK SELECCIONADO.md.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Esquema de STACK SELECCIONADO.md"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Abrir selector rápido": false,
+      "graph:Abrir vista gráfica": false,
+      "canvas:Crear nuevo lienzo": false,
+      "daily-notes:Abrir la nota de hoy": false,
+      "templates:Insertar plantilla": false,
+      "command-palette:Abrir paleta de comandos": false,
+      "bases:Crear nueva base": false,
+      "mermaid-tools:Open Mermaid Toolbar": false,
+      "terminal:Open terminal": false,
+      "templater-obsidian:Templater": false
+    }
+  },
+  "active": "4d49c89e7afb0b04",
+  "lastOpenFiles": [
+    "04_Backend_Go/STACK SELECCIONADO.md.md",
+    "04_Backend_Go/ACCOUNTS  TEST.md",
+    "01_Negocio_y_SaaS/Brief del Producto.md",
+    "TREE.base",
+    "Bienvenido.md",
+    "Promp a seguir.md",
+    "01_Negocio_y_SaaS/Plan_Red_Social_Hibrida_Valdivia.md",
+    "01_Negocio_y_SaaS/Modelo de Cuentas y Roles.md",
+    "01_Negocio_y_SaaS/DOCUMENTO-DE-TOMA-DE-REQUERIMIENTOS (3).pdf",
+    "01_Negocio_y_SaaS",
+    "02_Diseño_y_UI/Vistas/Registro.md",
+    "02_Diseño_y_UI/Vistas/Login.md",
+    "02_Diseño_y_UI/Vistas/Recuperar-contraseña.md",
+    "02_Diseño_y_UI/Vistas/Inicio.md",
+    "02_Diseño_y_UI/Vistas",
+    "02_Diseño_y_UI/DESIGN.md",
+    "02_Diseño_y_UI",
+    "03_Arquitectura/Diagramas/Geospatial Event Management-2026-05-22-224155.png",
+    "03_Arquitectura/Diagramas/casos-de-uso-general.png",
+    "03_Arquitectura/Diagramas/flujo-registro-mvp.png",
+    "03_Arquitectura/Modelo_Datos_ERD.md.md",
+    "03_Arquitectura/Flujo Ideal de Registro y Onboarding de Preferencias.md",
+    "03_Arquitectura/Diagramas",
+    "03_Arquitectura/Despliegue y Red.md",
+    "03_Arquitectura/Diseño de Base de Datos.md",
+    "03_Arquitectura/Arquitectura y Flujo de Usuarios.md.md",
+    "03_Arquitectura/Análisis de Flujo de Autenticación y Seguridad.md",
+    "03_Arquitectura",
+    "04_Backend_Go",
+    "05_Frontend_Expo/TELEMETRIA Y MAPLIBRE.md",
+    "05_Frontend_Expo/STACK SELECCIONADO.md.md",
+    "05_Frontend_Expo/CONFIGURACION GOOGLE MAPS.md.md",
+    "05_Frontend_Expo",
+    "06_Tareas_y_Sprint/thomi escritura 22-05-2026.md",
+    "06_Tareas_y_Sprint/Plan_Implementacion_Geoespacial_Hibrido.md",
+    "06_Tareas_y_Sprint/Hoja de Ruta y Flujos del Sistema.md",
+    "06_Tareas_y_Sprint",
+    "07_Bugs/01_expo_router_dependencias.md",
+    "Estructura Tiempo Real.canvas"
+  ]
+}

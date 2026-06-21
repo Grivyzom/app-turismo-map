@@ -4,15 +4,16 @@ import { MAP_CONFIG } from '../../config/mapConfig';
 import { LoadingFallback } from '../ui/LoadingFallback';
 
 import { MapContainerProps } from './types';
+import { lazyWithRetry } from '../../utils/lazyWithRetry';
 
 // Lazy-load both map providers so that maplibre-gl (the heaviest dependency,
 // ~200-250 KiB) and the Google Maps SDK are split into separate chunks and only
 // downloaded once the map is about to render — not on the initial page load.
-const GoogleMapContainer = React.lazy(() =>
+const GoogleMapContainer = lazyWithRetry(() =>
   import('./GoogleMapContainer.web').then((m) => ({ default: m.GoogleMapContainer })),
 );
 
-const MapLibreContainer = React.lazy(() =>
+const MapLibreContainer = lazyWithRetry(() =>
   import('./MapLibreContainer.web').then((m) => ({ default: m.MapLibreContainer })),
 );
 

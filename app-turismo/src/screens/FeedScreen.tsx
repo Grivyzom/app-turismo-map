@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { getAuthTokenAsync } from '../utils/authStorage';
 
 interface FeedItem {
   id: string;
@@ -28,14 +29,29 @@ interface FeedItem {
   reporterName: string;
 }
 
+interface Recommendation {
+  id: string;
+  title: string;
+  description: string;
+  latitude: number;
+  longitude: number;
+  category: string;
+  organizer: string;
+  time: string;
+  imageUrl?: string;
+  address?: string;
+}
+
 const INITIAL_FEED_ITEMS: FeedItem[] = [
   {
     id: 'f1',
     title: 'Muestra Gastronómica Kunstmann',
     location: 'Torobayo, Valdivia',
     category: 'gastronomia',
-    description: '¡El patio cervecero está a máxima capacidad! La fila para ingresar es de unos 15 minutos, pero la música en vivo está excelente y vale la pena la espera.',
-    imageUrl: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&q=80&w=800',
+    description:
+      '¡El patio cervecero está a máxima capacidad! La fila para ingresar es de unos 15 minutos, pero la música en vivo está excelente y vale la pena la espera.',
+    imageUrl:
+      'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&q=80&w=800',
     timeAgo: 'Hace 5 min',
     likes: 42,
     commentsCount: 8,
@@ -47,8 +63,10 @@ const INITIAL_FEED_ITEMS: FeedItem[] = [
     title: 'Sendero de Lotos en Parque Saval',
     location: 'Isla Teja, Valdivia',
     category: 'naturaleza',
-    description: '⚠️ Sendero este despejado, pero la pasarela norte tiene lodo por las lluvias de anoche. Recomiendo calzado técnico.',
-    imageUrl: 'https://images.unsplash.com/photo-1440342359743-84fcb8c21f21?auto=format&fit=crop&q=80&w=800',
+    description:
+      'Sendero este despejado, pero la pasarela norte tiene lodo por las lluvias de anoche. Recomiendo calzado técnico.',
+    imageUrl:
+      'https://images.unsplash.com/photo-1440342359743-84fcb8c21f21?auto=format&fit=crop&q=80&w=800',
     timeAgo: 'Hace 20 min',
     likes: 19,
     commentsCount: 3,
@@ -60,7 +78,8 @@ const INITIAL_FEED_ITEMS: FeedItem[] = [
     title: 'Feria del Chocolate Artesanal',
     location: 'Plaza de la República',
     category: 'gastronomia',
-    description: '🎟️ ¡Aviso! El puesto "Dulzuras del Sur" tiene 20% de descuento en bombones rellenos con frutos nativos presentando el check-in de la App.',
+    description:
+      '¡Aviso! El puesto "Dulzuras del Sur" tiene 20% de descuento en bombones rellenos con frutos nativos presentando el check-in de la App.',
     timeAgo: 'Hace 45 min',
     likes: 56,
     commentsCount: 12,
@@ -72,8 +91,10 @@ const INITIAL_FEED_ITEMS: FeedItem[] = [
     title: 'Exposición Histórica van de Maele',
     location: 'Museo UACh',
     category: 'cultura',
-    description: 'Hermosa curatoría colonial hoy. Poca afluencia de público, ideal para venir con calma a tomar fotografías.',
-    imageUrl: 'https://images.unsplash.com/photo-1565552643952-443e20e88b8d?auto=format&fit=crop&q=80&w=800',
+    description:
+      'Hermosa curatoría colonial hoy. Poca afluencia de público, ideal para venir con calma a tomar fotografías.',
+    imageUrl:
+      'https://images.unsplash.com/photo-1565552643952-443e20e88b8d?auto=format&fit=crop&q=80&w=800',
     timeAgo: 'Hace 1 hora',
     likes: 28,
     commentsCount: 2,
@@ -85,8 +106,44 @@ const INITIAL_FEED_ITEMS: FeedItem[] = [
 export default function FeedScreen() {
   const [feedItems, setFeedItems] = useState<FeedItem[]>(INITIAL_FEED_ITEMS);
   const [newReportText, setNewReportText] = useState('');
-  const [selectedAlertType, setSelectedAlertType] = useState<'alert' | 'promo' | 'info' | 'crowd' | undefined>(undefined);
+  const [selectedAlertType, setSelectedAlertType] = useState<
+    'alert' | 'promo' | 'info' | 'crowd' | undefined
+  >(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Estados de Recomendaciones
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
+
+  useEffect(() => {
+    fetchRecommendations();
+  }, []);
+
+  const fetchRecommendations = async () => {
+    setIsLoadingRecommendations(true);
+    try {
+      const token = await getAuthTokenAsync();
+      if (!token) return;
+
+      const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8080';
+      const response = await fetch(`${backendUrl}/api/v1/recommendations`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setRecommendations(data.results || []);
+      }
+    } catch (error) {
+      console.error('Error fetching recommendations:', error);
+    } finally {
+      setIsLoadingRecommendations(false);
+    }
+  };
 
   const getAlertIcon = (type?: string) => {
     switch (type) {
@@ -127,7 +184,7 @@ export default function FeedScreen() {
           };
         }
         return item;
-      })
+      }),
     );
   };
 
@@ -138,7 +195,12 @@ export default function FeedScreen() {
     setTimeout(() => {
       const newItem: FeedItem = {
         id: `f-${Date.now()}`,
-        title: selectedAlertType === 'alert' ? 'Alerta Comunitaria' : selectedAlertType === 'promo' ? 'Promoción Local' : 'Reporte de la Comunidad',
+        title:
+          selectedAlertType === 'alert'
+            ? 'Alerta Comunitaria'
+            : selectedAlertType === 'promo'
+              ? 'Promoción Local'
+              : 'Reporte de la Comunidad',
         location: 'Ubicación Actual',
         category: 'todos',
         description: newReportText,
@@ -168,10 +230,74 @@ export default function FeedScreen() {
         </Text>
       </View>
 
+      {/* RECOMENDACIONES (Algoritmo de Sugerencias) */}
+      <View style={styles.recommendationsContainer}>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>Sugerencias para ti</Text>
+          <TouchableOpacity onPress={fetchRecommendations}>
+            <MaterialIcons name="refresh" size={18} color="#3B82F6" />
+          </TouchableOpacity>
+        </View>
+
+        {isLoadingRecommendations ? (
+          <ActivityIndicator size="small" color="#3B82F6" style={{ marginTop: 20 }} />
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.horizontalScroll}
+          >
+            {recommendations.length > 0 ? (
+              recommendations.map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  activeOpacity={0.9}
+                  style={styles.recommendationCard}
+                >
+                  <Image
+                    source={{
+                      uri:
+                        item.imageUrl ||
+                        'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=400',
+                    }}
+                    style={styles.recImage}
+                  />
+                  <View style={styles.recContent}>
+                    <View
+                      style={[
+                        styles.recBadge,
+                        { backgroundColor: getCategoryColor(item.category) },
+                      ]}
+                    >
+                      <Text style={styles.recBadgeText}>{item.category.toUpperCase()}</Text>
+                    </View>
+                    <Text style={styles.recTitle} numberOfLines={1}>
+                      {item.title}
+                    </Text>
+                    <View style={styles.recMeta}>
+                      <Ionicons name="location" size={10} color="#9CA3AF" />
+                      <Text style={styles.recMetaText} numberOfLines={1}>
+                        {item.organizer}
+                      </Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <View style={styles.emptyRecs}>
+                <Text style={styles.emptyRecsText}>No hay sugerencias disponibles</Text>
+              </View>
+            )}
+          </ScrollView>
+        )}
+      </View>
+
       {/* CREAR ALERTA RÁPIDA (Estilo Waze) */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>📢 Reporte al Instante</Text>
-        <Text style={styles.cardSubtitle}>Comparte las condiciones del lugar donde te encuentras ahora mismo.</Text>
+        <Text style={styles.cardTitle}>Reporte al Instante</Text>
+        <Text style={styles.cardSubtitle}>
+          Comparte las condiciones del lugar donde te encuentras ahora mismo.
+        </Text>
 
         <TextInput
           style={styles.textInput}
@@ -188,7 +314,14 @@ export default function FeedScreen() {
           {(['alert', 'promo', 'crowd', 'info'] as const).map((type) => {
             const icon = getAlertIcon(type);
             const isSelected = selectedAlertType === type;
-            const label = type === 'alert' ? 'Peligro' : type === 'promo' ? 'Promo' : type === 'crowd' ? 'Lleno' : 'Info';
+            const label =
+              type === 'alert'
+                ? 'Peligro'
+                : type === 'promo'
+                  ? 'Promo'
+                  : type === 'crowd'
+                    ? 'Lleno'
+                    : 'Info';
 
             return (
               <TouchableOpacity
@@ -197,11 +330,16 @@ export default function FeedScreen() {
                 onPress={() => setSelectedAlertType(isSelected ? undefined : type)}
                 style={[
                   styles.alertChip,
-                  isSelected && { borderColor: icon.color, backgroundColor: 'rgba(255,255,255,0.06)' },
+                  isSelected && {
+                    borderColor: icon.color,
+                    backgroundColor: 'rgba(255,255,255,0.06)',
+                  },
                 ]}
               >
-                <MaterialIcons name={icon.name} size={18} color={icon.color} />
-                <Text style={[styles.alertChipText, isSelected && { color: icon.color }]}>{label}</Text>
+                <MaterialIcons name={icon.name as any} size={18} color={icon.color} />
+                <Text style={[styles.alertChipText, isSelected && { color: icon.color }]}>
+                  {label}
+                </Text>
               </TouchableOpacity>
             );
           })}
@@ -257,7 +395,11 @@ export default function FeedScreen() {
                   {/* Icono de Alerta Rápida */}
                   {alertInfo && (
                     <View style={[styles.alertBadge, { borderColor: alertInfo.color }]}>
-                      <MaterialIcons name={alertInfo.name} size={14} color={alertInfo.color} />
+                      <MaterialIcons
+                        name={alertInfo.name as any}
+                        size={14}
+                        color={alertInfo.color}
+                      />
                       <Text style={[styles.alertBadgeText, { color: alertInfo.color }]}>
                         {item.alertType?.toUpperCase()}
                       </Text>
@@ -555,5 +697,82 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     fontSize: 11,
     fontWeight: '600',
+  },
+  // ESTILOS DE RECOMENDACIONES
+  recommendationsContainer: {
+    marginBottom: 8,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    color: '#F8FAFC',
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  horizontalScroll: {
+    paddingLeft: 16,
+    paddingRight: 16,
+    gap: 12,
+  },
+  recommendationCard: {
+    width: 160,
+    backgroundColor: 'rgba(16, 24, 39, 0.7)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    overflow: 'hidden',
+  },
+  recImage: {
+    width: '100%',
+    height: 90,
+    resizeMode: 'cover',
+  },
+  recContent: {
+    padding: 10,
+  },
+  recBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginBottom: 4,
+  },
+  recBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: '800',
+  },
+  recTitle: {
+    color: '#F8FAFC',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  recMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  recMetaText: {
+    color: '#9CA3AF',
+    fontSize: 10,
+    flex: 1,
+  },
+  emptyRecs: {
+    width: 200,
+    height: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyRecsText: {
+    color: '#6B7280',
+    fontSize: 12,
+    fontStyle: 'italic',
   },
 });

@@ -7,21 +7,46 @@ import {
   Animated,
   Platform,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+
 import { audioRecorder } from '../../utils/audioRecorder';
 import { processAudioSearch, ParsedSearch } from '../../utils/aiSearchParser';
+import { useRealtimeSearch } from '../../utils/useRealtimeSearch';
+import { addRecentSearch } from '../../utils/recentSearches';
 
 interface SmartVoiceSearchProps {
   onSearchComplete: (result: ParsedSearch) => void;
+  onPartialResult?: (text: string) => void;
   isEmbedded?: boolean;
 }
 
-export function SmartVoiceSearch({ onSearchComplete, isEmbedded = false }: SmartVoiceSearchProps) {
-  const [isRecording, setIsRecording] = useState(false);
+export function SmartVoiceSearch({ onSearchComplete, onPartialResult, isEmbedded = false }: SmartVoiceSearchProps) {
   const [isProcessing, setIsProcessing] = useState(false);
-  const [statusText, setStatusText] = useState('Búsqueda Inteligente...');
-  
+  const [statusText, setStatusText] = useState('Escribe o dicta tu búsqueda...');
+
+  // Hook para streaming en tiempo real (WebSockets + MediaRecorder)
+  const {
+    isRecording: isWsRecording,
+    partialText,
+    startRecording: startWsRecording,
+    stopRecording: stopWsRecording,
+  } = useRealtimeSearch();
+
+  const [searchText, setSearchText] = useState('');
+
+  // Efecto para emitir resultados parciales al padre y actualizar input
+  useEffect(() => {
+    if (isWsRecording && partialText) {
+      setSearchText(partialText);
+      if (onPartialResult) onPartialResult(partialText);
+    }
+  }, [partialText, isWsRecording, onPartialResult]);
+
+  const [isNativeRecording, setIsNativeRecording] = useState(false);
+  const isRecording = isWsRecording || isNativeRecording;
+
   // Animaciones
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -32,7 +57,7 @@ export function SmartVoiceSearch({ onSearchComplete, isEmbedded = false }: Smart
         toValue: 1,
         tension: 60,
         friction: 10,
-        useNativeDriver: true,
+        useNativeDriver: false,
       }).start();
     }
   }, [slideAnim, isEmbedded]);
@@ -45,21 +70,21 @@ export function SmartVoiceSearch({ onSearchComplete, isEmbedded = false }: Smart
           Animated.timing(pulseAnim, {
             toValue: 1.3,
             duration: 800,
-            useNativeDriver: true,
+            useNativeDriver: false,
           }),
           Animated.timing(pulseAnim, {
             toValue: 1,
             duration: 800,
-            useNativeDriver: true,
+            useNativeDriver: false,
           }),
-        ])
+        ]),
       );
       pulseLoop.start();
     } else {
       Animated.timing(pulseAnim, {
         toValue: 1,
         duration: 200,
-        useNativeDriver: true,
+        useNativeDriver: false,
       }).start();
     }
 
@@ -68,44 +93,80 @@ export function SmartVoiceSearch({ onSearchComplete, isEmbedded = false }: Smart
     };
   }, [isRecording, pulseAnim]);
 
-  const handlePressIn = async () => {
+  const isProcessingResult = useRef(false);
+
+  const handleMicPress = async () => {
     if (isProcessing) return;
-    try {
-      await audioRecorder.startRecording();
-      setIsRecording(true);
+
+    if (isRecording) {
+      // Detener grabación
+      if (Platform.OS === 'web') {
+        stopWsRecording();
+      } else {
+        setIsNativeRecording(false);
+        setIsProcessing(true);
+        setStatusText('Procesando IA...');
+        try {
+          const uri = await audioRecorder.stopRecording();
+          if (uri) {
+            const result = await processAudioSearch(uri);
+            await audioRecorder.clearAudioFile(uri);
+            if (result.query) setSearchText(result.query);
+            setStatusText('Puedes editar o buscar');
+          }
+        } catch (error) {
+          console.error('Processing error', error);
+          setStatusText('Error al procesar audio');
+          setTimeout(() => setStatusText('Escribe o dicta tu búsqueda...'), 3000);
+        } finally {
+          setIsProcessing(false);
+        }
+      }
+    } else {
+      // Iniciar grabación
+      setSearchText('');
       setStatusText('Te escucho...');
-    } catch (error) {
-      console.error('Failed to start recording', error);
-      setStatusText('Error de micrófono');
-      setTimeout(() => setStatusText('Búsqueda Inteligente...'), 3000);
+      isProcessingResult.current = false;
+
+      if (Platform.OS === 'web') {
+        startWsRecording((result) => {
+          if (isProcessingResult.current) return;
+          isProcessingResult.current = true;
+
+          if (result.query) {
+            setSearchText(result.query);
+            setStatusText('Puedes editar o dar enter para buscar');
+          } else {
+            setStatusText('No se escuchó nada');
+            setTimeout(() => setStatusText('Escribe o dicta tu búsqueda...'), 3000);
+          }
+          setIsProcessing(false);
+        });
+      } else {
+        setIsNativeRecording(true);
+        try {
+          await audioRecorder.startRecording();
+        } catch (error) {
+          console.error('Failed to start recording', error);
+          setIsNativeRecording(false);
+          setStatusText('Error de micrófono');
+          setTimeout(() => setStatusText('Escribe o dicta tu búsqueda...'), 3000);
+        }
+      }
     }
   };
 
-  const handlePressOut = async () => {
-    if (!isRecording) return;
-    setIsRecording(false);
-    setIsProcessing(true);
-    setStatusText('Procesando IA...');
-
-    try {
-      const uri = await audioRecorder.stopRecording();
-      if (uri) {
-        const result = await processAudioSearch(uri);
-        await audioRecorder.clearAudioFile(uri);
-        
-        setStatusText(`Encontrado: ${result.category}`);
-        onSearchComplete(result);
-        
-        setTimeout(() => {
-          setStatusText('Búsqueda Inteligente...');
-        }, 3000);
-      }
-    } catch (error) {
-      console.error('Processing error', error);
-      setStatusText('Error al procesar audio');
-      setTimeout(() => setStatusText('Búsqueda Inteligente...'), 3000);
-    } finally {
-      setIsProcessing(false);
+  const handleSubmit = () => {
+    if (searchText.trim()) {
+      // Guardar de manera ultra ligera en AsyncStorage
+      addRecentSearch(searchText);
+      
+      onSearchComplete({
+        query: searchText,
+        category: 'todos',
+        originalText: searchText,
+        isFinal: true,
+      });
     }
   };
 
@@ -114,24 +175,28 @@ export function SmartVoiceSearch({ onSearchComplete, isEmbedded = false }: Smart
       {!isEmbedded && (
         <Ionicons name="search" size={18} color="#9CA3AF" style={styles.searchIcon} />
       )}
-      
+
       <View style={styles.textContainer}>
-        <Text
+        <TextInput
           style={[
             styles.placeholderText,
             isRecording && styles.textRecording,
             isProcessing && styles.textProcessing,
+            Platform.OS === 'web' && { outlineStyle: 'none' } as any,
           ]}
-          numberOfLines={1}
-        >
-          {statusText}
-        </Text>
+          value={searchText}
+          onChangeText={setSearchText}
+          onSubmitEditing={handleSubmit}
+          placeholder={statusText}
+          placeholderTextColor="#9CA3AF"
+          editable={!isRecording && !isProcessing}
+          returnKeyType="search"
+        />
       </View>
 
       <TouchableOpacity
         activeOpacity={0.8}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
+        onPress={handleMicPress}
         style={styles.micButtonWrapper}
       >
         {isRecording && (
@@ -144,12 +209,7 @@ export function SmartVoiceSearch({ onSearchComplete, isEmbedded = false }: Smart
             ]}
           />
         )}
-        <View
-          style={[
-            styles.micButton,
-            isRecording && styles.micButtonRecording,
-          ]}
-        >
+        <View style={[styles.micButton, isRecording && styles.micButtonRecording]}>
           {isProcessing ? (
             <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
@@ -185,9 +245,7 @@ export function SmartVoiceSearch({ onSearchComplete, isEmbedded = false }: Smart
         },
       ]}
     >
-      <View style={styles.glassPanel}>
-        {content}
-      </View>
+      <View style={styles.glassPanel}>{content}</View>
     </Animated.View>
   );
 }
@@ -251,6 +309,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 8,
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   placeholderText: {
     color: '#9CA3AF',
@@ -296,3 +355,4 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
 });
+

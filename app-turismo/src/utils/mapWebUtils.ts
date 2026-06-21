@@ -5,7 +5,21 @@ import { MapLayer } from '../components/Map/types';
 import { getCategoryColor } from './mapUtils';
 
 export const addMissingStyleImage = (map: MapLibreMap, imageId: string, mapLayer: MapLayer) => {
-  if (imageId !== 'wood-pattern' || map.hasImage(imageId)) {
+  if (map.hasImage(imageId)) {
+    return;
+  }
+
+  if (imageId !== 'wood-pattern') {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    const context = canvas.getContext('2d');
+    if (context) {
+      context.fillStyle = 'rgba(0,0,0,0)';
+      context.fillRect(0, 0, 1, 1);
+      const imageData = context.getImageData(0, 0, 1, 1);
+      map.addImage(imageId, imageData, { pixelRatio: 1 });
+    }
     return;
   }
 
@@ -107,6 +121,20 @@ export const ensureLayers = (map: MapLibreMap) => {
       },
     });
   }
+
+  if (!map.getLayer('relief-extrusion')) {
+    map.addLayer({
+      id: 'relief-extrusion',
+      type: 'fill-extrusion',
+      source: 'events',
+      paint: {
+        'fill-extrusion-color': ['get', 'color'],
+        'fill-extrusion-height': ['coalesce', ['get', 'extrusionHeight'], 0],
+        'fill-extrusion-base': 0,
+        'fill-extrusion-opacity': 0.8,
+      },
+    });
+  }
 };
 
 export const applyDarkTheme = (map: MapLibreMap) => {
@@ -203,20 +231,38 @@ export const updateMapGeoJSON = (map: MapLibreMap, events: any[]) => {
 
   ensureLayers(map);
 
-  const geojsonData = {
-    type: 'FeatureCollection',
-    features: events.map((event) => ({
+  const features = events.map((event) => {
+    // Si el evento tiene un polígono definido, lo usamos para el relieve/extrusion
+    const geometry =
+      event.polygon && event.polygon.length > 2
+        ? {
+            type: 'Polygon',
+            coordinates: [
+              [
+                ...event.polygon.map((p: any) => [p.longitude, p.latitude]),
+                [event.polygon[0].longitude, event.polygon[0].latitude], // Cerrar el polígono
+              ],
+            ],
+          }
+        : {
+            type: 'Point',
+            coordinates: [event.longitude, event.latitude],
+          };
+
+    return {
       type: 'Feature',
       id: event.id,
-      geometry: {
-        type: 'Point',
-        coordinates: [event.longitude, event.latitude],
-      },
+      geometry,
       properties: {
         ...event,
-        color: getCategoryColor(event.category),
+        color: getCategoryColor(event.category, event.musicStyle),
       },
-    })),
+    };
+  });
+
+  const geojsonData = {
+    type: 'FeatureCollection',
+    features,
   };
 
   const source = map.getSource('events') as maplibregl.GeoJSONSource;

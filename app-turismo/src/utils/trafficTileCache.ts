@@ -142,7 +142,7 @@ export class TrafficTileCache {
         }
 
         const data = await response.arrayBuffer();
-        
+
         // 3. Cachear resultado
         this.cache.set(key, data);
 

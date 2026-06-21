@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Image } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Image, ActionSheetIOS, Platform, Alert } from 'react-native';
+import { router } from 'expo-router';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 type EntityType = 'citizen' | 'business' | 'creator' | 'media';
 
@@ -111,7 +113,7 @@ export default function ProfileDashboardScreen() {
                 <Text className="text-gray-400 text-sm mt-1">Manager • Sede Centro</Text>
               </View>
               <View className="w-10 h-10 bg-gray-700 rounded-full items-center justify-center">
-                <Text className="text-gray-400">👤</Text>
+                <MaterialIcons name="person" size={20} color="#9CA3AF" />
               </View>
             </View>
           </View>
@@ -139,8 +141,37 @@ export default function ProfileDashboardScreen() {
               </View>
             </View>
 
-            <TouchableOpacity className="bg-indigo-600 p-4 rounded-2xl items-center shadow-lg shadow-indigo-900/50 mt-2">
-              <Text className="text-white font-bold text-base">📍 Emitir Nuevo Suceso</Text>
+            <TouchableOpacity 
+              className="bg-indigo-600 p-4 rounded-2xl items-center shadow-lg shadow-indigo-900/50 mt-2"
+              onPress={() => {
+                if (Platform.OS === 'ios') {
+                  ActionSheetIOS.showActionSheetWithOptions(
+                    {
+                      options: ['Cancelar', 'Punto de Interés / Evento', 'Sector / Edificio', 'Ruta / Ciclovía'],
+                      cancelButtonIndex: 0,
+                      title: '¿Qué deseas emitir en el mapa?',
+                    },
+                    (buttonIndex) => {
+                      if (buttonIndex === 1) {
+                        router.push({ pathname: '/', params: { action: 'create_point' } });
+                      } else if (buttonIndex === 2) {
+                        router.push({ pathname: '/', params: { action: 'create_sector' } });
+                      } else if (buttonIndex === 3) {
+                        router.push({ pathname: '/', params: { action: 'create_route' } });
+                      }
+                    }
+                  );
+                } else {
+                  Alert.alert('¿Qué deseas emitir?', '', [
+                    { text: 'Cancelar', style: 'cancel' },
+                    { text: 'Punto de Interés', onPress: () => router.push({ pathname: '/', params: { action: 'create_point' } }) },
+                    { text: 'Sector / Edificio', onPress: () => router.push({ pathname: '/', params: { action: 'create_sector' } }) },
+                    { text: 'Ruta / Ciclovía', onPress: () => router.push({ pathname: '/', params: { action: 'create_route' } }) },
+                  ]);
+                }
+              }}
+            >
+              <Text className="text-white font-bold text-base">Emitir Nuevo Suceso</Text>
             </TouchableOpacity>
           </View>
         )}

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autenticación</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="page-wrapper">
+        <button class="theme-toggle" aria-label="Cambiar tema">
+            <i class="fa-regular fa-sun"></i>
+        </button>
+
+        <div class="auth-card" id="auth-card">
+            <div class="card-header">
+                <h1 id="title">Crea tu cuenta</h1>
+                <p id="subtitle">Únete a 24000 desarrolladores para crear apps increíbles</p>
+            </div>
+
+            <div class="social-buttons recovery-hidden-field">
+                <button class="btn-social btn-google">
+                    <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" width="18" height="18" class="social-icon">
+                    Google
+                </button>
+                <button class="btn-social btn-github">
+                    <i class="fa-brands fa-github social-icon"></i>
+                    GitHub
+                </button>
+            </div>
+
+            <div class="divider recovery-hidden-field">
+                <span id="divider-text">O regístrate con tu correo</span>
+            </div>
+
+            <form class="auth-form" id="auth-form">
+                
+                <div class="input-group register-field">
+                    <i class="fa-regular fa-user input-icon"></i>
+                    <input type="text" placeholder="Nombre completo" id="name-input" required>
+                </div>
+                
+                <div class="input-group">
+                    <i class="fa-regular fa-envelope input-icon"></i>
+                    <input type="email" placeholder="tu@ejemplo.com" required>
+                </div>
+
+                <div class="password-container">
+                    <div class="input-group">
+                        <i class="fa-solid fa-lock input-icon"></i>
+                        <input type="password" id="password-input" placeholder="Contraseña" required>
+                        <button type="button" class="password-toggle-btn" id="password-toggle-btn" aria-label="Mostrar contraseña" aria-pressed="false">
+                            <svg class="password-toggle-icon password-toggle-icon-show" viewBox="0 0 24 24" aria-hidden="true">
+                                <path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/>
+                                <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/>
+                            </svg>
+                            <svg class="password-toggle-icon password-toggle-icon-hide" viewBox="0 0 24 24" aria-hidden="true">
+                                <path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18"/>
+                                <path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M10.58 10.58A3 3 0 0 0 9 13c0 1.66 1.34 3 3 3a3 3 0 0 0 2.42-1.22"/>
+                                <path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M5.64 5.64C4.01 6.78 2.91 8.2 2.25 9.12A1.67 1.67 0 0 0 2 10c1.85 4.75 5.9 8 10 8 1.23 0 2.44-.22 3.58-.62"/>
+                                <path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M9.88 4.93A9.4 9.4 0 0 1 12 4c4.1 0 8.15 3.25 10 8a1.67 1.67 0 0 1-.25.88c-.35.49-.76 1.02-1.24 1.55"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="forgot-password-wrapper login-only-field">
+                        <button type="button" class="forgot-password-link" id="forgot-pass-btn">¿Olvidaste tu contraseña? Recupérala aquí</button>
+                    </div>
+                </div>
+
+                <div class="input-group register-field" id="confirm-password-wrapper" style="display: none;">
+                    <i class="fa-solid fa-lock input-icon"></i>
+                    <input type="password" id="confirm-password-input" placeholder="Confirmar contraseña" required>
+                </div>
+
+                <div class="checkbox-group register-field">
+                    <input type="checkbox" id="terms" required>
+                    <label for="terms">Acepto los <a href="#">Términos y Condiciones</a></label>
+                </div>
+
+                <button type="submit" class="btn-submit" id="submit-btn">Registrarse</button>
+            </form>
+
+            <div class="card-footer">
+                <p>
+                    <span id="toggle-text">¿Ya tienes una cuenta?</span> 
+                    <button type="button" class="btn-text-link" id="toggle-btn">Inicia sesión</button>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        {
+            // --- Automatización Estacional ---
+            function aplicarEstacionAutomatica() {
+                const mesActual = new Date().getMonth();
+                const cuerpo = document.body;
+                if (mesActual >= 2 && mesActual <= 4) {
+                    cuerpo.classList.add('theme-autumn');
+                } else if (mesActual >= 5 && mesActual <= 8) {
+                    cuerpo.classList.add('theme-winter');
+                }
+            }
+            aplicarEstacionAutomatica();
+
+            // --- Máquina de Estados de la Interfaz ---
+            const authCard = document.getElementById('auth-card');
+            const toggleBtn = document.getElementById('toggle-btn');
+            const forgotPassBtn = document.getElementById('forgot-pass-btn');
+            
+            const title = document.getElementById('title');
+            const subtitle = document.getElementById('subtitle');
+            const dividerText = document.getElementById('divider-text');
+            const submitBtn = document.getElementById('submit-btn');
+            const toggleText = document.getElementById('toggle-text');
+            const passwordToggleBtn = document.getElementById('password-toggle-btn');
+            
+            const nameInput = document.getElementById('name-input');
+            const passwordInput = document.getElementById('password-input');
+            const confirmPasswordInput = document.getElementById('confirm-password-input');
+            const confirmPasswordWrapper = document.getElementById('confirm-password-wrapper');
+            const termsCheckbox = document.getElementById('terms');
+
+            function setPasswordVisibility(isVisible) {
+                passwordInput.type = isVisible ? 'text' : 'password';
+                passwordToggleBtn.setAttribute('aria-pressed', String(isVisible));
+                passwordToggleBtn.setAttribute('aria-label', isVisible ? 'Ocultar contraseña' : 'Mostrar contraseña');
+                passwordToggleBtn.classList.toggle('is-visible', isVisible);
+            }
+
+            passwordInput.addEventListener('input', () => {
+                if (vistaActual === VISTAS.REGISTER) {
+                    confirmPasswordWrapper.style.display = passwordInput.value.length > 0 ? '' : 'none';
+                }
+            });
+
+            passwordToggleBtn.addEventListener('click', () => {
+                setPasswordVisibility(passwordInput.type === 'password');
+            });
+
+            // Definición de las vistas disponibles
+            const VISTAS = {
+                REGISTER: 'register',
+                LOGIN: 'login',
+                RECOVERY: 'recovery'
+            };
+
+            let vistaActual = VISTAS.REGISTER;
+
+            function setViewState(nuevaVista) {
+                vistaActual = nuevaVista;
+                setPasswordVisibility(false);
+                
+                // Limpieza de clases de estado visual en la tarjeta
+                authCard.classList.remove('login-view', 'recovery-view');
+
+                // Configuración de requeridos por defecto para evitar roturas de validación nativa
+                nameInput.removeAttribute('required');
+                passwordInput.removeAttribute('required');
+                confirmPasswordInput.removeAttribute('required');
+                termsCheckbox.removeAttribute('required');
+
+                if (nuevaVista === VISTAS.REGISTER) {
+                    title.textContent = 'Crea tu cuenta';
+                    subtitle.textContent = 'Únete a 24000 desarrolladores para crear apps increíbles';
+                    dividerText.textContent = 'O regístrate con tu correo';
+                    submitBtn.textContent = 'Registrarse';
+                    toggleText.textContent = '¿Ya tienes una cuenta?';
+                    toggleBtn.textContent = 'Inicia sesión';
+
+                    nameInput.setAttribute('required', 'true');
+                    passwordInput.setAttribute('required', 'true');
+                    confirmPasswordInput.setAttribute('required', 'true');
+                    termsCheckbox.setAttribute('required', 'true');
+                    
+                    confirmPasswordWrapper.style.display = passwordInput.value.length > 0 ? '' : 'none';
+
+                } else if (nuevaVista === VISTAS.LOGIN) {
+                    authCard.classList.add('login-view');
+                    title.textContent = 'Iniciar sesión';
+                    subtitle.textContent = 'Bienvenido de nuevo, ingresa a tu cuenta';
+                    dividerText.textContent = 'O inicia sesión con tu correo';
+                    submitBtn.textContent = 'Ingresar';
+                    toggleText.textContent = '¿No tienes una cuenta?';
+                    toggleBtn.textContent = 'Regístrate';
+
+                    passwordInput.setAttribute('required', 'true');
+
+                } else if (nuevaVista === VISTAS.RECOVERY) {
+                    authCard.classList.add('recovery-view');
+                    title.textContent = 'Recuperar contraseña';
+                    subtitle.textContent = 'Ingresa tu correo para recibir un enlace de restauración';
+                    submitBtn.textContent = 'Enviar enlace';
+                    toggleText.textContent = '¿Recordaste tu contraseña?';
+                    toggleBtn.textContent = 'Inicia sesión';
+                }
+            }
+
+            // Evento para el botón inferior (Intercambio principal)
+            toggleBtn.addEventListener('click', () => {
+                if (vistaActual === VISTAS.REGISTER || vistaActual === VISTAS.RECOVERY) {
+                    setViewState(VISTAS.LOGIN);
+                } else {
+                    setViewState(VISTAS.REGISTER);
+                }
+            });
+
+            // Evento para el enlace "¿Olvidaste tu contraseña?"
+            forgotPassBtn.addEventListener('click', () => {
+                setViewState(VISTAS.RECOVERY);
+            });
+        }
+    </script>
+</body>
+</html>

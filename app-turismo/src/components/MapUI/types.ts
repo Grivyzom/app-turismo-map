@@ -5,6 +5,13 @@ export interface TopAppBarProps {
   onTabChange?: (tab: TabType) => void;
   onSearchClick?: () => void;
   onAccountClick?: () => void;
+  notificationsCount?: number;
+  onNotificationClick?: () => void;
+  onVoiceSearch?: (query: any) => void;
+  onVoicePartialSearch?: (text: string) => void;
+  isModalOpen?: boolean;
+  forceSidebarVisible?: boolean;
+  onSearchFocus?: () => void;
 }
 
 export interface NavLinkProps {

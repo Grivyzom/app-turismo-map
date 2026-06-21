@@ -10,6 +10,7 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { loadUserProfile, getDefaultUserProfile, type NormalUserProfile } from '../../utils/userProfileStorage';
+import { useAuth } from '../../context/AuthContext';
 
 import FeedScreen from '../../screens/FeedScreen';
 import PassportScreen from '../../screens/PassportScreen';
@@ -80,6 +81,7 @@ export default function FloatingIsland({
   children,
   showSidebar = true,
 }: FloatingIslandProps) {
+  const { isAuthenticated } = useAuth();
   const [profile, setProfile] = useState<NormalUserProfile>(getDefaultUserProfile());
   const [isPinned, setIsPinned] = useState(true);
   const [isHovered, setIsHovered] = useState(false);
@@ -261,14 +263,15 @@ export default function FloatingIsland({
                       {profile.fullName}
                     </Text>
                     <Text style={styles.profileRole}>
-                      {profile.userType === 'citizen'
-                        ? 'Turista'
-                        : profile.userType === 'partner_owner'
-                        ? 'Entidad'
-                        : 'Invitado'}
+                      {!isAuthenticated 
+                        ? "Para más funciones"
+                        : profile.userType === 'citizen'
+                          ? 'Turista'
+                          : profile.userType === 'partner_owner'
+                            ? 'Entidad'
+                            : 'Invitado'}
                     </Text>
                   </View>
-                  <MaterialIcons name="chevron-right" size={18} color="#4B5563" />
                 </>
               )}
             </TouchableOpacity>
@@ -317,30 +320,15 @@ export default function FloatingIsland({
 
 const styles = StyleSheet.create({
   overlayContainer: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    zIndex: 1000,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    ...Platform.select({
-      web: {
-        paddingBottom: '3.5vh',
-      } as any,
-      default: {
-        paddingBottom: 24,
-      }
-    }),
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'stretch',
     pointerEvents: 'auto',
   },
   islandContainer: {
-    width: '96vw',
-    height: '88vh',
+    flex: 1,
     maxWidth: 1750,
-    maxHeight: 1000,
+    alignSelf: 'center',
     borderRadius: 24,
     flexDirection: 'row',
     overflow: 'hidden',

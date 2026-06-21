@@ -1,22 +1,22 @@
 services:
-  db:
-    image: postgis/postgis:15-3.3-alpine
-    container_name: turismo_db
-    restart: always
-    environment:
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-grivyzom@2026}
-      POSTGRES_DB: ${DB_NAME:-app-turismo}
-    ports:
-      - "5433:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      # Ensures PostgreSQL is fully ready to accept connections before other containers start
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+  # db:
+  #   image: postgis/postgis:15-3.3-alpine
+  #   container_name: turismo_db
+  #   restart: always
+  #   environment:
+  #     POSTGRES_USER: ${DB_USER:-postgres}
+  #     POSTGRES_PASSWORD: ${DB_PASSWORD:-grivyzom@2026}
+  #     POSTGRES_DB: ${DB_NAME:-app-turismo}
+  #   ports:
+  #     - "5433:5432"
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     # Ensures PostgreSQL is fully ready to accept connections before other containers start
+  #     test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+  #     interval: 5s
+  #     timeout: 5s
+  #     retries: 5
 
   redis:
     image: redis:7-alpine
@@ -35,28 +35,24 @@ services:
     restart: unless-stopped
     ports:
       - "8081:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    env_file:
+      - .env
     environment:
       # Point DB and Redis hostnames to their respective docker-compose services
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-grivyzom@2026}
-      DB_NAME: ${DB_NAME:-app-turismo}
-      DB_SSLMODE: ${DB_SSLMODE:-disable}
+      DB_HOST: host.docker.internal
       REDIS_ADDR: redis:6379
-      PORT: ${PORT:-8080}
-      GOOGLE_WEB_CLIENT_ID: ${GOOGLE_WEB_CLIENT_ID}
+    volumes:
+      - ./app-turismo/assets/svg:/root/assets/svg
     depends_on:
-      db:
-        # Will wait for PostgreSQL to be completely healthy before starting the backend
-        condition: service_healthy
       redis:
         condition: service_started
 
   frontend:
     build:
-      context: ./app-turismo
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: app-turismo/Dockerfile
       # Build arguments are injected into the Expo Web compiler at build-time
       args:
         EXPO_PUBLIC_GOOGLE_MAPS_API_KEY: ${EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}
@@ -64,15 +60,37 @@ services:
         EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: ${EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID}
         EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID: ${EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID}
         EXPO_PUBLIC_BACKEND_URL: ${EXPO_PUBLIC_BACKEND_URL:-http://localhost:8081}
+        VITE_API_URL: ""
     container_name: turismo_frontend
     restart: unless-stopped
     ports:
       - "8082:80"
     depends_on:
       - backend
+      - whisper
+
+  whisper:
+    build:
+      context: .
+      dockerfile: Dockerfile.whisper
+    container_name: turismo_whisper
+    restart: unless-stopped
+    ports:
+      - "8765:8765"
+    volumes:
+      - whisper_cache:/root/.cache/huggingface
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
 
 volumes:
   postgres_data:
     driver: local
   redis_data:
+    driver: local
+  whisper_cache:
     driver: local

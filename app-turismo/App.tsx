@@ -17,7 +17,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 
 import { TopAppBar } from './src/components/MapUI';
-import { ToastToaster, toast } from './src/components/ui/ToastNotification';
+import { toast } from './src/components/ui/ToastNotification';
 import './global.css';
 import './src/styles/custom.css';
 import { MapContainer } from './src/components/Map/MapContainer';
@@ -261,7 +261,6 @@ export default function App() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
-      <ToastToaster />
 
       {/* Contenedor del Mapa Separado por Plataforma */}
       <View style={styles.mapContainer}>
