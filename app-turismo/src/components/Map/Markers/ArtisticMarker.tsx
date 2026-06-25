@@ -13,7 +13,11 @@ export type ArtisticMarkerType =
   | 'universidad'
   | 'bombero'
   | 'carabinero'
-  | 'camara';
+  | 'camara'
+  | 'escultura'
+  | 'torreon'
+  | 'estatua'
+  | 'arte';
 
 interface ArtisticMarkerProps {
   type: ArtisticMarkerType;
@@ -483,6 +487,110 @@ const CamaraIcon = ({ size, isLightMode }: { size: number; isLightMode?: boolean
   </Svg>
 );
 
+const SculptureIcon = ({ size, isLightMode }: { size: number; isLightMode?: boolean }) => (
+  <Svg width={size} height={size} viewBox="0 0 64 64">
+    {/* Shadow */}
+    <Ellipse
+      cx="32"
+      cy="52"
+      rx="20"
+      ry="6"
+      fill={isLightMode ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.2)'}
+    />
+    {/* Pedestal */}
+    <Path d="M20 48 L44 48 L42 42 L22 42 Z" fill={isLightMode ? '#A0AEC0' : '#CBD5E0'} />
+    <Path d="M22 42 L42 42 L38 32 L26 32 Z" fill={isLightMode ? '#718096' : '#A0AEC0'} />
+    {/* Abstract sculpture (geometric forms) */}
+    <Path
+      d="M32 10 Q28 18 28 24 Q28 28 32 32 Q36 28 36 24 Q36 18 32 10 Z"
+      fill={isLightMode ? '#2D3748' : '#CBD5E0'}
+    />
+    <Ellipse cx="20" cy="28" rx="5" ry="7" fill={isLightMode ? '#4A5568' : '#A0AEC0'} />
+    <Ellipse cx="44" cy="28" rx="5" ry="7" fill={isLightMode ? '#4A5568' : '#A0AEC0'} />
+    <Path d="M26 20 L38 20 L37 16 L27 16 Z" fill={isLightMode ? '#1A202C' : '#718096'} />
+  </Svg>
+);
+
+const TowerIcon = ({ size, isLightMode }: { size: number; isLightMode?: boolean }) => (
+  <Svg width={size} height={size} viewBox="0 0 64 64">
+    {/* Shadow */}
+    <Ellipse
+      cx="32"
+      cy="52"
+      rx="18"
+      ry="6"
+      fill={isLightMode ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.2)'}
+    />
+    {/* Base/Foundation */}
+    <Path d="M24 48 L40 48 L38 44 L26 44 Z" fill={isLightMode ? '#718096' : '#CBD5E0'} />
+    {/* Tower body */}
+    <Path d="M26 44 L38 44 L36 14 L28 14 Z" fill={isLightMode ? '#A0AEC0' : '#E2E8F0'} />
+    <Path d="M38 44 L42 42 L40 16 L36 14 Z" fill={isLightMode ? '#718096' : '#A0AEC0'} />
+    {/* Crenellations (almenas) */}
+    <Rect x="28" y="12" width="3" height="4" fill={isLightMode ? '#4A5568' : '#718096'} />
+    <Rect x="35" y="12" width="3" height="4" fill={isLightMode ? '#4A5568' : '#718096'} />
+    {/* Windows */}
+    <Rect x="29" y="25" width="2" height="3" fill={isLightMode ? '#90CDF4' : '#63B3ED'} />
+    <Rect x="34" y="25" width="2" height="3" fill={isLightMode ? '#90CDF4' : '#63B3ED'} />
+    <Rect x="29" y="35" width="2" height="3" fill={isLightMode ? '#90CDF4' : '#63B3ED'} />
+    <Rect x="34" y="35" width="2" height="3" fill={isLightMode ? '#90CDF4' : '#63B3ED'} />
+  </Svg>
+);
+
+const StatueIcon = ({ size, isLightMode }: { size: number; isLightMode?: boolean }) => (
+  <Svg width={size} height={size} viewBox="0 0 64 64">
+    {/* Shadow */}
+    <Ellipse
+      cx="32"
+      cy="52"
+      rx="20"
+      ry="6"
+      fill={isLightMode ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.2)'}
+    />
+    {/* Pedestal */}
+    <Path d="M18 48 L46 48 L44 42 L20 42 Z" fill={isLightMode ? '#A0AEC0' : '#CBD5E0'} />
+    <Path d="M20 42 L44 42 L40 36 L24 36 Z" fill={isLightMode ? '#718096' : '#A0AEC0'} />
+    {/* Statue body: head */}
+    <Ellipse cx="32" cy="22" rx="6" ry="7" fill={isLightMode ? '#2D3748' : '#CBD5E0'} />
+    {/* Arms */}
+    <Path d="M26 28 L16 32" stroke={isLightMode ? '#2D3748' : '#CBD5E0'} strokeWidth="2" />
+    <Path d="M38 28 L48 32" stroke={isLightMode ? '#2D3748' : '#CBD5E0'} strokeWidth="2" />
+    {/* Torso */}
+    <Path d="M27 30 L37 30 L36 36 L28 36 Z" fill={isLightMode ? '#4A5568' : '#A0AEC0'} />
+    {/* Legs */}
+    <Rect x="28" y="36" width="2" height="6" fill={isLightMode ? '#2D3748' : '#718096'} />
+    <Rect x="34" y="36" width="2" height="6" fill={isLightMode ? '#2D3748' : '#718096'} />
+  </Svg>
+);
+
+const ArtIcon = ({ size, isLightMode }: { size: number; isLightMode?: boolean }) => (
+  <Svg width={size} height={size} viewBox="0 0 64 64">
+    {/* Shadow */}
+    <Ellipse
+      cx="32"
+      cy="52"
+      rx="22"
+      ry="8"
+      fill={isLightMode ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.2)'}
+    />
+    {/* Frame/Canvas */}
+    <Path d="M12 20 L52 20 L52 48 L12 48 Z" fill={isLightMode ? '#FEF5E7' : '#E2E8F0'} />
+    <Path d="M14 22 L50 22 L50 46 L14 46 Z" fill={isLightMode ? '#FFFFFF' : '#FFFFFF'} />
+    {/* Artistic elements: paint strokes/colors */}
+    <Circle cx="24" cy="32" r="6" fill={isLightMode ? '#E53E3E' : '#FC8181'} opacity="0.7" />
+    <Circle cx="40" cy="28" r="5" fill={isLightMode ? '#4299E1' : '#63B3ED'} opacity="0.7" />
+    <Path
+      d="M18 40 Q32 38 48 42"
+      stroke={isLightMode ? '#D69E2E' : '#F6AD55'}
+      strokeWidth="2"
+      fill="none"
+    />
+    {/* Paintbrush */}
+    <Path d="M8 18 L10 28 L14 26 L12 16 Z" fill={isLightMode ? '#975A16' : '#C05621'} />
+    <Ellipse cx="10" cy="14" rx="2" ry="3" fill={isLightMode ? '#744210' : '#975A16'} />
+  </Svg>
+);
+
 const FaunaIcon = ({ size, isLightMode }: { size: number; isLightMode?: boolean }) => (
   <Svg width={size} height={size} viewBox="0 0 1770 1200">
     <G transform="translate(0, 1200) scale(0.1, -0.1)" fill={isLightMode ? '#2D3748' : '#FFFFFF'}>
@@ -730,6 +838,14 @@ export const ArtisticMarker = ({
           );
         }
         return <FaunaIcon size={size} isLightMode={isLightMode} />;
+      case 'escultura':
+        return <SculptureIcon size={size} isLightMode={isLightMode} />;
+      case 'torreon':
+        return <TowerIcon size={size} isLightMode={isLightMode} />;
+      case 'estatua':
+        return <StatueIcon size={size} isLightMode={isLightMode} />;
+      case 'arte':
+        return <ArtIcon size={size} isLightMode={isLightMode} />;
       default:
         return null;
     }

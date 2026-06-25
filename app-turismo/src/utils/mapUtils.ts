@@ -69,6 +69,14 @@ export const getCategoryColor = (category: string, musicStyle?: string) => {
       return '#718096'; // Gray
     case 'tienda':
       return '#8B5CF6'; // Violeta/Tienda
+    case 'escultura':
+      return '#6B7280'; // Gray (sculpture/art)
+    case 'torreon':
+      return '#92400E'; // Brown tower
+    case 'estatua':
+      return '#8B7355'; // Bronze statue
+    case 'arte':
+      return '#D97706'; // Amber art
     default:
       return '#3B82F6';
   }
@@ -144,6 +152,14 @@ export const getCategoryIcon = (category: string, musicStyle?: string): Category
       return 'videocam';
     case 'tienda':
       return 'store';
+    case 'escultura':
+      return 'art-track';
+    case 'torreon':
+      return 'castle';
+    case 'estatua':
+      return 'public';
+    case 'arte':
+      return 'palette';
     default:
       return 'place';
   }

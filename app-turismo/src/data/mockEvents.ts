@@ -9,6 +9,7 @@ import {
   CASINO_DREAMS_EVENT,
   HOSPITALES_EVENTS,
   SEGURIDAD_EVENTS,
+  ESTRUCTURAS_EVENTS,
 } from './polygonsData';
 
 export type CategoryFilter =
@@ -44,6 +45,7 @@ export const INITIAL_EVENTS: TurismoEvent[] = [
   ...UNIVERSIDADES_EVENTS,
   ...HOSPITALES_EVENTS,
   ...SEGURIDAD_EVENTS,
+  ...ESTRUCTURAS_EVENTS,
   CASINO_DREAMS_EVENT,
 ];
 

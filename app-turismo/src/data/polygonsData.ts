@@ -5,6 +5,7 @@ import humedalesData from '../../coords/humedales.json';
 import universidadesData from '../../coords/universidades.json';
 import hospitalesData from '../../coords/hospitales.json';
 import seguridadData from '../../coords/Camaras_bomberos_pacos_etc.json';
+import estructurasData from '../../coords/estructuras_importantes.json';
 import { getPolygonCenter } from '../utils/locationUtils';
 
 const parseGeoJSON = (data: any, defaultCategory: TurismoEvent['category']): TurismoEvent[] => {
@@ -123,6 +124,80 @@ const parseSeguridadData = (data: any): TurismoEvent[] => {
 };
 
 export const SEGURIDAD_EVENTS = parseSeguridadData(seguridadData);
+
+const parseEstructurasData = (data: any): TurismoEvent[] => {
+  if (!data || !data.features) return [];
+  return data.features.map((f: any, i: number) => {
+    let cat: TurismoEvent['category'] = 'arte';
+    const tourism = f.properties?.tourism;
+    const artworkType = f.properties?.artwork_type;
+    const manMade = f.properties?.man_made;
+    const building = f.properties?.building;
+
+    if (tourism === 'artwork') {
+      if (artworkType === 'statue') {
+        cat = 'estatua';
+      } else if (artworkType === 'sculpture') {
+        cat = 'escultura';
+      } else {
+        cat = 'arte';
+      }
+    } else if (manMade === 'tower' || building === 'tower') {
+      cat = 'torreon';
+    }
+
+    const idStr = (f.properties['@id'] || f.id || i).toString().replace(/\//g, '-');
+    const event: TurismoEvent = {
+      id: `${cat}-${idStr}`,
+      title: f.properties.name || cat.charAt(0).toUpperCase() + cat.slice(1),
+      description:
+        f.properties.description ||
+        (cat === 'escultura'
+          ? 'Escultura'
+          : cat === 'estatua'
+            ? 'Estatua'
+            : cat === 'torreon'
+              ? 'Torreón'
+              : 'Obra de arte'),
+      latitude: 0,
+      longitude: 0,
+      category: cat,
+      organizer: f.properties.operator || 'Público',
+      time: f.properties.opening_hours || '24/7',
+      address: f.properties['addr:street'] || f.properties['object:street'] || '',
+    };
+
+    if (f.geometry && f.geometry.type === 'Point') {
+      event.longitude = f.geometry.coordinates[0];
+      event.latitude = f.geometry.coordinates[1];
+    } else if (f.geometry && f.geometry.type === 'Polygon') {
+      const ring = f.geometry.coordinates[0];
+      event.polygon = ring.map((c: any) => ({ latitude: c[1], longitude: c[0] }));
+    } else if (f.geometry && f.geometry.type === 'MultiPolygon') {
+      const ring = f.geometry.coordinates[0][0];
+      event.polygon = ring.map((c: any) => ({ latitude: c[1], longitude: c[0] }));
+    } else if (f.geometry && f.geometry.type === 'LineString') {
+      event.polygon = f.geometry.coordinates.map((c: any) => ({ latitude: c[1], longitude: c[0] }));
+    }
+
+    if (f.properties.geometry && Array.isArray(f.properties.geometry)) {
+      event.polygon = f.properties.geometry.map((c: any) => ({
+        latitude: c.lat,
+        longitude: c.lon,
+      }));
+    }
+
+    if (event.polygon && event.polygon.length > 0) {
+      const center = getPolygonCenter(event.polygon);
+      event.latitude = center.latitude;
+      event.longitude = center.longitude;
+    }
+
+    return event;
+  });
+};
+
+export const ESTRUCTURAS_EVENTS = parseEstructurasData(estructurasData);
 
 export const CASINO_DREAMS_EVENT: TurismoEvent = {
   id: '85b23094-202f-44cd-ab96-86c82a59aec8',

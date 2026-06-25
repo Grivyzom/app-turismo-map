@@ -1,0 +1,69 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "escultura-1",
+      "properties": {
+        "@id": "escultura-1",
+        "name": "Escultura Abstracta Centro",
+        "description": "Escultura de arte contemporáneo en la plaza principal",
+        "tourism": "artwork",
+        "artwork_type": "sculpture",
+        "addr:street": "Calle O'Higgins, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-73.2467, -39.8115]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "estatua-1",
+      "properties": {
+        "@id": "estatua-1",
+        "name": "Estatua del Fundador",
+        "description": "Estatua histórica en honor al fundador de Valdivia",
+        "tourism": "artwork",
+        "artwork_type": "statue",
+        "addr:street": "Plaza de la República, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-73.2505, -39.8095]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "torreon-1",
+      "properties": {
+        "@id": "torreon-1",
+        "name": "Torreón de las Nieblas",
+        "description": "Antiguo torreón con vista a la ciudad",
+        "man_made": "tower",
+        "historic": "yes",
+        "addr:street": "Calle Independencia, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-73.2445, -39.8125]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "arte-1",
+      "properties": {
+        "@id": "arte-1",
+        "name": "Mural Urbano La Identidad",
+        "description": "Arte urbano que representa la identidad local",
+        "tourism": "artwork",
+        "artwork_type": "mural",
+        "addr:street": "Calle Picarte, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-73.2530, -39.8140]
+      }
+    }
+  ]
+}

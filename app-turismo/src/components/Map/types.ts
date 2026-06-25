@@ -48,7 +48,11 @@ export interface TurismoEvent {
     | 'hospital'
     | 'bombero'
     | 'carabinero'
-    | 'camara';
+    | 'camara'
+    | 'escultura'
+    | 'torreon'
+    | 'estatua'
+    | 'arte';
   organizer: string;
   time: string;
   attendeesCount?: number;
@@ -81,6 +85,14 @@ export interface TurismoEvent {
   floor_level?: number; // Para filtros dinámicos en Malls/Edificios (Piso 1, Piso 2, etc.)
   // Viñeta (Badge) properties
   vineta?: Vineta;
+  // Modal Standalone Properties
+  distancia?: string;
+  anioFundacion?: string;
+  nivelEducativo?: string;
+  instagram?: string;
+  linkedin?: string;
+  facebook?: string;
+  galeria?: string[]; // Arrays of images or emojis for the header
   // Navegación Interior
   indoorMap?: {
     floors: { level: number; label: string }[];

@@ -35,6 +35,7 @@ import { useSuperclusterEvents, getClusterDominantColor } from '../../utils/clus
 import { ContextualRadialMenu } from '../ui/ContextualRadialMenu';
 import { getLatestRadarPath } from '../../utils/weatherUtils';
 import { useUserLocationContext } from '../../context/UserLocationContext';
+import { NAVBAR_CLEARANCE } from '../../utils/layout';
 import { CICLOVIAS_GEOJSON } from '../../data/ciclovias';
 import { furnitureData } from '../../data/mobiliarioData';
 
@@ -351,9 +352,16 @@ const EventMarker = React.memo(
     const color = getCategoryColor(event.category, event.musicStyle);
     const iconName: CategoryIconName = getCategoryIcon(event.category, event.musicStyle);
 
-    const isMiniModalEvent = ['fauna', 'tienda', 'camara', 'universidad'].includes(
-      event.category?.toLowerCase() || '',
-    );
+    const isMiniModalEvent = [
+      'fauna',
+      'tienda',
+      'camara',
+      'universidad',
+      'escultura',
+      'torreon',
+      'estatua',
+      'arte',
+    ].includes(event.category?.toLowerCase() || '');
     const isAuthorityEvent = ['hospital', 'bombero', 'carabinero'].includes(
       event.category?.toLowerCase() || '',
     );
@@ -368,6 +376,10 @@ const EventMarker = React.memo(
       'bombero',
       'carabinero',
       'camara',
+      'escultura',
+      'torreon',
+      'estatua',
+      'arte',
     ].includes(event.category?.toLowerCase() || '');
 
     const handlePress = useCallback(() => {
@@ -1452,7 +1464,7 @@ const styles = StyleSheet.create({
   },
   providerBadge: {
     position: 'absolute',
-    top: 12,
+    top: NAVBAR_CLEARANCE,
     right: 12,
     zIndex: 20,
     flexDirection: 'row',
