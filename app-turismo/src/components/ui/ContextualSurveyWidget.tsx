@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useAuth } from '../../context/AuthContext';
+import { NAVBAR_HEIGHT } from '../../utils/layout';
 
 import { SparklesIcon, MapIcon, ClockIcon, CheckIcon } from './Icons';
 
@@ -185,8 +186,9 @@ export function ContextualSurveyWidget({ isSearchActive }: ContextualSurveyWidge
 const styles = StyleSheet.create({
   islandContainer: {
     position: 'absolute',
-    top: 0,
-    left: Platform.OS === 'web' ? 72 : 56,
+    // +12px de aire respecto al borde inferior de la navbar (su contenedor real)
+    top: NAVBAR_HEIGHT + 12,
+    left: 0,
     zIndex: 2500,
   },
   islandContent: {

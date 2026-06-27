@@ -14,7 +14,7 @@ import {
 } from '../../src/components/Map/types';
 import { CheckInRecord } from '../../src/utils/checkInStorage';
 import { ParsedSearch } from '../../src/utils/aiSearchParser';
-import { TabType } from '../../src/components/MapUI';
+import { TabType, MapDisplayMode } from '../../src/components/MapUI';
 import {
   DEFAULT_MAP_LAYER,
   loadPersistedMapLayer,
@@ -29,6 +29,28 @@ import {
   reverseGeocode,
 } from '../../src/utils/mapPincho';
 import { INITIAL_EVENTS, WS_SIMULATION_POOL, CategoryFilter } from '../../src/data/mockEvents';
+
+// Categorías visibles por modo de mapa. 'mapa' = infraestructura/seguridad de la ciudad,
+// 'turismo' = atractivos y naturaleza, 'comercial' = comercio y gastronomía.
+const MODE_CATEGORIES: Record<MapDisplayMode, CategoryFilter[]> = {
+  mapa: ['hospital', 'universidad', 'bombero', 'carabinero', 'camara', 'emergencia', 'publico'],
+  turismo: [
+    'cultura',
+    'naturaleza',
+    'museo',
+    'teatro',
+    'fauna',
+    'coliseo',
+    'puerto',
+    'musica',
+    'deportes',
+    'embarcacion',
+    'parque',
+    'agua',
+    'humedal',
+  ],
+  comercial: ['tienda', 'gastronomia'],
+};
 
 type MapPinchoState = {
   latitude: number;
@@ -54,6 +76,7 @@ export function useHomeScreenState(token: string | null) {
   const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>('todos');
   const [selectedEvent, setSelectedEvent] = useState<TurismoEvent | null>(null);
   const [viewMode, setViewMode] = useState<'local' | 'tourist'>('local');
+  const [mapDisplayMode, setMapDisplayMode] = useState<MapDisplayMode>('mapa');
 
   // ── Nested Zones State ─────────────────────────────────────────────────
   const [activeNestedZone, setActiveNestedZone] = useState<any>(null);
@@ -818,9 +841,10 @@ export function useHomeScreenState(token: string | null) {
           event.category,
         );
         const matchesCategory =
-          selectedCategory === 'todos' ||
-          (selectedCategory === 'emergencia' && isEmergencyEvent) ||
-          event.category === selectedCategory;
+          selectedCategory === 'todos'
+            ? isEmergencyEvent || MODE_CATEGORIES[mapDisplayMode].includes(event.category as CategoryFilter)
+            : (selectedCategory === 'emergencia' && isEmergencyEvent) ||
+              event.category === selectedCategory;
         const query = searchQuery.toLowerCase();
         const matchesSearch =
           (event.title?.toLowerCase() || '').includes(query) ||
@@ -828,7 +852,7 @@ export function useHomeScreenState(token: string | null) {
           (event.organizer?.toLowerCase() || '').includes(query);
         return matchesCategory && matchesSearch;
       }),
-    [events, selectedCategory, searchQuery],
+    [events, selectedCategory, searchQuery, mapDisplayMode],
   );
 
   const isTacticalModeActiveRef = useRef(isTacticalModeActive);
@@ -1266,6 +1290,10 @@ export function useHomeScreenState(token: string | null) {
     // Tourist/Local view mode
     viewMode,
     handleToggleViewMode,
+
+    // Map content mode (Mapa/Turismo/Comercial)
+    mapDisplayMode,
+    setMapDisplayMode,
 
     // Routing Mode (Geo-Router)
     isRoutingActive,

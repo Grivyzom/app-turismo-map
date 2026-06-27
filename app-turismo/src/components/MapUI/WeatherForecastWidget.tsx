@@ -5,6 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { getLocalizedWeather, ZoneWeather, getWeatherIcon } from '../../utils/weatherUtils';
 import { calculateDistance } from '../../utils/locationUtils';
 import { useUserLocationContext } from '../../context/UserLocationContext';
+import { NAVBAR_CLEARANCE } from '../../utils/layout';
 
 interface WeatherForecastWidgetProps {
   isDark?: boolean;
@@ -305,7 +306,7 @@ function getWindDirection(deg: number): string {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 56 : 16,
+    top: NAVBAR_CLEARANCE,
     right: 16,
     zIndex: 2500,
     alignItems: 'flex-end',

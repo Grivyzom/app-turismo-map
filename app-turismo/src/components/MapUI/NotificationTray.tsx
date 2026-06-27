@@ -10,6 +10,9 @@ interface NotificationTrayProps {
   onClose: () => void;
   onClearAll: () => void;
   onMarkAsRead: (id: string) => void;
+  // Posición medida del botón de notificaciones en el navbar, para anclar
+  // el panel justo debajo de él.
+  anchor?: { top: number; left: number };
 }
 
 export function NotificationTray({
@@ -17,6 +20,7 @@ export function NotificationTray({
   onClose,
   onClearAll,
   onMarkAsRead,
+  anchor,
 }: NotificationTrayProps) {
   const headerRight = (
     <TouchableOpacity onPress={onClearAll}>
@@ -28,8 +32,8 @@ export function NotificationTray({
     <SidebarSubmenu
       visible={true}
       onClose={onClose}
-      position={{ left: 76, bottom: 44 }}
-      pointerPosition="bottom-left"
+      position={anchor ?? { top: 60, left: 16 }}
+      pointerPosition="top-left"
       title="Notificaciones"
       headerRight={headerRight}
       width={320}

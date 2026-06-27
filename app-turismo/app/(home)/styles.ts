@@ -1,5 +1,9 @@
 import { StyleSheet, Platform } from 'react-native';
 
+import { NAVBAR_TOP, NAVBAR_HEIGHT, NAVBAR_CLEARANCE } from '../../src/utils/layout';
+
+export { NAVBAR_TOP, NAVBAR_HEIGHT, NAVBAR_CLEARANCE };
+
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -9,16 +13,16 @@ export const styles = StyleSheet.create({
   profileContainer: {
     flex: 1,
     backgroundColor: '#0B0F19',
-    // Offset to the right of the sidebar (16px margin + ~64px sidebar + 8px gap)
-    paddingLeft: 88,
-    paddingTop: 8,
+    paddingTop: NAVBAR_CLEARANCE,
   },
   topBarWrapper: {
     position: 'absolute',
-    // Anchored to the left side, full height
-    top: Platform.OS === 'ios' ? 56 : 16,
-    left: 16,
-    bottom: 20,
+    // Efecto "notch": pegada al borde superior, ancho completo, sin margen.
+    // NAVBAR_TOP queda como padding interno (ver TopAppBar) para despejar el notch/status bar.
+    top: 0,
+    left: 0,
+    right: 0,
+    height: NAVBAR_TOP + NAVBAR_HEIGHT,
     zIndex: 5000, // Keep above sidePanelOverlay (4000)
   },
   mapContainer: {

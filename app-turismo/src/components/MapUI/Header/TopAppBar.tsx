@@ -5,13 +5,8 @@ import {
   Platform,
   TouchableOpacity,
   Text,
-  Modal,
-  Pressable,
   Switch,
-  ScrollView,
   LayoutAnimation,
-  Animated,
-  Easing,
   useWindowDimensions,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -19,7 +14,8 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 
-import { TopAppBarProps, TabType } from '../types';
+import { TopAppBarProps, TabType, MapDisplayMode } from '../types';
+import { NAVBAR_TOP } from '../../../utils/layout';
 import { SmartVoiceSearch } from '../../ui/SmartVoiceSearch';
 import { ParsedSearch } from '../../../utils/aiSearchParser';
 import { useAuth } from '../../../context/AuthContext';
@@ -45,9 +41,12 @@ const C = {
   destructive: '#EF4444',
   destructiveBg: 'rgba(239, 68, 68, 0.12)',
   divider: 'rgba(255, 255, 255, 0.1)',
+  tourist: '#F59E0B',
+  touristBg: 'rgba(245, 158, 11, 0.15)',
+  local: '#10B981',
+  localBg: 'rgba(16, 185, 129, 0.15)',
 };
 
-// Shared glassmorphism shadow applied to both floating islands
 const ISLAND_SHADOW = Platform.select({
   ios: {
     shadowColor: '#000',
@@ -60,376 +59,131 @@ const ISLAND_SHADOW = Platform.select({
     boxShadow: '0px 8px 32px rgba(0, 0, 0, 0.2)',
     backdropFilter: 'blur(12px)',
     WebkitBackdropFilter: 'blur(12px)',
-    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
   },
 }) as any;
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  // Root wrapper – fills the vertical space provided by `topBarWrapper`
-  sidebarWrapper: {
+  navWrapper: {
     flex: 1,
-    flexDirection: 'column',
-    ...Platform.select({
-      web: {
-        transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      } as any,
-    }),
+    flexDirection: 'row',
   },
-
-  // ── Search floating island (rendered to the RIGHT of the rail) ───────────
-  searchFloating: {
-    position: 'absolute',
-    top: 0,
-    ...Platform.select({
-      web: {
-        transition: 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      } as any,
-    }),
-  },
-  searchIsland: {
-    height: 48, // Match sidebar width
-    borderRadius: 24,
+  navIsland: {
+    flex: 1,
+    height: '100%',
+    // Efecto "notch": pegada arriba, solo las esquinas inferiores curvas —
+    // parece una pestaña que sobresale desde el borde superior de la pantalla.
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
     backgroundColor: C.bg,
     borderWidth: 1,
+    borderTopWidth: 0,
     borderColor: C.border,
-    overflow: 'hidden', // Hide overflow during expansion animation
-    ...ISLAND_SHADOW,
-    ...Platform.select({
-      web: {
-        backgroundColor: C.bgGlass,
-        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      } as any,
-    }),
-  },
-  searchIslandFocused: {
-    borderColor: C.accent,
-  },
-  searchIslandHovered: {
-    borderColor: C.borderMid,
-  },
-  searchInactiveBtn: {
+    paddingHorizontal: 14,
+    paddingTop: NAVBAR_TOP,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 9,
-  },
-  searchInactiveBtnIconOnly: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: '100%',
-    width: 48, // Exactly match sidebar's 48px inner width
-  },
-  searchPlaceholder: {
-    color: C.textMuted,
-    fontSize: 13,
-    fontWeight: '500',
-    flex: 1,
-  },
-  searchActiveContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    height: '100%',
-    width: Platform.OS === 'web' ? 300 : 260, // Fixed expanded width
-    gap: 6,
-  },
-  searchBackBtn: {
-    padding: 6,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexShrink: 0,
-  },
-
-  // ── Nav rail (full height, collapsed or expanded) ─────────────────────────
-  sidebarIsland: {
-    flex: 1,
-    width: '100%',
-    borderRadius: 24,
-    backgroundColor: C.bg,
-    borderWidth: 1,
-    borderColor: C.border,
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    alignItems: 'stretch',
-    flexDirection: 'column',
-    justifyContent: 'space-between',
+    gap: 8,
     overflow: 'visible',
     ...ISLAND_SHADOW,
     ...Platform.select({ web: { backgroundColor: C.bgGlass } as any }),
   },
 
-  // ── Collapse/expand toggle + top notifications row ────────────────────────
-  railHeaderSection: {
-    flexDirection: 'column',
-    gap: 4,
-    width: '100%',
-  },
-
-  navSection: {
-    flexDirection: 'column',
-    gap: 4,
-    width: '100%',
-    alignItems: 'stretch',
-    overflow: 'visible',
-  },
-
-  sidebarDivider: {
-    height: 1,
-    backgroundColor: C.divider,
-    marginVertical: 8,
-    marginHorizontal: 4,
-  },
-
-  actionsSection: {
-    flexDirection: 'column',
-    gap: 6,
-    width: '100%',
-    alignItems: 'stretch',
-    overflow: 'visible',
-  },
-
-  // ── Sidebar item (nav tab) ────────────────────────────────────────────────
-  sidebarItem: {
+  // ── Logo / brand ──────────────────────────────────────────────────────────
+  logoSection: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
+    flexShrink: 0,
+    ...Platform.select({ web: { cursor: 'pointer' } }),
+  },
+  logoBadge: {
+    width: 33,
+    height: 33,
+    borderRadius: 10,
+    backgroundColor: 'rgba(110, 231, 183, 0.12)',
+    alignItems: 'center',
     justifyContent: 'center',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
     borderWidth: 1,
-    borderColor: 'transparent',
-    overflow: 'visible',
-    ...Platform.select({
-      web: {
-        cursor: 'pointer',
-        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-      },
-    }),
+    borderColor: 'rgba(110, 231, 183, 0.25)',
   },
-  sidebarItemExpanded: {
-    width: '100%',
-    height: 40,
-    borderRadius: 12,
-    justifyContent: 'flex-start',
-    paddingHorizontal: 10,
-    gap: 10,
-    alignSelf: 'stretch',
-  },
-  sidebarItemActive: {
-    backgroundColor: C.borderMid,
-    borderColor: C.border,
-  },
-  sidebarItemMarked: {
-    backgroundColor: 'rgba(127, 109, 242, 0.08)',
-    borderColor: 'rgba(127, 109, 242, 0.2)',
-  },
-  markedDot: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: C.accent,
-    borderWidth: 1,
-    borderColor: C.bgDeep,
-  },
-  sidebarItemIconOnly: {
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-  },
-  sidebarItemLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-    letterSpacing: 0.1,
+  logoTextBlock: { justifyContent: 'center' },
+  logoTitle: { color: '#F5FAF7', fontSize: 14, fontWeight: '900', letterSpacing: 0.3 },
+  logoSubtitle: {
+    color: '#6B7280',
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    marginTop: 1,
   },
 
-  // ── Avatar button ─────────────────────────────────────────────────────────
-  avatarButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: 'transparent',
-    ...Platform.select({
-      web: {
-        cursor: 'pointer',
-        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-      },
-    }),
-  },
-  avatarButtonActive: {
-    backgroundColor: C.borderMid,
-    borderColor: C.border,
-  },
-  avatarCircle: {
-    width: 24,
+  divider: {
+    width: 1,
     height: 24,
-    borderRadius: 12,
-    backgroundColor: C.borderMid,
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: C.divider,
+  },
+
+  // ── OPCIONES (Mapa / Turismo / Comercial) ─────────────────────────────────
+  modeGroup: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    borderRadius: 14,
+    padding: 4,
+    gap: 4,
     flexShrink: 0,
   },
-  avatarCircleActive: {
-    backgroundColor: C.accentBg,
-  },
-  avatarLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: 0.1,
-    flex: 1,
-  },
-  avatarButtonExpanded: {
-    width: '100%',
-    height: 40,
+  modeButton: {
     flexDirection: 'row',
-    justifyContent: 'flex-start',
-    paddingHorizontal: 8,
-    gap: 10,
-    borderRadius: 12,
-  },
-
-  // ── Collapse / expand toggle ───────────────────────────────────────────────
-  collapseButton: {
     alignItems: 'center',
-    justifyContent: 'center',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: C.bgDeep,
-    ...Platform.select({
-      web: {
-        cursor: 'pointer',
-        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-      },
-    }),
-  },
-  collapseButtonExpanded: {
-    width: '100%',
-    height: 36,
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
     paddingHorizontal: 10,
-    gap: 10,
-    borderRadius: 12,
+    paddingVertical: 5,
+    borderRadius: 9,
+    gap: 6,
+    ...Platform.select({ web: { cursor: 'pointer', transition: 'all 0.2s ease' } }),
   },
-  railLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: C.textMuted,
-    letterSpacing: 0.2,
+  modeButtonActive: {
+    backgroundColor: C.accentBg,
+    borderWidth: 1,
+    borderColor: 'rgba(110, 231, 183, 0.25)',
   },
+  modeButtonText: { color: C.textInactive, fontSize: 13, fontWeight: '600' },
+  modeButtonTextActive: { color: C.accent, fontWeight: '700' },
 
-  // ── Notification button ───────────────────────────────────────────────────
-  notificationButton: {
+  flexSpacer: { flex: 1 },
+
+  // ── Search box (inline, collapsible) ──────────────────────────────────────
+  searchAnchor: { position: 'relative' },
+  searchBox: {
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: C.bg,
+    borderWidth: 1,
+    borderColor: C.border,
+    overflow: 'hidden',
+    ...Platform.select({ web: { backgroundColor: C.bgGlass, transition: 'all 0.25s ease' } }),
+  },
+  searchBoxFocused: { borderColor: C.accent },
+  searchBoxHovered: { borderColor: C.borderMid },
+  searchCollapsedBtn: {
+    width: 38,
+    height: 38,
     alignItems: 'center',
     justifyContent: 'center',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: C.bgDeep,
-    position: 'relative',
-    ...Platform.select({
-      web: {
-        cursor: 'pointer',
-        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-      },
-    }),
   },
-  notificationButtonExpanded: {
-    width: '100%',
-    height: 40,
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
-    paddingHorizontal: 8,
-    gap: 10,
-    borderRadius: 12,
-  },
-  notificationButtonHovered: {
-    backgroundColor: C.borderMid,
-    borderColor: C.borderHover,
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: 5,
-    right: 5,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: C.destructive,
-    borderWidth: 1.5,
-    borderColor: C.bgDeep,
-  },
-
-  // ── Dropdown menu ─────────────────────────────────────────────────────────
-  dropdownBackdrop: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'transparent',
-  },
-  dropdownMenu: {
-    position: 'absolute',
-    backgroundColor: 'rgba(30, 30, 30, 0.6)',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: C.border,
-    padding: 6,
-    minWidth: 180,
-    zIndex: 9999,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.5,
-        shadowRadius: 20,
-      },
-      android: { elevation: 12 },
-      web: {
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
-      } as any,
-    }),
-  },
-  dropdownItem: {
+  searchExpandedContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    gap: 10,
-    ...Platform.select({
-      web: {
-        cursor: 'pointer',
-        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-      },
-    }),
+    height: '100%',
+    paddingHorizontal: 6,
+    width: Platform.OS === 'web' ? 280 : 220,
+    gap: 4,
   },
-  dropdownItemText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  dropdownDivider: {
-    height: 1,
-    backgroundColor: C.divider,
-    marginVertical: 4,
-    marginHorizontal: 8,
-  },
-
-  // ── Recent Searches Dropdown ─────────────────────────────────────────────
+  searchBackBtn: { padding: 6, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
   recentSearchesDropdown: {
     position: 'absolute',
-    top: 56, // height of search island (48) + gap (8)
-    left: 0,
-    width: Platform.OS === 'web' ? 348 : 308, // Active search width approx
+    top: 46,
+    right: 0,
+    width: Platform.OS === 'web' ? 320 : 260,
     backgroundColor: C.bg,
     borderRadius: 16,
     borderWidth: 1,
@@ -438,36 +192,14 @@ const styles = StyleSheet.create({
     zIndex: 150,
     ...ISLAND_SHADOW,
     ...Platform.select({
-      web: {
-        backgroundColor: C.bgGlass,
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-      } as any,
+      web: { backgroundColor: C.bgGlass, backdropFilter: 'blur(12px)' } as any,
     }),
   },
-  recentSearchItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-  },
-  recentSearchItemHovered: {
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  recentSearchText: {
-    flex: 1,
-    color: C.textPrimary,
-    fontSize: 13,
-  },
-  recentSearchDeleteBtn: {
-    padding: 4,
-    marginLeft: 8,
-  },
-  recentSearchHeader: {
-    paddingHorizontal: 16,
-    paddingVertical: 4,
-    marginBottom: 4,
-  },
+  recentSearchItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 16 },
+  recentSearchItemHovered: { backgroundColor: 'rgba(255, 255, 255, 0.06)' },
+  recentSearchText: { flex: 1, color: C.textPrimary, fontSize: 13 },
+  recentSearchDeleteBtn: { padding: 4, marginLeft: 8 },
+  recentSearchHeader: { paddingHorizontal: 16, paddingVertical: 4, marginBottom: 4 },
   recentSearchHeaderText: {
     color: C.textMuted,
     fontSize: 11,
@@ -476,53 +208,96 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // ── Settings modal ────────────────────────────────────────────────────────
-  settingsOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+  // ── Generic square icon button ────────────────────────────────────────────
+  iconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    ...Platform.select({
-      web: {
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
-      } as any,
-    }),
-  },
-  settingsCard: {
-    backgroundColor: C.bg,
-    borderRadius: 20,
     borderWidth: 1,
-    borderColor: C.divider,
-    width: '90%',
-    maxWidth: 420,
-    padding: 24,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.5,
-        shadowRadius: 16,
-      },
-      android: { elevation: 20 },
-      web: { boxShadow: '0 12px 40px rgba(0, 0, 0, 0.6)' } as any,
-    }),
+    borderColor: C.border,
+    backgroundColor: C.bgDeep,
+    flexShrink: 0,
+    position: 'relative',
+    ...Platform.select({ web: { cursor: 'pointer', transition: 'all 0.2s ease' } }),
   },
-  settingsHeader: {
+  iconBtnActive: { backgroundColor: C.accentBg, borderColor: 'rgba(52, 211, 153, 0.3)' },
+  iconBtnHovered: { backgroundColor: C.borderMid, borderColor: C.borderHover },
+  notificationBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: C.destructive,
+    borderWidth: 1.5,
+    borderColor: C.bgDeep,
+  },
+
+  // ── Estado (Turista / Local) ─────────────────────────────────────────────
+  estadoGroup: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    borderRadius: 14,
+    padding: 4,
+    gap: 4,
+    flexShrink: 0,
   },
-  settingsTitle: { color: C.textPrimary, fontSize: 18, fontWeight: '700', letterSpacing: 0.2 },
-  settingsCloseBtn: { padding: 4 },
-  settingsBody: { gap: 18, marginBottom: 24 },
-  settingRow: {
+  estadoButton: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 9,
+    gap: 6,
+    ...Platform.select({ web: { cursor: 'pointer', transition: 'all 0.2s ease' } }),
   },
+  estadoButtonText: { fontSize: 12, fontWeight: '700' },
+  // Fila del toggle Turista/Local dentro del menú overflow "⋮"
+  overflowEstadoRow: { flexDirection: 'row', justifyContent: 'center', paddingVertical: 6, paddingHorizontal: 8 },
+
+  // ── Avatar button ─────────────────────────────────────────────────────────
+  avatarButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.bgDeep,
+    flexShrink: 0,
+    ...Platform.select({ web: { cursor: 'pointer', transition: 'all 0.2s ease' } }),
+  },
+  avatarButtonActive: { backgroundColor: C.accentBg, borderColor: 'rgba(52, 211, 153, 0.3)' },
+  avatarCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: C.borderMid,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarCircleActive: { backgroundColor: C.accentBg },
+
+  // ── Dropdown menu ─────────────────────────────────────────────────────────
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    gap: 10,
+    ...Platform.select({ web: { cursor: 'pointer', transition: 'all 0.2s ease' } }),
+  },
+  dropdownItemText: { fontSize: 13, fontWeight: '600' },
+  dropdownDivider: { height: 1, backgroundColor: C.divider, marginVertical: 4, marginHorizontal: 8 },
+
+  // ── Settings dropdown ─────────────────────────────────────────────────────
+  settingsBody: { gap: 18, padding: 14 },
+  settingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 },
   settingInfo: { flex: 1, paddingRight: 16 },
   settingLabel: { color: C.textPrimary, fontSize: 14, fontWeight: '600' },
   settingDesc: { color: C.textMuted, fontSize: 12, marginTop: 2 },
@@ -539,28 +314,11 @@ const styles = StyleSheet.create({
   selectorBtnActive: { backgroundColor: C.accent },
   selectorBtnText: { color: C.textMuted, fontSize: 12, fontWeight: '600' },
   selectorBtnTextActive: { color: C.textPrimary, fontWeight: '700' },
-  settingsFooter: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12 },
-  btnSecondary: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: C.borderMid,
-  },
-  btnSecondaryText: { color: C.textMuted, fontSize: 13, fontWeight: '600' },
-  btnPrimary: {
-    backgroundColor: C.accent,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-  },
-  btnPrimaryText: { color: C.textPrimary, fontSize: 13, fontWeight: '700' },
 
   // ── Tooltip ───────────────────────────────────────────────────────────────
   tooltip: {
     position: 'absolute',
-    left: 50, // just past the icon button
-    top: 6,
+    top: 44,
     backgroundColor: 'rgba(26, 26, 26, 0.97)',
     borderRadius: 10,
     paddingVertical: 5,
@@ -574,97 +332,56 @@ const styles = StyleSheet.create({
         whiteSpace: 'nowrap',
         boxShadow: '0 4px 14px rgba(0, 0, 0, 0.45)',
         backdropFilter: 'blur(10px)',
-        WebkitBackdropFilter: 'blur(10px)',
       } as any,
     }),
   },
-  tooltipText: {
-    color: C.textPrimary,
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.2,
-  },
+  tooltipText: { color: C.textPrimary, fontSize: 12, fontWeight: '600', letterSpacing: 0.2 },
 });
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-/** Vertical sidebar navigation item — icon-only with a hover tooltip */
-const SidebarItem = React.memo(function SidebarItem({
-  icon,
-  label,
-  active,
-  isMarked,
-  expanded,
-  onClick,
-  onHover,
-}: {
-  icon: string;
-  label?: string;
-  active: boolean;
-  isMarked?: boolean;
-  expanded?: boolean;
-  onClick?: () => void;
-  onHover?: () => void;
-}) {
-  const [isHovered, setIsHovered] = useState(false);
+/** Botón con tooltip hover (web) usado para los iconos sueltos de la navbar.
+ * Reenvía el ref al TouchableOpacity para poder medir su posición y anclar
+ * el menú contextual correspondiente justo debajo de él. */
+const NavIconButton = React.memo(
+  React.forwardRef<
+    View,
+    {
+      icon: string;
+      iconSet?: 'Ionicons' | 'MaterialIcons';
+      label: string;
+      active?: boolean;
+      badge?: boolean;
+      onClick?: () => void;
+    }
+  >(function NavIconButton({ icon, iconSet = 'Ionicons', label, active, badge, onClick }, ref) {
+    const [isHovered, setIsHovered] = useState(false);
+    const IconComp = iconSet === 'Ionicons' ? Ionicons : MaterialIcons;
 
-  return (
-    <TouchableOpacity
-      onPress={onClick}
-      activeOpacity={0.7}
-      //@ts-ignore
-      onMouseEnter={() => {
-        setIsHovered(true);
-        onHover?.();
-      }}
-      onMouseLeave={() => setIsHovered(false)}
-      style={[
-        styles.sidebarItem,
-        expanded ? styles.sidebarItemExpanded : styles.sidebarItemIconOnly,
-        active && styles.sidebarItemActive,
-        isMarked && styles.sidebarItemMarked,
-        isHovered &&
-          !active &&
-          !isMarked && {
-            backgroundColor: 'rgba(255, 255, 255, 0.08)',
-            borderColor: C.border,
-          },
-        isHovered &&
-          isMarked && {
-            backgroundColor: C.accentBg,
-            borderColor: C.accent,
-          },
-      ]}
-    >
-      <MaterialIcons
-        name={icon as any}
-        size={20}
-        color={active || isMarked ? C.accent : C.textInactive}
-      />
-      {expanded && label && (
-        <Text
-          style={[
-            styles.sidebarItemLabel,
-            { color: active || isMarked ? C.accent : C.textInactive, flex: 1 },
-          ]}
-          numberOfLines={1}
-        >
-          {label}
-        </Text>
-      )}
-      {/* Red dot for marked items */}
-      {isMarked && <View style={styles.markedDot} />}
-      {/* Web-only tooltip (collapsed mode only) */}
-      {!expanded && Platform.OS === 'web' && isHovered && label && (
-        <View style={styles.tooltip} pointerEvents="none">
-          <Text style={styles.tooltipText}>{label}</Text>
-        </View>
-      )}
-    </TouchableOpacity>
-  );
-});
+    return (
+      <TouchableOpacity
+        ref={ref}
+        onPress={onClick}
+        activeOpacity={0.7}
+        //@ts-ignore
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        style={[styles.iconBtn, active && styles.iconBtnActive, isHovered && !active && styles.iconBtnHovered]}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+      >
+        <IconComp name={icon as any} size={17} color={active ? C.accent : C.textPrimary} />
+        {badge && <View style={styles.notificationBadge} />}
+        {Platform.OS === 'web' && isHovered && (
+          <View style={styles.tooltip} pointerEvents="none">
+            <Text style={styles.tooltipText}>{label}</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  }),
+);
 
-/** Dropdown action item (profile menu) */
 const DropdownItem = React.memo(function DropdownItem({
   icon,
   label,
@@ -687,24 +404,14 @@ const DropdownItem = React.memo(function DropdownItem({
       onMouseLeave={() => setIsHovered(false)}
       style={[
         styles.dropdownItem,
-        isHovered && {
-          backgroundColor: isDestructive ? C.destructiveBg : 'rgba(255, 255, 255, 0.06)',
-        },
+        isHovered && { backgroundColor: isDestructive ? C.destructiveBg : 'rgba(255, 255, 255, 0.06)' },
       ]}
     >
-      <MaterialIcons
-        name={icon as any}
-        size={18}
-        color={isDestructive ? C.destructive : isHovered ? C.accent : C.textMuted}
-      />
+      <MaterialIcons name={icon as any} size={18} color={isDestructive ? C.destructive : isHovered ? C.accent : C.textMuted} />
       <Text
         style={[
           styles.dropdownItemText,
-          isDestructive
-            ? { color: C.destructive }
-            : isHovered
-              ? { color: C.textPrimary }
-              : { color: '#E5E7EB' },
+          isDestructive ? { color: C.destructive } : isHovered ? { color: C.textPrimary } : { color: '#E5E7EB' },
         ]}
       >
         {label}
@@ -713,7 +420,6 @@ const DropdownItem = React.memo(function DropdownItem({
   );
 });
 
-/** Recent Search Row item */
 const RecentSearchRow = React.memo(function RecentSearchRow({
   item,
   onSelect,
@@ -731,11 +437,7 @@ const RecentSearchRow = React.memo(function RecentSearchRow({
       onMouseLeave={() => setIsHovered(false)}
       style={[styles.recentSearchItem, isHovered && styles.recentSearchItemHovered]}
     >
-      <TouchableOpacity
-        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }}
-        onPress={onSelect}
-        activeOpacity={0.7}
-      >
+      <TouchableOpacity style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }} onPress={onSelect} activeOpacity={0.7}>
         <Ionicons name="time-outline" size={16} color={C.textMuted} />
         <Text style={styles.recentSearchText} numberOfLines={1}>
           {item.query}
@@ -748,24 +450,78 @@ const RecentSearchRow = React.memo(function RecentSearchRow({
   );
 });
 
-// ─── Tab definitions ─────────────────────────────────────────────────────────
-const TABS: { id: TabType; icon: string; label: string }[] = [
-  { id: 'map', icon: 'map', label: 'Mapa' },
-  { id: 'feed', icon: 'dynamic-feed', label: 'Feed' },
-  { id: 'eventos', icon: 'event', label: 'Eventos' },
-  { id: 'saved', icon: 'collections', label: 'Guardados' },
-  { id: 'historial', icon: 'history', label: 'Recientes' },
+// ─── Responsive breakpoints (px de ancho de ventana) ─────────────────────────
+const BP_OVERFLOW = 680; // < : acciones secundarias colapsan en menú "⋮"
+const BP_MODE_LABELS = 820; // ≥ : etiquetas de Mapa/Turismo/Comercial
+const BP_LOGO_TEXT = 940; // ≥ : "Valdivia / PORTAL TURÍSTICO" junto al logo
+const BP_ESTADO_LABELS = 1100; // ≥ : etiquetas Turista/Local
+
+// ─── Mode/estado definitions ─────────────────────────────────────────────────
+const MODE_OPTIONS: { id: MapDisplayMode; label: string; icon: string }[] = [
+  { id: 'mapa', label: 'Mapa', icon: 'map' },
+  { id: 'turismo', label: 'Turismo', icon: 'explore' },
+  { id: 'comercial', label: 'Comercial', icon: 'storefront' },
 ];
 
-const RAIL_WIDTH_COLLAPSED = 64;
-const RAIL_WIDTH_EXPANDED = 220;
-const RAIL_WIDTH_EXPANDED_COMPACT = 200; // Mobile/tablet — leave more room for the map
+const PROFILE_LINKS: { tab: TabType; label: string; icon: string }[] = [
+  { tab: 'profile', label: 'Mi Perfil', icon: 'person' },
+  { tab: 'feed', label: 'Feed de Eventos', icon: 'dynamic-feed' },
+  { tab: 'eventos', label: 'Eventos', icon: 'event' },
+  { tab: 'saved', label: 'Mis Guardados', icon: 'collections' },
+  { tab: 'historial', label: 'Recientes', icon: 'history' },
+  { tab: 'forum', label: 'Foro', icon: 'forum' },
+];
+
+// ─── Estado (Turista / Local) ─────────────────────────────────────────────────
+/** Toggle compartido entre la navbar inline y el menú overflow. */
+const EstadoToggle = React.memo(function EstadoToggle({
+  viewMode,
+  onSelect,
+  showLabels,
+}: {
+  viewMode: 'local' | 'tourist';
+  onSelect: (target: 'local' | 'tourist') => void;
+  showLabels: boolean;
+}) {
+  return (
+    <View style={styles.estadoGroup}>
+      <TouchableOpacity
+        style={[styles.estadoButton, viewMode === 'tourist' && { backgroundColor: C.touristBg }]}
+        onPress={() => onSelect('tourist')}
+        activeOpacity={0.8}
+        accessibilityRole="button"
+        accessibilityState={{ selected: viewMode === 'tourist' }}
+        accessibilityLabel="Modo Turista"
+      >
+        <MaterialIcons name="explore" size={15} color={viewMode === 'tourist' ? C.tourist : C.textInactive} />
+        {showLabels && (
+          <Text style={[styles.estadoButtonText, { color: viewMode === 'tourist' ? C.tourist : C.textInactive }]}>
+            Turista
+          </Text>
+        )}
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.estadoButton, viewMode === 'local' && { backgroundColor: C.localBg }]}
+        onPress={() => onSelect('local')}
+        activeOpacity={0.8}
+        accessibilityRole="button"
+        accessibilityState={{ selected: viewMode === 'local' }}
+        accessibilityLabel="Modo Local"
+      >
+        <MaterialIcons name="home" size={15} color={viewMode === 'local' ? C.local : C.textInactive} />
+        {showLabels && (
+          <Text style={[styles.estadoButtonText, { color: viewMode === 'local' ? C.local : C.textInactive }]}>
+            Local
+          </Text>
+        )}
+      </TouchableOpacity>
+    </View>
+  );
+});
 
 // ─── Main export ─────────────────────────────────────────────────────────────
 export const TopAppBar: React.FC<
   TopAppBarProps & {
-    onHoverIn?: () => void;
-    onHoverOut?: () => void;
     onVoiceSearch?: (res: ParsedSearch) => void;
     onVoicePartialSearch?: (text: string) => void;
     onTabHover?: (tab: TabType) => void;
@@ -777,66 +533,80 @@ export const TopAppBar: React.FC<
     onTabChange,
     onVoiceSearch,
     onVoicePartialSearch,
-    onTabHover,
     notificationsCount = 0,
     onNotificationClick,
-    isModalOpen = false,
-    forceSidebarVisible = false,
     onSearchFocus,
     onCollectionsClick,
+    mapDisplayMode = 'mapa',
+    onMapDisplayModeChange,
+    viewMode = 'local',
+    onToggleViewMode,
+    showFilters = false,
+    onFiltersClick,
+    onFiltersAnchorChange,
+    onNotificationsAnchorChange,
   } = props;
 
   const { signOut, isAuthenticated } = useAuth();
   const router = useRouter();
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
-  const isCompact = windowWidth < 768;
 
-  // ── Core navigation state ─────────────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState<TabType>(currentTab);
+  // ── Breakpoints responsive ────────────────────────────────────────────────
+  // Bajo BP_OVERFLOW se colapsan las acciones secundarias en un menú "⋮".
+  // Las etiquetas de texto aparecen progresivamente al haber más ancho.
+  const isNarrow = windowWidth < BP_OVERFLOW;
+  const showLogoText = windowWidth >= BP_LOGO_TEXT;
+  const showModeLabels = windowWidth >= BP_MODE_LABELS;
+  const showEstadoLabels = windowWidth >= BP_ESTADO_LABELS;
+
+  // ── Search state ──────────────────────────────────────────────────────────
   const [isSearchActive, setIsSearchActive] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  const railWidth = isExpanded
-    ? isCompact
-      ? RAIL_WIDTH_EXPANDED_COMPACT
-      : RAIL_WIDTH_EXPANDED
-    : RAIL_WIDTH_COLLAPSED;
+  const [isSearchHovered, setIsSearchHovered] = useState(false);
+  const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
 
   // ── Profile state ─────────────────────────────────────────────────────────
   const [profile, setProfile] = useState<NormalUserProfile | null>(null);
 
   // ── Dropdown state ────────────────────────────────────────────────────────
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  // Dropdown opens to the RIGHT of the sidebar
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
   const avatarRef = useRef<View>(null);
+  const [isAvatarHovered, setIsAvatarHovered] = useState(false);
+
+  // ── Anclaje de botones del navbar (para medir y posicionar sus menús) ─────
+  const toolsBtnRef = useRef<View>(null);
+  const notifBtnRef = useRef<View>(null);
+  const settingsBtnRef = useRef<View>(null);
+  const overflowBtnRef = useRef<View>(null);
+
+  const measureAnchor = useCallback(
+    (ref: React.RefObject<View>): Promise<{ top: number; left: number; right: number }> => {
+      return new Promise((resolve) => {
+        if (ref.current) {
+          ref.current.measure((_x, _y, w, h, px, py) => {
+            resolve({ top: py + h + 8, left: px, right: Math.max(16, windowWidth - (px + w)) });
+          });
+        } else {
+          resolve({ top: 60, left: 16, right: 16 });
+        }
+      });
+    },
+    [windowWidth],
+  );
 
   // ── Settings state ────────────────────────────────────────────────────────
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
+  const [settingsPosition, setSettingsPosition] = useState({ top: 0, right: 0 });
+
+  // ── Overflow "⋮" (acciones secundarias en pantallas angostas) ──────────────
+  const [isOverflowOpen, setIsOverflowOpen] = useState(false);
+  const [overflowPosition, setOverflowPosition] = useState({ top: 0, right: 0 });
   const [pushNotifications, setPushNotifications] = useState(true);
   const [soundEffects, setSoundEffects] = useState(true);
   const [language, setLanguage] = useState<'es' | 'en'>('es');
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
 
-  // ── Hover state (web only) ────────────────────────────────────────────────
-  const [isSearchHovered, setIsSearchHovered] = useState(false);
-  const [isAvatarHovered, setIsAvatarHovered] = useState(false);
-  const [isNotifHovered, setIsNotifHovered] = useState(false);
-  const [personalizationCompleted, setPersonalizationCompleted] = useState(true);
-
-  // ── Recent Searches State ──────────────────────────────────────────────────
-  const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
-
   // ── Effects ───────────────────────────────────────────────────────────────
-  const fetchPersonalizationStatus = useCallback(async () => {
-    try {
-      const completed = await AsyncStorage.getItem('app-turismo.personalization-completed');
-      setPersonalizationCompleted(completed === 'true');
-    } catch {
-      setPersonalizationCompleted(false);
-    }
-  }, []);
-
   const fetchProfile = useCallback(async () => {
     try {
       const stored = await loadUserProfile();
@@ -864,48 +634,51 @@ export const TopAppBar: React.FC<
   }, []);
 
   useEffect(() => {
-    fetchPersonalizationStatus();
-    fetchProfile();
-    loadSettings();
-  }, [fetchPersonalizationStatus, fetchProfile, loadSettings]);
-
-  const saveSettings = useCallback(async () => {
-    try {
-      await Promise.all([
-        AsyncStorage.setItem('app-turismo.settings.notifications', String(pushNotifications)),
-        AsyncStorage.setItem('app-turismo.settings.sound', String(soundEffects)),
-        AsyncStorage.setItem('app-turismo.settings.language', language),
-        AsyncStorage.setItem('app-turismo.settings.theme', themeMode),
-      ]);
-      setIsSettingsVisible(false);
-    } catch {
-      /* ignore */
-    }
-  }, [pushNotifications, soundEffects, language, themeMode]);
-
-  useEffect(() => {
     fetchProfile();
     loadSettings();
   }, [fetchProfile, loadSettings]);
 
-  useEffect(() => {
-    const t = setTimeout(() => setActiveTab(currentTab), 0);
-    return () => clearTimeout(t);
-  }, [currentTab]);
+  // Cada control de Ajustes persiste al instante (sin botón "Guardar"),
+  // como se espera de un dropdown — no de un formulario modal.
+  const persistSetting = useCallback(async (key: string, value: string) => {
+    try {
+      await AsyncStorage.setItem(key, value);
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
-  // ── Animation for Sidebar when Modals open ────────────────────────────────
-  const sidebarAnim = useRef(new Animated.Value(1)).current;
-  const isHidden = isModalOpen && !forceSidebarVisible;
+  const handlePushNotificationsChange = useCallback(
+    (value: boolean) => {
+      setPushNotifications(value);
+      persistSetting('app-turismo.settings.notifications', String(value));
+    },
+    [persistSetting],
+  );
 
-  useEffect(() => {
-    // Hide sidebar when a modal is open to give it more space
-    Animated.timing(sidebarAnim, {
-      toValue: isHidden ? 0 : 1,
-      duration: 350,
-      easing: Easing.bezier(0.4, 0, 0.2, 1),
-      useNativeDriver: Platform.OS !== 'web',
-    }).start();
-  }, [isHidden, sidebarAnim]);
+  const handleSoundEffectsChange = useCallback(
+    (value: boolean) => {
+      setSoundEffects(value);
+      persistSetting('app-turismo.settings.sound', String(value));
+    },
+    [persistSetting],
+  );
+
+  const handleLanguageChange = useCallback(
+    (value: 'es' | 'en') => {
+      setLanguage(value);
+      persistSetting('app-turismo.settings.language', value);
+    },
+    [persistSetting],
+  );
+
+  const handleThemeChange = useCallback(
+    (value: 'dark' | 'light') => {
+      setThemeMode(value);
+      persistSetting('app-turismo.settings.theme', value);
+    },
+    [persistSetting],
+  );
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleTabChange = useCallback(
@@ -914,41 +687,47 @@ export const TopAppBar: React.FC<
         onCollectionsClick?.();
         return;
       }
-      setActiveTab(tab);
       onTabChange?.(tab);
     },
     [onTabChange, onCollectionsClick],
   );
 
+  const handleModeSelect = useCallback(
+    (mode: MapDisplayMode) => {
+      onMapDisplayModeChange?.(mode);
+      if (currentTab !== 'map') {
+        onTabChange?.('map');
+      }
+    },
+    [onMapDisplayModeChange, onTabChange, currentTab],
+  );
+
+  const handleEstadoSelect = useCallback(
+    (target: 'local' | 'tourist') => {
+      if (target !== viewMode) {
+        onToggleViewMode?.();
+      }
+    },
+    [viewMode, onToggleViewMode],
+  );
+
   const handleToggleSearch = useCallback(
     (active: boolean) => {
-      // Elegant expansion animation
       LayoutAnimation.configureNext(
-        LayoutAnimation.create(
-          300,
-          LayoutAnimation.Types.easeInEaseOut,
-          LayoutAnimation.Properties.opacity,
-        ),
+        LayoutAnimation.create(250, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity),
       );
-      if (active && isModalOpen) {
-        onSearchFocus?.(); // Close modal when interacting with search
-      }
       if (active) {
+        onSearchFocus?.();
         getRecentSearches().then(setRecentSearches);
       }
       setIsSearchActive(active);
     },
-    [isModalOpen, onSearchFocus],
+    [onSearchFocus],
   );
 
   const handleRecentSearchSelect = useCallback(
     (item: RecentSearch) => {
-      onVoiceSearch?.({
-        query: item.query,
-        category: item.category,
-        originalText: item.query,
-        isFinal: true,
-      });
+      onVoiceSearch?.({ query: item.query, category: item.category, originalText: item.query, isFinal: true });
     },
     [onVoiceSearch],
   );
@@ -958,329 +737,261 @@ export const TopAppBar: React.FC<
     setRecentSearches((prev) => prev.filter((s) => s.id !== id));
   }, []);
 
-  const handleToggleDropdown = useCallback(() => {
+  const handleToggleDropdown = useCallback(async () => {
     if (isDropdownOpen) {
       setIsDropdownOpen(false);
       return;
     }
     void fetchProfile();
-    if (avatarRef.current) {
-      avatarRef.current.measure((x, y, w, h, px, py) => {
-        // Place dropdown to the RIGHT of the sidebar button
-        const estimatedHeight = 160; // Estimated height for Mi Perfil, Ajustes, Logout
-        const topPos = py + estimatedHeight > windowHeight - 20 ? py - estimatedHeight + h : py;
-
-        setDropdownPosition({ top: Math.max(16, topPos), left: px + w + 12 });
-        setIsDropdownOpen(true);
-      });
-    } else {
-      setDropdownPosition({ top: 120, left: 76 });
-      setIsDropdownOpen(true);
-    }
-  }, [isDropdownOpen, fetchProfile, windowHeight]);
+    const pos = await measureAnchor(avatarRef);
+    setDropdownPosition({ top: pos.top, right: pos.right });
+    setIsDropdownOpen(true);
+  }, [isDropdownOpen, fetchProfile, measureAnchor]);
 
   const handleSignOut = useCallback(async () => {
     setIsDropdownOpen(false);
     await signOut();
   }, [signOut]);
 
+  // En pantallas angostas las acciones viven en el menú "⋮": se ancla a ese
+  // botón en vez de al icono individual (que no está montado).
+  const handleFiltersPress = useCallback(async () => {
+    setIsOverflowOpen(false);
+    const pos = await measureAnchor(isNarrow ? overflowBtnRef : toolsBtnRef);
+    onFiltersAnchorChange?.({ top: pos.top, left: pos.left });
+    onFiltersClick?.();
+  }, [isNarrow, measureAnchor, onFiltersAnchorChange, onFiltersClick]);
+
+  const handleNotificationsPress = useCallback(async () => {
+    setIsOverflowOpen(false);
+    const pos = await measureAnchor(isNarrow ? overflowBtnRef : notifBtnRef);
+    onNotificationsAnchorChange?.({ top: pos.top, left: pos.left });
+    onNotificationClick?.();
+  }, [isNarrow, measureAnchor, onNotificationsAnchorChange, onNotificationClick]);
+
+  const handleToggleSettings = useCallback(async () => {
+    if (isSettingsVisible) {
+      setIsSettingsVisible(false);
+      return;
+    }
+    setIsOverflowOpen(false);
+    const pos = await measureAnchor(isNarrow ? overflowBtnRef : settingsBtnRef);
+    setSettingsPosition({ top: pos.top, right: pos.right });
+    setIsSettingsVisible(true);
+  }, [isNarrow, isSettingsVisible, measureAnchor]);
+
+  const handleToggleOverflow = useCallback(async () => {
+    if (isOverflowOpen) {
+      setIsOverflowOpen(false);
+      return;
+    }
+    const pos = await measureAnchor(overflowBtnRef);
+    setOverflowPosition({ top: pos.top, right: pos.right });
+    setIsOverflowOpen(true);
+  }, [isOverflowOpen, measureAnchor]);
+
   // ─── Derived values ───────────────────────────────────────────────────────
-  const isAvatarActive = activeTab === 'profile' || isDropdownOpen;
-  const firstName = profile?.fullName ? profile.fullName.split(' ')[0] : 'Perfil';
+  const isAvatarActive = currentTab === 'profile' || isDropdownOpen;
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <>
-      {/* ━━━ FLOATING SEARCH BAR — to the RIGHT of the rail ━━━━━━━━━━━━━━━━━ */}
-      <Animated.View
-        style={[
-          styles.searchFloating,
-          {
-            left: railWidth + 12,
-            zIndex: 100,
-            opacity: sidebarAnim,
-            transform: [
-              {
-                translateX: sidebarAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [-40, 0],
-                }),
-              },
-            ],
-            pointerEvents: isHidden ? 'none' : 'auto',
-          },
-        ]}
-      >
-        <View
-          style={[
-            styles.searchIsland,
-            isSearchActive && styles.searchIslandFocused,
-            isSearchHovered && !isSearchActive && styles.searchIslandHovered,
-          ]}
-          //@ts-ignore
-          onMouseEnter={() => setIsSearchHovered(true)}
-          onMouseLeave={() => setIsSearchHovered(false)}
-        >
-          {isSearchActive ? (
-            // ── Active: show voice search UI ──────────────────────────────────
-            <View style={styles.searchActiveContent}>
-              <TouchableOpacity
-                onPress={() => handleToggleSearch(false)}
-                style={styles.searchBackBtn}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="arrow-back" size={18} color={C.textPrimary} />
-              </TouchableOpacity>
-              <SmartVoiceSearch
-                isEmbedded={true}
-                onPartialResult={(text) => {
-                  onVoicePartialSearch?.(text);
-                }}
-                onSearchComplete={(res) => {
-                  // Actualizar recientes si busca una nueva desde el SmartVoiceSearch
-                  getRecentSearches().then(setRecentSearches);
-                  onVoiceSearch?.(res);
-                }}
-              />
-            </View>
-          ) : (
-            // ── Inactive: icon-only compact search trigger ────────────────────
-            <TouchableOpacity
-              onPress={() => handleToggleSearch(true)}
-              activeOpacity={0.8}
-              style={styles.searchInactiveBtnIconOnly}
-            >
-              <Ionicons name="search" size={17} color={C.textMuted} />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* ── Recent Searches Dropdown ── */}
-        {isSearchActive && recentSearches.length > 0 && (
-          <View style={styles.recentSearchesDropdown}>
-            <View style={styles.recentSearchHeader}>
-              <Text style={styles.recentSearchHeaderText}>Búsquedas Recientes</Text>
-            </View>
-            {recentSearches.map((item) => (
-              <RecentSearchRow
-                key={item.id}
-                item={item}
-                onSelect={() => handleRecentSearchSelect(item)}
-                onDelete={() => handleDeleteRecentSearch(item.id)}
-              />
-            ))}
-          </View>
-        )}
-      </Animated.View>
-
-      {/* ━━━ VERTICAL RAIL — collapsible sidebar, full height ━━━━━━━━━━━━━━━ */}
-      <Animated.View
-        style={[
-          styles.sidebarWrapper,
-          {
-            width: railWidth,
-            opacity: sidebarAnim,
-            transform: [
-              {
-                translateX: sidebarAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [-200, 0], // Smooth slide from left completely off-screen
-                }),
-              },
-            ],
-            // Completely ignore interactions if hidden
-            pointerEvents: isHidden ? 'none' : 'auto',
-          },
-        ]}
-      >
-        <View style={styles.sidebarIsland}>
-          {/* ── Top: Collapse toggle + Notifications ──────────────────────── */}
-          <View style={styles.railHeaderSection}>
-            <TouchableOpacity
-              onPress={() => setIsExpanded((prev) => !prev)}
-              activeOpacity={0.7}
-              style={[styles.collapseButton, isExpanded && styles.collapseButtonExpanded]}
-            >
-              <MaterialIcons
-                name={isExpanded ? 'chevron-left' : 'chevron-right'}
-                size={20}
-                color={C.textMuted}
-              />
-              {isExpanded && <Text style={styles.railLabel}>Colapsar</Text>}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={onNotificationClick}
-              activeOpacity={0.7}
-              //@ts-ignore
-              onMouseEnter={() => setIsNotifHovered(true)}
-              onMouseLeave={() => setIsNotifHovered(false)}
-              style={[
-                styles.notificationButton,
-                isExpanded && styles.notificationButtonExpanded,
-                isNotifHovered && styles.notificationButtonHovered,
-              ]}
-            >
-              <Ionicons name="notifications-outline" size={18} color={C.textPrimary} />
-              {isExpanded && (
-                <Text
-                  style={[styles.sidebarItemLabel, { color: C.textPrimary, flex: 1 }]}
-                  numberOfLines={1}
-                >
-                  Notificaciones
-                </Text>
-              )}
-              {notificationsCount > 0 && <View style={styles.notificationBadge} />}
-              {/* Web-only tooltip (collapsed mode only) */}
-              {!isExpanded && Platform.OS === 'web' && isNotifHovered && (
-                <View style={styles.tooltip} pointerEvents="none">
-                  <Text style={styles.tooltipText}>
-                    {notificationsCount > 0
-                      ? `${notificationsCount} notificaciones`
-                      : 'Notificaciones'}
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.sidebarDivider} />
-
-          {/* ── Middle: Nav Tabs ───────────────────────────────────────────── */}
-          <ScrollView
-            style={{ flex: 1 }}
-            contentContainerStyle={styles.navSection}
-            showsVerticalScrollIndicator={false}
+      <View style={styles.navWrapper}>
+        <View style={styles.navIsland}>
+          {/* ━━━ Logo ━━━ */}
+          <TouchableOpacity
+            style={styles.logoSection}
+            activeOpacity={0.8}
+            onPress={() => handleModeSelect('mapa')}
+            accessibilityRole="button"
+            accessibilityLabel="Ir al mapa"
           >
-            {TABS.map((tab) => (
-              <SidebarItem
-                key={tab.id}
-                icon={tab.icon}
-                label={tab.label}
-                active={activeTab === tab.id}
-                expanded={isExpanded}
-                onClick={() => handleTabChange(tab.id)}
-                onHover={onTabHover ? () => onTabHover(tab.id) : undefined}
-              />
-            ))}
-
-            {!personalizationCompleted && (
-              <SidebarItem
-                icon="gift"
-                label="Personalizar"
-                active={false}
-                isMarked={true}
-                expanded={isExpanded}
-                onClick={() => router.push('/onboarding')}
-              />
+            <View style={styles.logoBadge}>
+              <MaterialIcons name="explore" size={20} color="#6EE7B7" />
+            </View>
+            {showLogoText && (
+              <View style={styles.logoTextBlock}>
+                <Text style={styles.logoTitle}>Valdivia</Text>
+                <Text style={styles.logoSubtitle}>PORTAL TURÍSTICO</Text>
+              </View>
             )}
-          </ScrollView>
+          </TouchableOpacity>
 
-          <View style={styles.sidebarDivider} />
+          <View style={styles.divider} />
 
-          {/* ── Bottom: Sugerencias + Perfil ────────────────────────────────── */}
-          <View style={styles.actionsSection}>
-            <SidebarItem
-              icon="lightbulb"
-              label="Sugerencias"
-              active={false}
-              expanded={isExpanded}
-              onClick={() => router.push('/onboarding')}
-            />
+          {/* ━━━ OPCIONES: Mapa / Turismo / Comercial ━━━ */}
+          <View style={styles.modeGroup}>
+            {MODE_OPTIONS.map((mode) => {
+              const isActive = mapDisplayMode === mode.id && currentTab === 'map';
+              return (
+                <TouchableOpacity
+                  key={mode.id}
+                  style={[styles.modeButton, isActive && styles.modeButtonActive]}
+                  onPress={() => handleModeSelect(mode.id)}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isActive }}
+                  accessibilityLabel={`Modo ${mode.label}`}
+                >
+                  <MaterialIcons name={mode.icon as any} size={16} color={isActive ? C.accent : C.textInactive} />
+                  {showModeLabels && (
+                    <Text style={[styles.modeButtonText, isActive && styles.modeButtonTextActive]}>{mode.label}</Text>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
 
-            {isAuthenticated ? (
-              <TouchableOpacity
-                ref={avatarRef}
-                onPress={handleToggleDropdown}
-                activeOpacity={0.7}
-                //@ts-ignore
-                onMouseEnter={() => setIsAvatarHovered(true)}
-                onMouseLeave={() => setIsAvatarHovered(false)}
-                style={[
-                  styles.avatarButton,
-                  isExpanded ? styles.avatarButtonExpanded : styles.sidebarItemIconOnly,
-                  isAvatarActive && styles.avatarButtonActive,
-                  isAvatarHovered &&
-                    !isAvatarActive && {
-                      backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                      borderColor: C.border,
-                    },
-                ]}
-              >
-                <View style={[styles.avatarCircle, isAvatarActive && styles.avatarCircleActive]}>
-                  <MaterialIcons
-                    name={(profile?.avatarIcon || 'person') as any}
-                    size={14}
-                    color={isAvatarActive ? C.accent : C.textPrimary}
+          <View style={styles.flexSpacer} />
+
+          {/* ━━━ Searchbar ━━━ */}
+          <View style={styles.searchAnchor}>
+            <View
+              style={[styles.searchBox, isSearchActive && styles.searchBoxFocused, isSearchHovered && !isSearchActive && styles.searchBoxHovered]}
+              //@ts-ignore
+              onMouseEnter={() => setIsSearchHovered(true)}
+              onMouseLeave={() => setIsSearchHovered(false)}
+            >
+              {isSearchActive ? (
+                <View style={styles.searchExpandedContent}>
+                  <SmartVoiceSearch
+                    isEmbedded={true}
+                    onPartialResult={(text) => onVoicePartialSearch?.(text)}
+                    onSearchComplete={(res) => {
+                      getRecentSearches().then(setRecentSearches);
+                      onVoiceSearch?.(res);
+                    }}
                   />
+                  <TouchableOpacity onPress={() => handleToggleSearch(false)} style={styles.searchBackBtn} activeOpacity={0.7}>
+                    <Ionicons name="close" size={16} color={C.textPrimary} />
+                  </TouchableOpacity>
                 </View>
-                {isExpanded && (
-                  <Text
-                    style={[
-                      styles.avatarLabel,
-                      { color: isAvatarActive ? C.accent : C.textPrimary },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {firstName}
-                  </Text>
-                )}
-                {/* Web-only avatar tooltip (collapsed mode only) */}
-                {!isExpanded && Platform.OS === 'web' && isAvatarHovered && !isDropdownOpen && (
-                  <View style={styles.tooltip} pointerEvents="none">
-                    <Text style={styles.tooltipText}>{firstName}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            ) : (
-              <SidebarItem
-                icon="login"
-                label="Ingresar"
-                active={false}
-                expanded={isExpanded}
-                onClick={() => router.push('/ingresar')}
-              />
+              ) : (
+                <TouchableOpacity onPress={() => handleToggleSearch(true)} activeOpacity={0.8} style={styles.searchCollapsedBtn}>
+                  <Ionicons name="search" size={17} color={C.textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {isSearchActive && recentSearches.length > 0 && (
+              <View style={styles.recentSearchesDropdown}>
+                <View style={styles.recentSearchHeader}>
+                  <Text style={styles.recentSearchHeaderText}>Búsquedas Recientes</Text>
+                </View>
+                {recentSearches.map((item) => (
+                  <RecentSearchRow
+                    key={item.id}
+                    item={item}
+                    onSelect={() => handleRecentSearchSelect(item)}
+                    onDelete={() => handleDeleteRecentSearch(item.id)}
+                  />
+                ))}
+              </View>
             )}
           </View>
 
-          <ContextualSurveyWidget isSearchActive={isSearchActive} />
-        </View>
-      </Animated.View>
+          {isNarrow ? (
+            /* ━━━ Menú overflow "⋮" (acciones secundarias colapsadas) ━━━ */
+            <NavIconButton
+              ref={overflowBtnRef}
+              icon="more-vert"
+              iconSet="MaterialIcons"
+              label="Más opciones"
+              active={isOverflowOpen}
+              badge={notificationsCount > 0}
+              onClick={handleToggleOverflow}
+            />
+          ) : (
+            <>
+              {/* ━━━ Herramientas ━━━ */}
+              <NavIconButton
+                ref={toolsBtnRef}
+                icon="tune"
+                iconSet="MaterialIcons"
+                label="Herramientas"
+                active={showFilters}
+                onClick={handleFiltersPress}
+              />
 
-      {/* ━━━ DROPDOWN MODAL (opens to the right of the sidebar) ━━━━━━━━━━━━ */}
+              {/* ━━━ Notificaciones ━━━ */}
+              <NavIconButton
+                ref={notifBtnRef}
+                icon="notifications-outline"
+                iconSet="Ionicons"
+                label={notificationsCount > 0 ? `${notificationsCount} notificaciones` : 'Notificaciones'}
+                badge={notificationsCount > 0}
+                onClick={handleNotificationsPress}
+              />
+
+              {/* ━━━ Estado: Turista / Local ━━━ */}
+              <EstadoToggle viewMode={viewMode} onSelect={handleEstadoSelect} showLabels={showEstadoLabels} />
+
+              {/* ━━━ Ajustes ━━━ */}
+              <NavIconButton
+                ref={settingsBtnRef}
+                icon="settings"
+                iconSet="MaterialIcons"
+                label="Ajustes"
+                active={isSettingsVisible}
+                onClick={handleToggleSettings}
+              />
+            </>
+          )}
+
+          {/* ━━━ Perfil ━━━ */}
+          <TouchableOpacity
+            ref={avatarRef}
+            onPress={isAuthenticated ? handleToggleDropdown : () => router.push('/ingresar')}
+            activeOpacity={0.7}
+            //@ts-ignore
+            onMouseEnter={() => setIsAvatarHovered(true)}
+            onMouseLeave={() => setIsAvatarHovered(false)}
+            style={[styles.avatarButton, isAvatarActive && styles.avatarButtonActive, isAvatarHovered && !isAvatarActive && styles.iconBtnHovered]}
+            accessibilityRole="button"
+            accessibilityLabel="Perfil"
+          >
+            <View style={[styles.avatarCircle, isAvatarActive && styles.avatarCircleActive]}>
+              <MaterialIcons
+                name={(profile?.avatarIcon || 'person') as any}
+                size={14}
+                color={isAvatarActive ? C.accent : C.textPrimary}
+              />
+            </View>
+            {Platform.OS === 'web' && isAvatarHovered && !isDropdownOpen && (
+              <View style={styles.tooltip} pointerEvents="none">
+                <Text style={styles.tooltipText}>{isAuthenticated ? 'Mi Perfil' : 'Ingresar'}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <ContextualSurveyWidget isSearchActive={isSearchActive} />
+
+      {/* ━━━ DROPDOWN DE PERFIL (debajo del icono, alineado a la derecha) ━━━ */}
       <SidebarSubmenu
         visible={isDropdownOpen}
         onClose={() => setIsDropdownOpen(false)}
-        position={{ top: dropdownPosition.top, left: dropdownPosition.left }}
+        position={{ top: dropdownPosition.top, right: dropdownPosition.right }}
         pointerPosition="top-left"
-        width={180}
-        maxHeight={windowHeight * 0.6}
+        width={220}
+        maxHeight={windowHeight * 0.7}
       >
         {isAuthenticated ? (
           <>
-            <DropdownItem
-              icon="person"
-              label="Mi Perfil"
-              onPress={() => {
-                setIsDropdownOpen(false);
-                handleTabChange('profile');
-              }}
-            />
-            <DropdownItem
-              icon="settings"
-              label="Ajustes"
-              onPress={() => {
-                setIsDropdownOpen(false);
-                setIsSettingsVisible(true);
-              }}
-            />
+            {PROFILE_LINKS.map((link) => (
+              <DropdownItem
+                key={link.tab}
+                icon={link.icon}
+                label={link.label}
+                onPress={() => {
+                  setIsDropdownOpen(false);
+                  handleTabChange(link.tab);
+                }}
+              />
+            ))}
             <View style={styles.dropdownDivider} />
-            <DropdownItem
-              icon="logout"
-              label="Cerrar sesión"
-              onPress={handleSignOut}
-              isDestructive
-            />
+            <DropdownItem icon="logout" label="Cerrar sesión" onPress={handleSignOut} isDestructive />
           </>
         ) : (
           <DropdownItem
@@ -1294,138 +1005,98 @@ export const TopAppBar: React.FC<
         )}
       </SidebarSubmenu>
 
-      {/* ━━━ SETTINGS MODAL ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <Modal
+      {/* ━━━ DROPDOWN DE AJUSTES (debajo del icono, alineado a la derecha) ━━━ */}
+      <SidebarSubmenu
         visible={isSettingsVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsSettingsVisible(false)}
+        onClose={() => setIsSettingsVisible(false)}
+        position={{ top: settingsPosition.top, right: settingsPosition.right }}
+        pointerPosition="top-left"
+        title="Ajustes"
+        width={300}
+        maxHeight={windowHeight * 0.7}
       >
-        <View style={styles.settingsOverlay}>
-          <View style={styles.settingsCard}>
-            <View style={styles.settingsHeader}>
-              <Text style={styles.settingsTitle}>Ajustes de la Aplicación</Text>
-              <TouchableOpacity
-                onPress={() => setIsSettingsVisible(false)}
-                style={styles.settingsCloseBtn}
-              >
-                <Ionicons name="close" size={20} color={C.textPrimary} />
-              </TouchableOpacity>
+        <View style={styles.settingsBody}>
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Notificaciones Push</Text>
+              <Text style={styles.settingDesc}>Recibe alertas de eventos cercanos en tiempo real</Text>
             </View>
+            <Switch
+              value={pushNotifications}
+              onValueChange={handlePushNotificationsChange}
+              trackColor={{ false: C.borderMid, true: C.accent }}
+              thumbColor={pushNotifications ? C.textPrimary : C.textMuted}
+            />
+          </View>
+          <View style={styles.settingsDivider} />
 
-            <ScrollView contentContainerStyle={styles.settingsBody}>
-              {/* Notificaciones Push */}
-              <View style={styles.settingRow}>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingLabel}>Notificaciones Push</Text>
-                  <Text style={styles.settingDesc}>
-                    Recibe alertas de eventos cercanos en tiempo real
-                  </Text>
-                </View>
-                <Switch
-                  value={pushNotifications}
-                  onValueChange={setPushNotifications}
-                  trackColor={{ false: C.borderMid, true: C.accent }}
-                  thumbColor={pushNotifications ? C.textPrimary : C.textMuted}
-                />
-              </View>
-              <View style={styles.settingsDivider} />
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Efectos de Sonido</Text>
+              <Text style={styles.settingDesc}>Reproduce sonidos en interacciones y búsquedas</Text>
+            </View>
+            <Switch
+              value={soundEffects}
+              onValueChange={handleSoundEffectsChange}
+              trackColor={{ false: C.borderMid, true: C.accent }}
+              thumbColor={soundEffects ? C.textPrimary : C.textMuted}
+            />
+          </View>
+          <View style={styles.settingsDivider} />
 
-              {/* Efectos de Sonido */}
-              <View style={styles.settingRow}>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingLabel}>Efectos de Sonido</Text>
-                  <Text style={styles.settingDesc}>
-                    Reproduce sonidos en interacciones y búsquedas
-                  </Text>
-                </View>
-                <Switch
-                  value={soundEffects}
-                  onValueChange={setSoundEffects}
-                  trackColor={{ false: C.borderMid, true: C.accent }}
-                  thumbColor={soundEffects ? C.textPrimary : C.textMuted}
-                />
-              </View>
-              <View style={styles.settingsDivider} />
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Idioma de la Guía</Text>
+              <Text style={styles.settingDesc}>Idioma de los contenidos del feed y foro</Text>
+            </View>
+            <View style={styles.selectorGroup}>
+              {(['es', 'en'] as const).map((lang) => (
+                <TouchableOpacity key={lang} style={[styles.selectorBtn, language === lang && styles.selectorBtnActive]} onPress={() => handleLanguageChange(lang)}>
+                  <Text style={[styles.selectorBtnText, language === lang && styles.selectorBtnTextActive]}>{lang.toUpperCase()}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+          <View style={styles.settingsDivider} />
 
-              {/* Idioma */}
-              <View style={styles.settingRow}>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingLabel}>Idioma de la Guía</Text>
-                  <Text style={styles.settingDesc}>Idioma de los contenidos del feed y foro</Text>
-                </View>
-                <View style={styles.selectorGroup}>
-                  {(['es', 'en'] as const).map((lang) => (
-                    <TouchableOpacity
-                      key={lang}
-                      style={[styles.selectorBtn, language === lang && styles.selectorBtnActive]}
-                      onPress={() => setLanguage(lang)}
-                    >
-                      <Text
-                        style={[
-                          styles.selectorBtnText,
-                          language === lang && styles.selectorBtnTextActive,
-                        ]}
-                      >
-                        {lang.toUpperCase()}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-              <View style={styles.settingsDivider} />
-
-              {/* Tema Visual */}
-              <View style={styles.settingRow}>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingLabel}>Tema Visual</Text>
-                  <Text style={styles.settingDesc}>Personaliza los colores de la interfaz</Text>
-                </View>
-                <View style={styles.selectorGroup}>
-                  <TouchableOpacity
-                    style={[styles.selectorBtn, themeMode === 'dark' && styles.selectorBtnActive]}
-                    onPress={() => setThemeMode('dark')}
-                  >
-                    <Text
-                      style={[
-                        styles.selectorBtnText,
-                        themeMode === 'dark' && styles.selectorBtnTextActive,
-                      ]}
-                    >
-                      Oscuro
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.selectorBtn, themeMode === 'light' && styles.selectorBtnActive]}
-                    onPress={() => setThemeMode('light')}
-                  >
-                    <Text
-                      style={[
-                        styles.selectorBtnText,
-                        themeMode === 'light' && styles.selectorBtnTextActive,
-                      ]}
-                    >
-                      Claro
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </ScrollView>
-
-            <View style={styles.settingsFooter}>
-              <TouchableOpacity
-                style={styles.btnSecondary}
-                onPress={() => setIsSettingsVisible(false)}
-              >
-                <Text style={styles.btnSecondaryText}>Cancelar</Text>
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Tema Visual</Text>
+              <Text style={styles.settingDesc}>Personaliza los colores de la interfaz</Text>
+            </View>
+            <View style={styles.selectorGroup}>
+              <TouchableOpacity style={[styles.selectorBtn, themeMode === 'dark' && styles.selectorBtnActive]} onPress={() => handleThemeChange('dark')}>
+                <Text style={[styles.selectorBtnText, themeMode === 'dark' && styles.selectorBtnTextActive]}>Oscuro</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.btnPrimary} onPress={saveSettings}>
-                <Text style={styles.btnPrimaryText}>Guardar</Text>
+              <TouchableOpacity style={[styles.selectorBtn, themeMode === 'light' && styles.selectorBtnActive]} onPress={() => handleThemeChange('light')}>
+                <Text style={[styles.selectorBtnText, themeMode === 'light' && styles.selectorBtnTextActive]}>Claro</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
-      </Modal>
+      </SidebarSubmenu>
+
+      {/* ━━━ MENÚ OVERFLOW "⋮" (acciones secundarias en pantallas angostas) ━━━ */}
+      <SidebarSubmenu
+        visible={isOverflowOpen}
+        onClose={() => setIsOverflowOpen(false)}
+        position={{ top: overflowPosition.top, right: overflowPosition.right }}
+        pointerPosition="top-left"
+        width={240}
+        maxHeight={windowHeight * 0.7}
+      >
+        <View style={styles.overflowEstadoRow}>
+          <EstadoToggle viewMode={viewMode} onSelect={handleEstadoSelect} showLabels />
+        </View>
+        <View style={styles.dropdownDivider} />
+        <DropdownItem icon="tune" label="Herramientas" onPress={handleFiltersPress} />
+        <DropdownItem
+          icon="notifications-none"
+          label={notificationsCount > 0 ? `Notificaciones (${notificationsCount})` : 'Notificaciones'}
+          onPress={handleNotificationsPress}
+        />
+        <DropdownItem icon="settings" label="Ajustes" onPress={handleToggleSettings} />
+      </SidebarSubmenu>
     </>
   );
 };

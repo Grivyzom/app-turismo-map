@@ -1,4 +1,4 @@
-import React, { Suspense, useState, useCallback, useEffect } from 'react';
+import React, { Suspense, useState, useCallback, useEffect, useMemo } from 'react';
 import {
   SafeAreaView,
   View,
@@ -8,7 +8,6 @@ import {
   Dimensions,
   Platform,
   Animated,
-  Easing,
   Pressable,
   Image,
   ActivityIndicator,
@@ -60,7 +59,8 @@ import { useAuth } from '../../src/context/AuthContext';
 import { lazyWithRetry } from '../../src/utils/lazyWithRetry';
 
 import { useHomeScreenState } from './useHomeScreenState';
-import { styles } from './styles';
+import { styles, NAVBAR_CLEARANCE } from './styles';
+import { BottomPlaceCarousel, PlaceItem } from '../../src/components/ui/BottomPlaceCarousel';
 
 // --- Lazy-loaded screens ---
 const UserProfileScreen = lazyWithRetry(() => import('../../src/screens/UserProfileScreen'));
@@ -253,8 +253,34 @@ export default function HomeScreen() {
     rateRoute,
     viewMode,
     handleToggleViewMode,
+    mapDisplayMode,
+    setMapDisplayMode,
     activeToast,
   } = useHomeScreenState(token);
+
+  // Filtrado inmersivo para el BottomPlaceCarousel.
+  // El modo (Mapa | Turismo | Comercial) viene del navbar (mapDisplayMode).
+  const lugaresCarrusel = useMemo(() => {
+    if (mapDisplayMode === 'mapa') return [];
+    
+    // Configura qué categorías pertenecen a qué modo
+    const turismoCats = ['cultura', 'naturaleza', 'museo', 'parque', 'teatro', 'monumento'];
+    const comercialCats = ['gastronomia', 'tienda', 'casino', 'mercado', 'mall'];
+
+    return filteredEvents
+      .filter(e => {
+         if (mapDisplayMode === 'turismo') return turismoCats.includes(e.category);
+         if (mapDisplayMode === 'comercial') return comercialCats.includes(e.category);
+         return false;
+      })
+      .map(e => ({
+         id: e.id,
+         name: e.title,
+         category: e.category,
+         imageUrl: e.imageUrl || 'https://via.placeholder.com/400x300',
+         distance: e.distance ? `${(e.distance / 1000).toFixed(1)} km` : undefined
+      }));
+  }, [mapDisplayMode, filteredEvents]);
 
   useEffect(() => {
     if (params.action === 'create_sector') {
@@ -374,26 +400,42 @@ export default function HomeScreen() {
   );
 
   const showMainUI = activeTab === 'map';
-  const isModalOpen =
-    (!!selectedEvent && selectedEvent.category?.toLowerCase() !== 'camara') ||
-    !!mapPincho ||
-    (isDesktop && activeTab !== 'map');
 
-  const [isSidebarHovered, setIsSidebarHovered] = React.useState(false);
-  const [isSidebarPinned, setIsSidebarPinned] = React.useState(true);
-  const isSidebarVisible = !isModalOpen || isSidebarHovered || isSidebarPinned;
-
-  const modalShiftAnim = React.useRef(new Animated.Value(1)).current;
-  React.useEffect(() => {
-    Animated.timing(modalShiftAnim, {
-      toValue: isSidebarVisible ? 1 : 0,
-      duration: 350,
-      easing: Easing.bezier(0.4, 0, 0.2, 1),
-      useNativeDriver: false, // Changed to false to allow layout animations like 'left'
-    }).start();
-  }, [isSidebarVisible, modalShiftAnim]);
+  const handleToggleViewModeWithNotification = useCallback(() => {
+    handleToggleViewMode();
+    showNotification(
+      viewMode === 'local' ? 'Modo Explorador (Turismo) activado.' : 'Modo Ciudadano (Local) activado.',
+      'info',
+    );
+  }, [handleToggleViewMode, viewMode, showNotification]);
 
   const [formAddress, setFormAddress] = React.useState('');
+
+  // Posición medida de los botones "Herramientas" y "Notificaciones" del navbar,
+  // para anclar sus paneles justo debajo (en vez de una posición fija).
+  const FILTERS_PANEL_WIDTH = 300;
+  const NOTIFICATIONS_PANEL_WIDTH = 320;
+  const [filtersAnchor, setFiltersAnchor] = React.useState({
+    top: NAVBAR_CLEARANCE,
+    left: Math.max(16, screenWidth - FILTERS_PANEL_WIDTH - 16),
+  });
+  const [notificationsAnchor, setNotificationsAnchor] = React.useState({
+    top: NAVBAR_CLEARANCE,
+    left: Math.max(16, screenWidth - NOTIFICATIONS_PANEL_WIDTH - 16),
+  });
+  const handleFiltersAnchorChange = useCallback(
+    (pos: { top: number; left: number }) =>
+      setFiltersAnchor({ top: pos.top, left: Math.min(pos.left, screenWidth - FILTERS_PANEL_WIDTH - 16) }),
+    [screenWidth],
+  );
+  const handleNotificationsAnchorChange = useCallback(
+    (pos: { top: number; left: number }) =>
+      setNotificationsAnchor({
+        top: pos.top,
+        left: Math.min(pos.left, screenWidth - NOTIFICATIONS_PANEL_WIDTH - 16),
+      }),
+    [screenWidth],
+  );
 
   const copyToClipboard = React.useCallback(
     async (text: string) => {
@@ -474,6 +516,13 @@ export default function HomeScreen() {
             currentTab={activeTab}
             onTabChange={setActiveTab}
             onTabHover={prefetchProfile}
+            mapDisplayMode={mapDisplayMode}
+            onMapDisplayModeChange={setMapDisplayMode}
+            viewMode={viewMode}
+            onToggleViewMode={handleToggleViewModeWithNotification}
+            showFilters={showFilters}
+            onFiltersClick={() => setShowFilters(!showFilters)}
+            onFiltersAnchorChange={handleFiltersAnchorChange}
           />
         </View>
 
@@ -499,7 +548,15 @@ export default function HomeScreen() {
             onVoicePartialSearch={handleVoicePartialSearch}
             notificationsCount={notifications.filter((n) => !n.isRead).length}
             onNotificationClick={() => setShowNotificationTray(!showNotificationTray)}
+            onNotificationsAnchorChange={handleNotificationsAnchorChange}
             onTabHover={prefetchFeed}
+            mapDisplayMode={mapDisplayMode}
+            onMapDisplayModeChange={setMapDisplayMode}
+            viewMode={viewMode}
+            onToggleViewMode={handleToggleViewModeWithNotification}
+            showFilters={showFilters}
+            onFiltersClick={() => setShowFilters(!showFilters)}
+            onFiltersAnchorChange={handleFiltersAnchorChange}
           />
         </View>
 
@@ -525,7 +582,15 @@ export default function HomeScreen() {
             onVoicePartialSearch={handleVoicePartialSearch}
             notificationsCount={notifications.filter((n) => !n.isRead).length}
             onNotificationClick={() => setShowNotificationTray(!showNotificationTray)}
+            onNotificationsAnchorChange={handleNotificationsAnchorChange}
             onTabHover={prefetchEventos}
+            mapDisplayMode={mapDisplayMode}
+            onMapDisplayModeChange={setMapDisplayMode}
+            viewMode={viewMode}
+            onToggleViewMode={handleToggleViewModeWithNotification}
+            showFilters={showFilters}
+            onFiltersClick={() => setShowFilters(!showFilters)}
+            onFiltersAnchorChange={handleFiltersAnchorChange}
           />
         </View>
 
@@ -551,7 +616,15 @@ export default function HomeScreen() {
             onVoicePartialSearch={handleVoicePartialSearch}
             notificationsCount={notifications.filter((n) => !n.isRead).length}
             onNotificationClick={() => setShowNotificationTray(!showNotificationTray)}
+            onNotificationsAnchorChange={handleNotificationsAnchorChange}
             onTabHover={prefetchHistorial}
+            mapDisplayMode={mapDisplayMode}
+            onMapDisplayModeChange={setMapDisplayMode}
+            viewMode={viewMode}
+            onToggleViewMode={handleToggleViewModeWithNotification}
+            showFilters={showFilters}
+            onFiltersClick={() => setShowFilters(!showFilters)}
+            onFiltersAnchorChange={handleFiltersAnchorChange}
           />
         </View>
 
@@ -577,7 +650,15 @@ export default function HomeScreen() {
             onVoicePartialSearch={handleVoicePartialSearch}
             notificationsCount={notifications.filter((n) => !n.isRead).length}
             onNotificationClick={() => setShowNotificationTray(!showNotificationTray)}
+            onNotificationsAnchorChange={handleNotificationsAnchorChange}
             onTabHover={prefetchSaved}
+            mapDisplayMode={mapDisplayMode}
+            onMapDisplayModeChange={setMapDisplayMode}
+            viewMode={viewMode}
+            onToggleViewMode={handleToggleViewModeWithNotification}
+            showFilters={showFilters}
+            onFiltersClick={() => setShowFilters(!showFilters)}
+            onFiltersAnchorChange={handleFiltersAnchorChange}
           />
         </View>
 
@@ -603,7 +684,15 @@ export default function HomeScreen() {
             onVoicePartialSearch={handleVoicePartialSearch}
             notificationsCount={notifications.filter((n) => !n.isRead).length}
             onNotificationClick={() => setShowNotificationTray(!showNotificationTray)}
+            onNotificationsAnchorChange={handleNotificationsAnchorChange}
             onTabHover={prefetchForum}
+            mapDisplayMode={mapDisplayMode}
+            onMapDisplayModeChange={setMapDisplayMode}
+            viewMode={viewMode}
+            onToggleViewMode={handleToggleViewModeWithNotification}
+            showFilters={showFilters}
+            onFiltersClick={() => setShowFilters(!showFilters)}
+            onFiltersAnchorChange={handleFiltersAnchorChange}
           />
         </View>
 
@@ -674,6 +763,19 @@ export default function HomeScreen() {
           activeNestedZone={activeNestedZone}
         />
       </View>
+
+      {/* --- CARRUSEL INMERSIVO DE LUGARES (Flotante Abajo) --- */}
+      {activeTab === 'map' && (
+        <BottomPlaceCarousel
+          visible={mapDisplayMode !== 'mapa'}
+          data={lugaresCarrusel}
+          onPlacePress={(lugar) => {
+            console.log("Abrir detalles:", lugar);
+            // Aquí puedes conectar tu modal de detalles
+            setSelectedEvent(filteredEvents.find(e => e.id === lugar.id) || null);
+          }}
+        />
+      )}
 
       {showMainUI && mapPincho && !isDesktop && (
         <View pointerEvents="box-none" style={styles.sidePanelOverlay}>
@@ -816,16 +918,13 @@ export default function HomeScreen() {
       )}
 
       {isDesktop && activeTab !== 'map' && (
-        <Animated.View
+        <View
           style={{
             position: 'absolute',
-            top: Platform.OS === 'ios' ? 56 : 16,
+            top: NAVBAR_CLEARANCE,
             bottom: 20,
+            left: 16,
             right: 16,
-            left: modalShiftAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [16, 104], // 104px avoids the 88px expanded sidebar + 16px gap
-            }),
             zIndex: 4000,
           }}
         >
@@ -835,76 +934,32 @@ export default function HomeScreen() {
             onClose={() => setActiveTab('map')}
             showSidebar={false}
           />
-        </Animated.View>
+        </View>
       )}
 
-      {/* ZONA DE ACTIVACIÓN (HITBOX) PARA EL SIDEBAR (Elevada) */}
-      <View
-        style={[
-          styles.topBarWrapper,
-          isDesktop && isModalOpen && { left: 0, paddingLeft: 16 },
-          { zIndex: 6000 }, // Elevate TopAppBar above FloatingIsland to keep navigation accessible
-        ]}
-        pointerEvents="box-none"
-      >
-        {isDesktop && isModalOpen && (
-          <Pressable
-            //@ts-ignore
-            onMouseEnter={() => isDesktop && isModalOpen && setIsSidebarHovered(true)}
-            onMouseLeave={() => isDesktop && isModalOpen && setIsSidebarHovered(false)}
-            style={[
-              {
-                position: 'absolute',
-                top: 0,
-                bottom: 0,
-                left: 0,
-                width: isSidebarVisible ? 120 : 24, // 24px invisible edge. When open, cover sidebar area to keep it hovered.
-                zIndex: 1, // Just behind TopAppBar
-                backgroundColor: isSidebarVisible ? 'transparent' : 'rgba(30,30,30,0.4)', // Subtle hint when hidden
-                borderRightWidth: isSidebarVisible ? 0 : 1,
-                borderRightColor: 'rgba(255,255,255,0.08)',
-                borderTopRightRadius: isSidebarVisible ? 0 : 16,
-                borderBottomRightRadius: isSidebarVisible ? 0 : 16,
-              },
-              { cursor: isSidebarPinned ? 'default' : 'pointer' } as any,
-            ]}
-            onPress={() => setIsSidebarPinned(!isSidebarPinned)}
-          >
-            {/* Visual cue indicator */}
-            {!isSidebarVisible && (
-              <View
-                style={{
-                  position: 'absolute',
-                  top: '50%',
-                  marginTop: -20,
-                  left: 8,
-                  width: 4,
-                  height: 40,
-                  borderRadius: 2,
-                  backgroundColor: 'rgba(255,255,255,0.3)',
-                }}
-              />
-            )}
-          </Pressable>
-        )}
-
-        <View style={{ flex: 1, zIndex: 10 }} pointerEvents="box-none">
-          <TopAppBar
-            currentTab={activeTab}
-            onTabChange={setActiveTab}
-            onVoiceSearch={handleVoiceSearch}
-            onVoicePartialSearch={handleVoicePartialSearch}
-            notificationsCount={notifications.filter((n) => !n.isRead).length}
-            onNotificationClick={() => setShowNotificationTray(!showNotificationTray)}
-            isModalOpen={isModalOpen}
-            forceSidebarVisible={isSidebarHovered || isSidebarPinned}
-            onSearchFocus={() => {
-              if (selectedEvent) handleSelectEvent(null);
-              if (mapPincho) clearMapPincho();
-            }}
-            onCollectionsClick={() => setShowCollectionsIsland(true)}
-          />
-        </View>
+      {/* ━━━ NAVBAR SUPERIOR ━━━ */}
+      <View style={[styles.topBarWrapper, { zIndex: 6000 }]} pointerEvents="box-none">
+        <TopAppBar
+          currentTab={activeTab}
+          onTabChange={setActiveTab}
+          onVoiceSearch={handleVoiceSearch}
+          onVoicePartialSearch={handleVoicePartialSearch}
+          notificationsCount={notifications.filter((n) => !n.isRead).length}
+          onNotificationClick={() => setShowNotificationTray(!showNotificationTray)}
+          onNotificationsAnchorChange={handleNotificationsAnchorChange}
+          mapDisplayMode={mapDisplayMode}
+          onMapDisplayModeChange={setMapDisplayMode}
+          viewMode={viewMode}
+          onToggleViewMode={handleToggleViewModeWithNotification}
+          showFilters={showFilters}
+          onFiltersClick={() => setShowFilters(!showFilters)}
+          onFiltersAnchorChange={handleFiltersAnchorChange}
+          onSearchFocus={() => {
+            if (selectedEvent) handleSelectEvent(null);
+            if (mapPincho) clearMapPincho();
+          }}
+          onCollectionsClick={() => setShowCollectionsIsland(true)}
+        />
       </View>
       {showMainUI && (
         <View
@@ -974,34 +1029,6 @@ export default function HomeScreen() {
             />
           </TouchableOpacity>
 
-          <View style={styles.controlDivider} />
-
-          {/* Selector de Modo Vista (Local / Turista) */}
-          <TouchableOpacity
-            style={[
-              styles.controlButton,
-              viewMode === 'tourist' && { backgroundColor: 'rgba(245, 158, 11, 0.15)' },
-              viewMode === 'local' && { backgroundColor: 'rgba(16, 185, 129, 0.15)' },
-            ]}
-            onPress={() => {
-              handleToggleViewMode();
-              showNotification(
-                viewMode === 'local'
-                  ? 'Modo Explorador (Turismo) activado.'
-                  : 'Modo Ciudadano (Local) activado.',
-                'info',
-              );
-            }}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel={viewMode === 'local' ? 'Modo Local activo' : 'Modo Turista activo'}
-          >
-            <MaterialIcons
-              name={viewMode === 'tourist' ? 'explore' : 'home'}
-              size={isDesktop ? 18 : 22}
-              color={viewMode === 'tourist' ? '#F59E0B' : '#10B981'}
-            />
-          </TouchableOpacity>
         </View>
       )}
 
@@ -1077,8 +1104,8 @@ export default function HomeScreen() {
         <View
           style={{
             position: 'absolute',
-            top: insets.top + (isDesktop ? 20 : 70), // On desktop, keep it high up; mobile needs space for notch
-            left: isDesktop ? 104 : 20, // Prevents overlap with the sidebar
+            top: NAVBAR_CLEARANCE,
+            left: 20,
             right: 20,
             zIndex: 999,
           }}
@@ -1300,7 +1327,7 @@ export default function HomeScreen() {
             style={[
               styles.filterOverlay,
               isDesktop
-                ? { right: 72, bottom: 20, width: 300 }
+                ? { top: filtersAnchor.top, left: filtersAnchor.left, bottom: 'auto', right: 'auto', width: 300 }
                 : {
                     left: 0,
                     right: 0,
@@ -1543,12 +1570,11 @@ export default function HomeScreen() {
                 width: isDesktop ? panelWidth : '100%',
                 maxWidth: isDesktop ? panelWidth : '100%',
                 height: isDesktop ? 'auto' : '82%',
-                // Use the same top and bottom anchors as topBarWrapper
+                // Use the same bottom anchor as topBarWrapper
                 bottom: isDesktop ? 20 : 0,
-                // Base position aligns with the sidebar container when hidden
                 left: isDesktop ? 16 : 0,
                 right: isDesktop ? 'auto' : 0,
-                top: isDesktop ? (Platform.OS === 'ios' ? 56 : 16) : 'auto',
+                top: isDesktop ? NAVBAR_CLEARANCE : 'auto',
                 borderTopLeftRadius: 32,
                 borderTopRightRadius: 32,
                 borderBottomLeftRadius: isDesktop ? 32 : 0,
@@ -1560,14 +1586,6 @@ export default function HomeScreen() {
                       ? panelSlide.interpolate({
                           inputRange: [0, 1],
                           outputRange: [-panelWidth - 32, 0],
-                        })
-                      : 0,
-                  },
-                  {
-                    translateX: isDesktop
-                      ? modalShiftAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0, 88], // Fluidly shift right when sidebar expands, left when it hides
                         })
                       : 0,
                   },
@@ -1937,7 +1955,7 @@ export default function HomeScreen() {
             styles.miniModalContainer,
             {
               width: isDesktop ? 380 : '90%',
-              left: isDesktop ? 100 : '5%', // Sidebar width + offset on desktop
+              left: isDesktop ? 20 : '5%',
               bottom: isDesktop ? 32 : 40,
               transform: [
                 {
@@ -2044,7 +2062,7 @@ export default function HomeScreen() {
                 styles.miniModalContainer,
                 {
                   width: isDesktop ? 380 : '90%',
-                  left: isDesktop ? 100 : '5%', // Sidebar width + offset on desktop
+                  left: isDesktop ? 20 : '5%',
                   bottom: isDesktop ? 32 : 40,
                 },
               ]}
@@ -2326,6 +2344,7 @@ export default function HomeScreen() {
           onMarkAsRead={(id) => {
             setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
           }}
+          anchor={notificationsAnchor}
         />
       )}
 
