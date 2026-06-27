@@ -44,20 +44,21 @@ export default function DevDashboardScreen() {
             </LinearGradient>
           </TouchableOpacity>
 
-          {/* Herramienta 2: Variables de Entorno (Mock) */}
+          {/* Herramienta 2: Galería de Pines */}
           <TouchableOpacity
             style={styles.card}
             activeOpacity={0.8}
-            onPress={() => alert('Pronto: Gestor de Variables')}
+            onPress={() => router.push('/dev/gallery-manager')}
           >
             <LinearGradient
-              colors={['rgba(99, 102, 241, 0.2)', 'rgba(99, 102, 241, 0.05)']}
+              colors={['rgba(139, 92, 246, 0.2)', 'rgba(139, 92, 246, 0.05)']}
               style={styles.cardGradient}
             >
-              <MaterialIcons name="tune" size={36} color="#6366F1" />
-              <Text style={styles.cardTitle}>Environment</Text>
+              <MaterialIcons name="image-search" size={36} color="#8B5CF6" />
+              <Text style={styles.cardTitle}>Pin Gallery</Text>
               <Text style={styles.cardDesc}>
-                Ajusta variables de entorno al vuelo sin recargar. Simula fallos de API o latencia.
+                Sube y gestiona imágenes de referencia para categorías (Fauna, Bosques, Reservas,
+                etc).
               </Text>
             </LinearGradient>
           </TouchableOpacity>

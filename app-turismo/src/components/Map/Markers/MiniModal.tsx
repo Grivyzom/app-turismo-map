@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  TouchableOpacity,
+  LayoutChangeEvent,
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import Animated, {
@@ -17,10 +17,18 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
+  withTiming,
+  withRepeat,
+  withSequence,
+  Easing,
+  FadeIn,
+  LinearTransition,
 } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 
-import { getCategoryColor } from '../../../utils/mapUtils';
 import { TurismoEvent } from '../types';
+import { PinGallery } from '../../ui/PinGallery';
+import { pinGalleryApi } from '../../../utils/pinGalleryApi';
 
 interface MiniModalProps {
   event: TurismoEvent;
@@ -31,7 +39,6 @@ interface MiniModalProps {
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 /* eslint-disable react-hooks/immutability */
-// Animation for tactile feel (98% scale on press)
 const useTactileScale = () => {
   const scale = useSharedValue(1);
   const animatedStyle = useAnimatedStyle(() => ({
@@ -49,33 +56,53 @@ const useTactileScale = () => {
 };
 /* eslint-enable react-hooks/immutability */
 
+// ─── Constants matching the standalone design ──────────────────────────
+const MODAL_MAX_WIDTH = 340;
+const GALLERY_HEIGHT = 196;
+
 export const MiniModal = ({ event, isLightMode, isSelected }: MiniModalProps) => {
-  const isFauna = event.category?.toLowerCase() === 'fauna';
-  const isHospital = event.category?.toLowerCase() === 'hospital';
-  const isBombero = event.category?.toLowerCase() === 'bombero';
-  const isCarabinero = event.category?.toLowerCase() === 'carabinero';
   const isCamara = event.category?.toLowerCase() === 'camara';
-  const isTienda = event.category?.toLowerCase() === 'tienda';
   const isUniversidad = event.category?.toLowerCase() === 'universidad';
 
-  const [isExpanded, setIsExpanded] = React.useState(isSelected || isTienda);
+  const [isExpanded, setIsExpanded] = useState(isSelected || false);
+  const [galeriaIndex, setGaleriaIndex] = useState(0);
+  const [modalWidth, setModalWidth] = useState(MODAL_MAX_WIDTH);
+  const [galeriaImages, setGaleriaImages] = useState<string[]>([]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (isSelected) {
       setIsExpanded(true);
-    } else if (!isTienda) {
+    } else {
       setIsExpanded(false);
     }
-  }, [isSelected, isTienda]);
-  const color = getCategoryColor(event.category);
+  }, [isSelected]);
 
-  const isInformative =
-    isFauna || isTienda || isHospital || isBombero || isCarabinero || isCamara || isUniversidad;
+  useEffect(() => {
+    const loadGalleryImages = async () => {
+      try {
+        const images = await pinGalleryApi.getGallery(event.id);
+        if (images.length > 0) {
+          setGaleriaImages(images);
+        } else if (event.galeria?.length) {
+          setGaleriaImages(event.galeria);
+        }
+      } catch (error) {
+        console.warn('Error loading gallery:', error);
+        if (event.galeria?.length) {
+          setGaleriaImages(event.galeria);
+        }
+      }
+    };
+    loadGalleryImages();
+  }, [event.id, event.galeria]);
+
+  const onModalLayout = useCallback((e: LayoutChangeEvent) => {
+    const w = e.nativeEvent.layout.width;
+    if (w > 0) setModalWidth(w);
+  }, []);
 
   const handleToggleExpand = () => {
-    if (isInformative) {
-      setIsExpanded(!isExpanded);
-    }
+    setIsExpanded(!isExpanded);
   };
 
   const handleDirections = () => {
@@ -87,59 +114,93 @@ export const MiniModal = ({ event, isLightMode, isSelected }: MiniModalProps) =>
     if (url) Linking.openURL(url);
   };
 
-  const handleContact = () => {
-    if (event.contactPhone) {
-      Linking.openURL(`tel:${event.contactPhone}`);
-    } else if (event.contactEmail) {
-      Linking.openURL(`mailto:${event.contactEmail}`);
+  const handleContact = (
+    type: 'phone' | 'email' | 'instagram' | 'facebook' | 'linkedin',
+    value?: string,
+  ) => {
+    if (!value) return;
+    switch (type) {
+      case 'phone':
+        Linking.openURL(`tel:${value}`);
+        break;
+      case 'email':
+        Linking.openURL(`mailto:${value}`);
+        break;
+      default:
+        Linking.openURL(value);
+        break;
     }
   };
 
-  const handleProductPress = (productName: string) => {
-    if (event.contactPhone) {
-      const cleanPhone = event.contactPhone.replace(/\D/g, '');
-      if (cleanPhone.startsWith('569') || cleanPhone.length === 9 || cleanPhone.startsWith('9')) {
-        const fullPhone = cleanPhone.length === 9 ? `56${cleanPhone}` : cleanPhone;
-        const text = encodeURIComponent(
-          `¡Hola! Estoy interesado en el producto "${productName}" de tu tienda "${event.title}" que vi en el mapa turístico.`,
-        );
-        Linking.openURL(`https://wa.me/${fullPhone}?text=${text}`);
-      } else {
-        Linking.openURL(`tel:${event.contactPhone}`);
-      }
-    } else if (event.contactEmail) {
-      const subject = encodeURIComponent(`Consulta sobre: ${productName}`);
-      const body = encodeURIComponent(
-        `Hola, me interesa obtener más información sobre el producto "${productName}" publicado en ${event.title}.`,
+  const expandBtn = useTactileScale();
+  const ubicarBtn = useTactileScale();
+  const phoneBtn = useTactileScale();
+  const emailBtn = useTactileScale();
+  const instaBtn = useTactileScale();
+  const inBtn = useTactileScale();
+  const fbBtn = useTactileScale();
+
+  // ─── Data with defaults ────────────────────────────────────────────
+  const nombre = event.title || 'Ubicación';
+  const categoria = event.category || 'Punto de interés';
+  const galeria =
+    galeriaImages.length > 0
+      ? galeriaImages
+      : event.galeria || (event.imageUrl ? [event.imageUrl] : ['📍', '🗺️', '📌']);
+  const distancia = event.distancia || '';
+  const descripcion = event.description || '';
+  const nivelEducativo = event.nivelEducativo;
+  const anioFundacion = event.anioFundacion;
+  const ubicacion = event.address || '';
+  const telefono = event.contactPhone;
+  const email = event.contactEmail;
+  const horarios = event.openingHours;
+  const instagram = event.instagram;
+  const linkedin = event.linkedin;
+  const facebook = event.facebook;
+
+  // ─── Title scroll animation ────────────────────────────────────────
+  // The standalone uses `translateX(calc(-100% - 24px))` which scrolls
+  // the full text width. We measure via a shared value that represents
+  // a percentage of the title width overflow — we'll use a generous
+  // fixed distance proportional to character count.
+  const titleAnimValue = useSharedValue(0);
+
+  useEffect(() => {
+    if (nombre.length > 30) {
+      // Approximate scroll distance based on character count.
+      // ~7px per character is a rough estimate for 17px Inter font.
+      const scrollDistance = Math.max(nombre.length * 7 - modalWidth + 60, 100);
+      titleAnimValue.value = withRepeat(
+        withSequence(
+          withTiming(0, { duration: 1800 }),
+          withTiming(-scrollDistance, { duration: 5000, easing: Easing.linear }),
+          withTiming(-scrollDistance, { duration: 1200 }),
+          withTiming(0, { duration: 1800, easing: Easing.linear }),
+        ),
+        -1,
+        false,
       );
-      Linking.openURL(`mailto:${event.contactEmail}?subject=${subject}&body=${body}`);
+    } else {
+      titleAnimValue.value = 0;
     }
-  };
+  }, [nombre, modalWidth, titleAnimValue]);
 
-  const getBusinessStatus = (openingHours?: string) => {
-    if (!openingHours) return null;
-    const isOpen = true; // Placeholder for demo
-    return {
-      isOpen,
-      text: isOpen ? 'Abierto' : 'Cerrado',
-      subtext: openingHours.split(',')[0],
-      color: isOpen ? '#10B981' : '#EF4444',
-      bgColor: isOpen ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-    };
-  };
+  const animatedTitleStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: titleAnimValue.value }],
+  }));
 
-  const status = getBusinessStatus(event.openingHours);
+  // ─── Chevron rotation animation ────────────────────────────────────
+  const chevronRotation = useSharedValue(0);
+  useEffect(() => {
+    chevronRotation.value = withTiming(isExpanded ? 180 : 0, { duration: 350 });
+  }, [isExpanded, chevronRotation]);
 
-  const primaryBtn = useTactileScale();
-  const secondaryBtn = useTactileScale();
-  const catalogBtn = useTactileScale();
+  const arrowAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${chevronRotation.value}deg` }],
+  }));
 
-  const textColor = isLightMode ? '#191C1D' : '#F0F1F2';
-  const subtextColor = isLightMode ? '#414844' : '#C1C8C3';
-  const bgColor = isLightMode ? '#FFFFFF' : 'rgba(34, 34, 34, 0.95)';
-  const borderColor = isLightMode ? 'rgba(0,0,0,0.05)' : 'rgba(255, 255, 255, 0.1)';
-  const btnBg = isLightMode ? '#F3F4F5' : 'rgba(255, 255, 255, 0.08)';
-
+  // ─── Camara tooltip ────────────────────────────────────────────────
   if (isCamara) {
     if (Platform.OS === 'web') {
       const { Tooltip } = require('react-tooltip');
@@ -151,16 +212,16 @@ export const MiniModal = ({ event, isLightMode, isSelected }: MiniModalProps) =>
           place="top"
           content={event.title}
           style={{
-            backgroundColor: bgColor,
-            color: textColor,
-            borderColor: borderColor,
+            backgroundColor: '#0d1117',
+            color: '#c8d4dc',
+            borderColor: 'rgba(200,150,100,0.18)',
             borderWidth: 1,
             borderStyle: 'solid',
             borderRadius: 8,
             padding: '6px 12px',
             fontSize: '12px',
             fontWeight: '500',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
             zIndex: 99999,
           }}
         />,
@@ -172,523 +233,622 @@ export const MiniModal = ({ event, isLightMode, isSelected }: MiniModalProps) =>
       <Animated.View
         entering={ZoomIn.duration(200)}
         exiting={ZoomOut.duration(150)}
-        style={[
-          styles.tooltipContainer,
-          {
-            backgroundColor: bgColor,
-            borderColor: borderColor,
-          },
-        ]}
+        style={[styles.tooltipContainer]}
       >
-        <Text style={[styles.tooltipText, { color: textColor }]}>{event.title}</Text>
-        <View style={[styles.pointer, { borderTopColor: bgColor }]} />
+        <Text style={styles.tooltipText}>{event.title}</Text>
+        <View style={[styles.pointer, { borderTopColor: '#0d1117' }]} />
       </Animated.View>
     );
   }
 
+  // ─── Helpers ───────────────────────────────────────────────────────
+  const hasContactInfo = ubicacion || telefono;
+  const hasExpandedContact = email || horarios;
+  const hasSocial = instagram || linkedin || facebook;
+
   return (
     <Animated.View
-      entering={ZoomIn.duration(300)}
-      exiting={ZoomOut.duration(200)}
-      style={[
-        styles.modalContainer,
-        {
-          backgroundColor: bgColor,
-          borderColor: borderColor,
-          transformOrigin: 'bottom center',
-          maxWidth: isExpanded ? (event.category === 'tienda' ? 320 : 300) : 260,
-        },
-      ]}
+      entering={ZoomIn.duration(250)}
+      exiting={ZoomOut.duration(150)}
+      layout={LinearTransition.duration(400)}
+      onLayout={onModalLayout}
+      style={[styles.modalContainer, { transformOrigin: 'bottom' } as any]}
     >
-      <Pressable
-        onPress={(e) => {
-          e.stopPropagation();
-          handleToggleExpand();
-        }}
-        style={styles.pressableContent}
-      >
-        {isExpanded &&
-          (event.imageUrl ? (
-            <Image source={{ uri: event.imageUrl }} style={styles.bannerImage} />
-          ) : (
-            isInformative && (
-              <View style={[styles.bannerPlaceholder, { backgroundColor: color }]}>
-                <MaterialIcons
-                  name={
-                    isFauna
-                      ? 'pets'
-                      : isHospital
-                        ? 'local-hospital'
-                        : isBombero
-                          ? 'fire-extinguisher'
-                          : isCarabinero
-                            ? 'local-police'
-                            : isCamara
-                              ? 'videocam'
-                              : isUniversidad
-                                ? 'school'
-                                : 'storefront'
-                  }
-                  size={40}
-                  color="#FFF"
-                />
-              </View>
-            )
-          ))}
+      {/* ── Handle / drag indicator ─────────────────────────────── */}
+      <Pressable onPress={handleToggleExpand} style={styles.handleContainer}>
+        <View style={styles.handle} />
+      </Pressable>
 
-        <View style={styles.contentRow}>
-          {!isExpanded &&
-            (event.imageUrl ? (
-              <Image source={{ uri: event.imageUrl }} style={styles.thumbnail} />
-            ) : (
-              <View style={[styles.thumbnailPlaceholder, { backgroundColor: color }]}>
-                <MaterialIcons
-                  name={
-                    isFauna
-                      ? 'pets'
-                      : isHospital
-                        ? 'local-hospital'
-                        : isBombero
-                          ? 'fire-extinguisher'
-                          : isCarabinero
-                            ? 'local-police'
-                            : isCamara
-                              ? 'videocam'
-                              : isUniversidad
-                                ? 'school'
-                                : 'storefront'
-                  }
-                  size={20}
-                  color="#FFF"
-                />
-              </View>
-            ))}
-
-          <View style={styles.infoCol}>
-            <Text
-              style={[styles.title, { color: textColor }, isExpanded && styles.expandedTitle]}
-              numberOfLines={isExpanded ? 2 : 1}
-            >
-              {event.title}
-            </Text>
-
-            {isInformative && !isExpanded && (
-              <View style={styles.expandHint}>
-                <MaterialIcons name="keyboard-arrow-down" size={16} color={color} />
-                <Text style={[styles.expandHintText, { color: color }]}>Toca para más info</Text>
-              </View>
-            )}
-
-            {status && (
-              <View style={styles.statusRow}>
-                <View style={[styles.statusDot, { backgroundColor: status.color }]} />
-                <Text style={[styles.statusText, { color: subtextColor }]} numberOfLines={1}>
-                  {status.text} • {status.subtext}
-                </Text>
-              </View>
-            )}
-
-            {event.description && (
-              <View style={{ position: 'relative' }}>
-                <Text
-                  style={[
-                    styles.descriptionText,
-                    { color: subtextColor, paddingRight: isFauna ? 24 : 0 },
-                  ]}
-                  numberOfLines={isExpanded ? 15 : isFauna ? 3 : 2}
-                >
-                  {event.description}
-                </Text>
-                {isFauna && (
-                  <TouchableOpacity
-                    onPress={(e: any) => {
-                      e.stopPropagation();
-                      setIsExpanded(!isExpanded);
-                    }}
-                    style={{
-                      position: 'absolute',
-                      right: 0,
-                      bottom: 0,
-                      backgroundColor: bgColor,
-                      paddingLeft: 4,
-                    }}
-                  >
-                    <MaterialIcons
-                      name={isExpanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-                      size={18}
-                      color={color}
-                    />
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
-
-            {isExpanded && (
-              <View style={[styles.extraInfo, { borderTopColor: borderColor }]}>
-                {event.organizer && !isFauna && (
-                  <View style={styles.extraInfoItem}>
-                    <MaterialIcons name="person" size={14} color={color} />
-                    <Text style={[styles.extraInfoText, { color: subtextColor }]}>
-                      {event.organizer}
-                    </Text>
-                  </View>
-                )}
-                {event.address && (
-                  <View style={styles.extraInfoItem}>
-                    <MaterialIcons name="location-on" size={14} color={color} />
-                    <Text style={[styles.extraInfoText, { color: subtextColor }]}>
-                      {event.address}
-                    </Text>
-                  </View>
-                )}
-                {event.time && !isFauna && (
-                  <View style={styles.extraInfoItem}>
-                    <MaterialIcons name="access-time" size={14} color={color} />
-                    <Text style={[styles.extraInfoText, { color: subtextColor }]}>
-                      {event.time}
-                    </Text>
-                  </View>
-                )}
-                {!isFauna && event.contactPhone && (
-                  <View style={styles.extraInfoItem}>
-                    <MaterialIcons name="phone" size={14} color={color} />
-                    <Text style={[styles.extraInfoText, { color: subtextColor }]}>
-                      {event.contactPhone}
-                    </Text>
-                  </View>
-                )}
-                {!isFauna && event.openingHours && (
-                  <View style={styles.extraInfoItem}>
-                    <MaterialIcons name="schedule" size={14} color={color} />
-                    <Text style={[styles.extraInfoText, { color: subtextColor }]}>
-                      {event.openingHours}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            )}
-
-            <View style={styles.actionsRow}>
-              <AnimatedPressable
-                style={[
-                  styles.actionButton,
-                  { backgroundColor: color },
-                  isFauna && styles.fullWidthButton,
-                  primaryBtn.animatedStyle,
-                ]}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  handleDirections();
-                }}
-                onPressIn={primaryBtn.onPressIn}
-                onPressOut={primaryBtn.onPressOut}
-              >
-                <MaterialIcons name="directions" size={16} color="#FFFFFF" />
-                {isFauna && <Text style={styles.buttonText}>Cómo llegar</Text>}
-              </AnimatedPressable>
-
-              {!isFauna && (
-                <AnimatedPressable
-                  style={[
-                    styles.iconButton,
-                    { backgroundColor: btnBg },
-                    secondaryBtn.animatedStyle,
-                  ]}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    handleContact();
-                  }}
-                  onPressIn={secondaryBtn.onPressIn}
-                  onPressOut={secondaryBtn.onPressOut}
-                >
-                  <MaterialIcons name="chat" size={16} color={textColor} />
-                </AnimatedPressable>
-              )}
-
-              {!isFauna && event.catalog && event.catalog.length > 0 && (
-                <AnimatedPressable
-                  style={[styles.iconButton, { backgroundColor: btnBg }, catalogBtn.animatedStyle]}
-                  onPressIn={catalogBtn.onPressIn}
-                  onPressOut={catalogBtn.onPressOut}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    setIsExpanded(!isExpanded);
-                  }}
-                >
-                  <MaterialIcons name="shopping-bag" size={16} color={color} />
-                </AnimatedPressable>
+      {/* ── Gallery carousel ────────────────────────────────────── */}
+      <View style={styles.galleryContainer}>
+        <ScrollView
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onScroll={(e) => {
+            const index = Math.round(e.nativeEvent.contentOffset.x / modalWidth);
+            if (index !== galeriaIndex && index >= 0 && index < galeria.length) {
+              setGaleriaIndex(index);
+            }
+          }}
+          scrollEventThrottle={16}
+        >
+          {galeria.map((imagen, i) => (
+            <View key={i} style={[styles.slide, { width: modalWidth }]}>
+              {imagen.startsWith('http') ? (
+                <Image source={{ uri: imagen }} style={styles.slideImage} />
+              ) : (
+                <View style={styles.slideEmojiContainer}>
+                  <Text style={styles.slideEmoji}>{imagen}</Text>
+                </View>
               )}
             </View>
+          ))}
+        </ScrollView>
+
+        {/* Top bar: categoria + dots */}
+        <View style={styles.topBar}>
+          <View style={styles.categoryBadge}>
+            <Text style={styles.categoryBadgeText}>{categoria}</Text>
           </View>
+          {galeria.length > 1 && (
+            <View style={styles.dotsContainer}>
+              {galeria.map((_, i) => (
+                <View
+                  key={i}
+                  style={[styles.dot, galeriaIndex === i ? styles.dotActive : styles.dotInactive]}
+                />
+              ))}
+            </View>
+          )}
         </View>
 
-        {isExpanded && event.catalog && event.catalog.length > 0 && (
-          <View style={[styles.carouselContainer, { borderTopColor: borderColor }]}>
-            <View style={styles.carouselHeader}>
-              <MaterialIcons name="shopping-bag" size={16} color={color} />
-              <Text style={[styles.carouselTitle, { color: textColor }]}>
-                Productos de la Tienda
-              </Text>
+        {/* Bottom gradient + title overlay */}
+        <LinearGradient
+          colors={['transparent', 'rgba(13,17,23,0.55)', 'rgba(13,17,23,0.98)']}
+          locations={[0, 0.45, 1]}
+          style={styles.bottomGradientContainer}
+          pointerEvents="none"
+        >
+          <View style={styles.titleWrapper}>
+            <Animated.Text style={[styles.titleText, animatedTitleStyle]} numberOfLines={1}>
+              {nombre}
+            </Animated.Text>
+          </View>
+          {distancia ? (
+            <View style={styles.distanceRow}>
+              <MaterialIcons name="place" size={11} color="#c89664" />
+              <Text style={styles.distanceText}>{distancia}</Text>
             </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.carouselScroll}
-              snapToInterval={138}
-              decelerationRate="fast"
-            >
-              {event.catalog.map((product) => (
-                <Pressable
-                  key={product.id}
-                  style={({ pressed }) => [
-                    styles.productCard,
-                    {
-                      backgroundColor: btnBg,
-                      borderColor: borderColor,
-                      opacity: pressed ? 0.9 : 1,
-                      transform: [{ scale: pressed ? 0.98 : 1 }],
-                    },
-                  ]}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    handleProductPress(product.name);
-                  }}
+          ) : null}
+        </LinearGradient>
+      </View>
+
+      {/* ── Body ────────────────────────────────────────────────── */}
+      <View style={styles.bodyContainer}>
+        {/* Descripción */}
+        {descripcion ? (
+          <Text style={styles.descriptionText} numberOfLines={isExpanded ? 15 : 2}>
+            {descripcion}
+          </Text>
+        ) : null}
+
+        {/* Info grid — solo expandido (Universidad) */}
+        {isExpanded && isUniversidad && (nivelEducativo || anioFundacion) && (
+          <Animated.View entering={FadeIn.duration(250)} style={styles.infoGrid}>
+            {nivelEducativo ? (
+              <View style={styles.infoGridCell}>
+                <Text style={styles.infoGridLabel}>Carreras</Text>
+                <Text style={styles.infoGridValue1}>{nivelEducativo}</Text>
+              </View>
+            ) : null}
+            {anioFundacion ? (
+              <View
+                style={[styles.infoGridCell, nivelEducativo ? styles.infoGridCellBorder : null]}
+              >
+                <Text style={styles.infoGridLabel}>Trayectoria</Text>
+                <Text style={styles.infoGridValue2}>{anioFundacion}</Text>
+              </View>
+            ) : null}
+          </Animated.View>
+        )}
+
+        {/* Rows de contacto */}
+        {hasContactInfo && (
+          <View style={styles.contactRowsContainer}>
+            {/* Ubicación — siempre */}
+            {ubicacion ? (
+              <View style={styles.contactRow}>
+                <View style={styles.iconBox}>
+                  <MaterialIcons name="location-on" size={15} color="#c89664" />
+                </View>
+                <View style={styles.contactRowTextContent}>
+                  <Text style={styles.contactRowLabel}>Ubicación</Text>
+                  <Text style={styles.contactRowValue}>{ubicacion}</Text>
+                </View>
+              </View>
+            ) : null}
+
+            {/* Teléfono — siempre */}
+            {telefono && (
+              <>
+                {ubicacion ? <View style={styles.internalDivider} /> : null}
+                <AnimatedPressable
+                  style={[styles.contactRow, phoneBtn.animatedStyle]}
+                  onPress={() => handleContact('phone', telefono)}
+                  onPressIn={phoneBtn.onPressIn}
+                  onPressOut={phoneBtn.onPressOut}
                 >
-                  {product.imageUrl ? (
-                    <Image source={{ uri: product.imageUrl }} style={styles.productImage} />
-                  ) : (
-                    <View
-                      style={[styles.productImagePlaceholder, { backgroundColor: color + '15' }]}
-                    >
-                      <MaterialIcons name="image" size={24} color={color} />
-                    </View>
-                  )}
-                  <View style={styles.productInfo}>
-                    <Text style={[styles.productName, { color: textColor }]} numberOfLines={2}>
-                      {product.name}
-                    </Text>
-                    <Text style={[styles.productPrice, { color: color }]}>
-                      {`$${product.price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`}
-                    </Text>
+                  <View style={styles.iconBox}>
+                    <MaterialIcons name="phone" size={15} color="#c89664" />
                   </View>
-                </Pressable>
-              ))}
-            </ScrollView>
+                  <View style={styles.contactRowTextContent}>
+                    <Text style={styles.contactRowLabel}>Teléfono</Text>
+                    <Text style={styles.contactRowValueHighlighted}>{telefono}</Text>
+                  </View>
+                  <MaterialIcons
+                    name="chevron-right"
+                    size={14}
+                    color="rgba(200,150,100,0.35)"
+                    style={{ alignSelf: 'center' }}
+                  />
+                </AnimatedPressable>
+              </>
+            )}
+
+            {/* Email — solo expandido */}
+            {isExpanded && email && (
+              <Animated.View entering={FadeIn.duration(200)}>
+                <View style={styles.internalDivider} />
+                <AnimatedPressable
+                  style={[styles.contactRow, emailBtn.animatedStyle]}
+                  onPress={() => handleContact('email', email)}
+                  onPressIn={emailBtn.onPressIn}
+                  onPressOut={emailBtn.onPressOut}
+                >
+                  <View style={styles.iconBox}>
+                    <MaterialIcons name="email" size={15} color="#c89664" />
+                  </View>
+                  <View style={styles.contactRowTextContent}>
+                    <Text style={styles.contactRowLabel}>Email</Text>
+                    <Text style={styles.contactRowValueHighlighted}>{email}</Text>
+                  </View>
+                  <MaterialIcons
+                    name="chevron-right"
+                    size={14}
+                    color="rgba(200,150,100,0.35)"
+                    style={{ alignSelf: 'center' }}
+                  />
+                </AnimatedPressable>
+              </Animated.View>
+            )}
+
+            {/* Horarios — solo expandido */}
+            {isExpanded && horarios && (
+              <Animated.View entering={FadeIn.duration(200)}>
+                <View style={styles.internalDivider} />
+                <View style={styles.contactRow}>
+                  <View style={styles.iconBox}>
+                    <MaterialIcons name="schedule" size={15} color="#c89664" />
+                  </View>
+                  <View style={styles.contactRowTextContent}>
+                    <Text style={styles.contactRowLabel}>Horarios</Text>
+                    <Text style={styles.contactRowValue}>{horarios}</Text>
+                  </View>
+                </View>
+              </Animated.View>
+            )}
           </View>
         )}
-      </Pressable>
-      {/* Pointer triangle adapting towards the pin */}
-      <View style={[styles.pointer, { borderTopColor: bgColor }]} />
+
+        {/* Redes sociales — solo expandido */}
+        {isExpanded && hasSocial && (
+          <Animated.View entering={FadeIn.duration(250)} style={styles.socialContainer}>
+            <Text style={styles.socialLabel}>Síguenos</Text>
+            <View style={styles.socialRow}>
+              {instagram && (
+                <AnimatedPressable
+                  style={[styles.socialButton, instaBtn.animatedStyle]}
+                  onPress={() => handleContact('instagram', instagram)}
+                  onPressIn={instaBtn.onPressIn}
+                  onPressOut={instaBtn.onPressOut}
+                >
+                  <MaterialIcons name="camera-alt" size={15} color="#c89664" />
+                </AnimatedPressable>
+              )}
+              {linkedin && (
+                <AnimatedPressable
+                  style={[styles.socialButton, inBtn.animatedStyle]}
+                  onPress={() => handleContact('linkedin', linkedin)}
+                  onPressIn={inBtn.onPressIn}
+                  onPressOut={inBtn.onPressOut}
+                >
+                  <MaterialIcons name="work" size={15} color="#c89664" />
+                </AnimatedPressable>
+              )}
+              {facebook && (
+                <AnimatedPressable
+                  style={[styles.socialButton, fbBtn.animatedStyle]}
+                  onPress={() => handleContact('facebook', facebook)}
+                  onPressIn={fbBtn.onPressIn}
+                  onPressOut={fbBtn.onPressOut}
+                >
+                  <MaterialIcons name="facebook" size={15} color="#c89664" />
+                </AnimatedPressable>
+              )}
+            </View>
+          </Animated.View>
+        )}
+
+        {/* Divider */}
+        <LinearGradient
+          colors={['transparent', 'rgba(200,150,100,0.12)', 'transparent']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.divider}
+        />
+
+        {/* Botones */}
+        <View style={styles.actionButtonsRow}>
+          <AnimatedPressable
+            style={[styles.expandButton, expandBtn.animatedStyle]}
+            onPress={handleToggleExpand}
+            onPressIn={expandBtn.onPressIn}
+            onPressOut={expandBtn.onPressOut}
+          >
+            <Text style={styles.expandButtonText}>{isExpanded ? 'Ver menos' : 'Ver más'}</Text>
+            <Animated.View style={arrowAnimStyle}>
+              <MaterialIcons name="keyboard-arrow-up" size={14} color="#c89664" />
+            </Animated.View>
+          </AnimatedPressable>
+
+          <AnimatedPressable
+            style={[styles.ubicarButtonWrapper, ubicarBtn.animatedStyle]}
+            onPress={handleDirections}
+            onPressIn={ubicarBtn.onPressIn}
+            onPressOut={ubicarBtn.onPressOut}
+          >
+            <LinearGradient
+              colors={['#c89664', '#d9af7e']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.ubicarButton}
+            >
+              <MaterialIcons name="near-me" size={14} color="#0a0e14" />
+              <Text style={styles.ubicarButtonText}>Ubicar</Text>
+            </LinearGradient>
+          </AnimatedPressable>
+        </View>
+      </View>
+
+      {/* Pointer triangle */}
+      <View style={[styles.pointer, { borderTopColor: '#0d1117' }]} />
     </Animated.View>
   );
 };
 
+// ─── Styles ────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   modalContainer: {
-    maxWidth: 260,
-    minWidth: 180,
-    borderRadius: 16,
+    width: MODAL_MAX_WIDTH,
+    backgroundColor: '#0d1117',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
     marginBottom: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 8,
-    borderWidth: 1,
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  pressableContent: {
-    width: '100%',
-  },
-  bannerImage: {
-    width: '100%',
-    height: 120,
-    borderTopLeftRadius: 15,
-    borderTopRightRadius: 15,
-  },
-  bannerPlaceholder: {
-    width: '100%',
-    height: 100,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderTopLeftRadius: 15,
-    borderTopRightRadius: 15,
-  },
-  contentRow: {
-    flexDirection: 'row',
-    padding: 10,
-    gap: 12,
-    alignItems: 'flex-start',
-    width: '100%',
-  },
-  thumbnail: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    marginTop: 2,
-  },
-  expandedThumbnail: {
-    width: 60,
-    height: 60,
-    borderRadius: 15,
-  },
-  thumbnailPlaceholder: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 2,
-  },
-  infoCol: {
-    flex: 1,
-  },
-  title: {
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif-medium',
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 2,
-    letterSpacing: -0.3,
-  },
-  expandedTitle: {
-    fontSize: 16,
-    marginBottom: 4,
-  },
-  expandHint: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-    gap: 2,
-  },
-  expandHintText: {
-    fontSize: 10,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-    gap: 4,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  statusText: {
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  descriptionText: {
-    fontSize: 12,
-    lineHeight: 16,
-    marginBottom: 8,
-  },
-  extraInfo: {
-    marginTop: 4,
-    marginBottom: 12,
-    gap: 6,
-    borderTopWidth: 1,
-    paddingTop: 8,
-  },
-  extraInfoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  extraInfoText: {
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 4,
-  },
-  iconButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionButton: {
-    height: 32,
-    borderRadius: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-    gap: 6,
-  },
-  fullWidthButton: {
-    flex: 1,
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  carouselContainer: {
-    marginTop: 4,
-    paddingTop: 8,
-    paddingBottom: 10,
-    borderTopWidth: 1,
-    width: '100%',
-  },
-  carouselHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 8,
-    paddingHorizontal: 10,
-  },
-  carouselTitle: {
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif-medium',
-    fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  carouselScroll: {
-    paddingHorizontal: 10,
-    gap: 8,
-  },
-  productCard: {
-    width: 130,
-    borderRadius: 12,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.9,
+    shadowRadius: 40,
+    elevation: 16,
     overflow: 'hidden',
     borderWidth: 1,
+    borderColor: 'rgba(200,150,100,0.08)',
+    alignItems: 'center',
   },
-  productImage: {
+  handleContainer: {
     width: '100%',
-    height: 75,
+    alignItems: 'center',
+    paddingTop: 11,
+    paddingBottom: 7,
+    zIndex: 10,
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    backgroundColor: 'rgba(200,150,100,0.2)',
+    borderRadius: 2,
+  },
+
+  // ── Gallery ──────────────────────────────────────────────
+  galleryContainer: {
+    position: 'relative',
+    width: '100%',
+    height: GALLERY_HEIGHT,
+    backgroundColor: '#0a0e14',
+    overflow: 'hidden',
+  },
+  slide: {
+    height: '100%',
+    backgroundColor: '#141c28',
+  },
+  slideImage: {
+    width: '100%',
+    height: '100%',
     resizeMode: 'cover',
   },
-  productImagePlaceholder: {
-    width: '100%',
-    height: 75,
+  slideEmojiContainer: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  productInfo: {
-    padding: 6,
+  slideEmoji: {
+    fontSize: 52,
   },
-  productName: {
-    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif',
-    fontSize: 11,
-    fontWeight: '600',
-    lineHeight: 14,
-    height: 28,
+  topBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    padding: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    zIndex: 10,
   },
-  productPrice: {
-    fontSize: 11,
+  categoryBadge: {
+    backgroundColor: 'rgba(10,14,20,0.82)',
+    paddingVertical: 5,
+    paddingHorizontal: 11,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(200,150,100,0.18)',
+  },
+  categoryBadgeText: {
+    color: '#c89664',
+    fontSize: 10,
     fontWeight: '700',
-    marginTop: 2,
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
   },
+  dotsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(10,14,20,0.7)',
+    paddingVertical: 6,
+    paddingHorizontal: 9,
+    borderRadius: 20,
+    gap: 5,
+  },
+  dot: {
+    height: 4,
+    borderRadius: 2,
+  },
+  dotActive: {
+    width: 16,
+    backgroundColor: '#c89664',
+  },
+  dotInactive: {
+    width: 6,
+    backgroundColor: 'rgba(200,150,100,0.28)',
+  },
+  bottomGradientContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 5,
+    paddingTop: 52,
+    paddingHorizontal: 18,
+    paddingBottom: 14,
+  },
+  titleWrapper: {
+    overflow: 'hidden',
+    height: 26,
+    marginBottom: 5,
+  },
+  titleText: {
+    color: '#f0f4f8',
+    fontSize: 17,
+    fontWeight: '700',
+    ...(Platform.OS === 'ios' ? { fontFamily: 'Inter' } : {}),
+  },
+  distanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  distanceText: {
+    color: '#c89664',
+    fontSize: 12,
+    fontWeight: '500',
+    letterSpacing: 0.1,
+  },
+
+  // ── Body ─────────────────────────────────────────────────
+  bodyContainer: {
+    paddingTop: 18,
+    paddingHorizontal: 18,
+    paddingBottom: 20,
+    width: '100%',
+    gap: 14,
+  },
+  descriptionText: {
+    color: '#8a96a3',
+    fontSize: 13,
+    lineHeight: 21,
+  },
+
+  // ── Info Grid ────────────────────────────────────────────
+  infoGrid: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(200,150,100,0.1)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(200,150,100,0.1)',
+    overflow: 'hidden',
+  },
+  infoGridCell: {
+    flex: 1,
+    paddingVertical: 11,
+    paddingHorizontal: 13,
+    backgroundColor: '#0d1117',
+  },
+  infoGridCellBorder: {
+    borderLeftWidth: 1,
+    borderLeftColor: 'rgba(200,150,100,0.1)',
+  },
+  infoGridLabel: {
+    color: '#44505c',
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.65,
+    marginBottom: 4,
+  },
+  infoGridValue1: {
+    color: '#c8d4dc',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  infoGridValue2: {
+    color: '#c89664',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  // ── Contact Rows ─────────────────────────────────────────
+  contactRowsContainer: {
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.04)',
+    overflow: 'hidden',
+  },
+  contactRow: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'flex-start',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  iconBox: {
+    width: 34,
+    height: 34,
+    backgroundColor: 'rgba(200,150,100,0.07)',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    borderWidth: 1,
+    borderColor: 'rgba(200,150,100,0.12)',
+  },
+  contactRowTextContent: {
+    flex: 1,
+    minWidth: 0,
+    paddingTop: 1,
+  },
+  contactRowLabel: {
+    color: '#3e4a56',
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.65,
+    marginBottom: 2,
+  },
+  contactRowValue: {
+    color: '#c8d4dc',
+    fontSize: 13,
+  },
+  contactRowValueHighlighted: {
+    color: '#c89664',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  internalDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    marginHorizontal: 14,
+  },
+
+  // ── Social ───────────────────────────────────────────────
+  socialContainer: {
+    gap: 10,
+  },
+  socialLabel: {
+    color: '#3e4a56',
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.65,
+  },
+  socialRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  socialButton: {
+    width: 36,
+    height: 36,
+    backgroundColor: 'rgba(200,150,100,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(200,150,100,0.14)',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // ── Action Buttons ───────────────────────────────────────
+  divider: {
+    height: 1,
+    width: '100%',
+    marginVertical: 0,
+  },
+  actionButtonsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  expandButton: {
+    flex: 1,
+    backgroundColor: 'rgba(200,150,100,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(200,150,100,0.18)',
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  expandButtonText: {
+    color: '#c89664',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  ubicarButtonWrapper: {
+    flex: 1,
+    borderRadius: 14,
+    overflow: 'hidden',
+    shadowColor: 'rgba(200,150,100,1)',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.28,
+    shadowRadius: 18,
+    elevation: 6,
+  },
+  ubicarButton: {
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  ubicarButtonText: {
+    color: '#0a0e14',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  // ── Pointer ──────────────────────────────────────────────
   pointer: {
     width: 0,
     height: 0,
@@ -702,7 +862,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: -8,
   },
+
+  // ── Tooltip (camara) ─────────────────────────────────────
   tooltipContainer: {
+    backgroundColor: '#0d1117',
+    borderColor: 'rgba(200,150,100,0.18)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
@@ -719,6 +883,7 @@ const styles = StyleSheet.create({
     minWidth: 100,
   },
   tooltipText: {
+    color: '#c8d4dc',
     fontSize: 12,
     fontWeight: '600',
     textAlign: 'center',
