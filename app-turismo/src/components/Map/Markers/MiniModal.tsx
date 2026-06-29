@@ -68,18 +68,21 @@ export const MiniModal = ({ event, isLightMode, isSelected }: MiniModalProps) =>
   const windowHeight = Dimensions.get('window').height;
   const maxModalHeight = Math.min(windowHeight * 0.6, 480);
 
-  const [isExpanded, setIsExpanded] = useState(isSelected || false);
+  const hasUniversidadInfo = isUniversidad && (event.nivelEducativo || event.anioFundacion);
+  const shouldAutoExpand = isSelected && hasUniversidadInfo;
+
+  const [isExpanded, setIsExpanded] = useState<boolean>(shouldAutoExpand ? true : false);
   const [galeriaIndex, setGaleriaIndex] = useState(0);
   const [modalWidth, setModalWidth] = useState(MODAL_MAX_WIDTH);
   const [galeriaImages, setGaleriaImages] = useState<string[]>([]);
 
   useEffect(() => {
     if (isSelected) {
-      setIsExpanded(true);
+      setIsExpanded(shouldAutoExpand ? true : false);
     } else {
       setIsExpanded(false);
     }
-  }, [isSelected]);
+  }, [isSelected, shouldAutoExpand]);
 
   useEffect(() => {
     const loadGalleryImages = async () => {
@@ -259,9 +262,9 @@ export const MiniModal = ({ event, isLightMode, isSelected }: MiniModalProps) =>
       style={[styles.modalContainer, { transformOrigin: 'bottom', maxHeight: maxModalHeight } as any]}
     >
       {/* ── Handle / drag indicator ─────────────────────────────── */}
-      <Pressable onPress={handleToggleExpand} style={styles.handleContainer}>
+      <View style={styles.handleContainer}>
         <View style={styles.handle} />
-      </Pressable>
+      </View>
 
       {/* ── Gallery carousel ────────────────────────────────────── */}
       <View style={styles.galleryContainer}>
@@ -337,8 +340,8 @@ export const MiniModal = ({ event, isLightMode, isSelected }: MiniModalProps) =>
           </Text>
         ) : null}
 
-        {/* Info grid — solo expandido (Universidad) */}
-        {isExpanded && isUniversidad && (nivelEducativo || anioFundacion) && (
+        {/* Info grid — Universidades (Nivel 1, no expandido) */}
+        {isUniversidad && (nivelEducativo || anioFundacion) && (
           <Animated.View entering={FadeIn.duration(250)} style={styles.infoGrid}>
             {nivelEducativo ? (
               <View style={styles.infoGridCell}>
@@ -357,8 +360,8 @@ export const MiniModal = ({ event, isLightMode, isSelected }: MiniModalProps) =>
           </Animated.View>
         )}
 
-        {/* Rows de contacto */}
-        {hasContactInfo && (
+        {/* Contacto Nivel 1: Ubicación + Teléfono (siempre) */}
+        {(ubicacion || telefono) && (
           <View style={styles.contactRowsContainer}>
             {/* Ubicación — siempre */}
             {ubicacion ? (
@@ -400,10 +403,12 @@ export const MiniModal = ({ event, isLightMode, isSelected }: MiniModalProps) =>
               </>
             )}
 
-            {/* Email — solo expandido */}
+            {/* Divider entre Nivel 1 y Nivel 2 */}
+            {isExpanded && (email || horarios) && <View style={styles.internalDivider} />}
+
+            {/* Email — solo expandido (Nivel 2) */}
             {isExpanded && email && (
               <Animated.View entering={FadeIn.duration(200)}>
-                <View style={styles.internalDivider} />
                 <AnimatedPressable
                   style={[styles.contactRow, emailBtn.animatedStyle]}
                   onPress={() => handleContact('email', email)}
@@ -427,10 +432,10 @@ export const MiniModal = ({ event, isLightMode, isSelected }: MiniModalProps) =>
               </Animated.View>
             )}
 
-            {/* Horarios — solo expandido */}
+            {/* Horarios — solo expandido (Nivel 2) */}
             {isExpanded && horarios && (
               <Animated.View entering={FadeIn.duration(200)}>
-                <View style={styles.internalDivider} />
+                {email && <View style={styles.internalDivider} />}
                 <View style={styles.contactRow}>
                   <View style={styles.iconBox}>
                     <MaterialIcons name="schedule" size={15} color="#c89664" />
