@@ -13,6 +13,7 @@ import { TrafficTileCache, TRAFFIC_PROTOCOL } from '../../utils/trafficTileCache
 import { useSuperclusterEvents, getClusterDominantColor } from '../../utils/clusterUtils';
 import { radialMenuRegistry } from '../../utils/radialMenuRegistry';
 import { getLatestRadarPath } from '../../utils/weatherUtils';
+import { useRainEffect } from '../../utils/useRainEffect';
 import { CICLOVIAS_GEOJSON } from '../../data/ciclovias';
 import { MOBILIARIO_GEOJSON } from '../../data/mobiliarioData';
 import { FloorSelector } from '../MapUI/FloorSelector';
@@ -973,7 +974,6 @@ function renderHospitalMarker(
   mapLayer: string,
 ) {
   pinEl.innerHTML = '';
-  const isDark = mapLayer === 'dark' || mapLayer === 'satellite';
   const container = document.createElement('div');
   container.className = 'marker-hospital-container';
   Object.assign(container.style, {
@@ -991,22 +991,53 @@ function renderHospitalMarker(
       : 'drop-shadow(0px 4px 6px rgba(0,0,0,0.2))',
   });
 
-  const svgColorBase = isDark ? '#FFFFFF' : '#E2E8F0';
-  const svgColorRoof = isDark ? '#CBD5E0' : '#A0AEC0';
-  const svgColorDoor = isDark ? '#A0AEC0' : '#718096';
-  const svgColorWindow = isDark ? '#90CDF4' : '#63B3ED';
+  container.innerHTML = `
+    <svg width="40" height="40" viewBox="0 0 64 64">
+      <ellipse cx="32" cy="54" rx="20" ry="6" fill="rgba(0,0,0,0.2)" />
+      <path d="M32 6 C21 6 12 15 12 26 C12 40 32 58 32 58 C32 58 52 40 52 26 C52 15 43 6 32 6 Z" fill="#FFFFFF" stroke="#CBD5E0" stroke-width="1.5" />
+      <rect x="28.5" y="18" width="7" height="18" fill="#DC2626" rx="1" />
+      <rect x="21" y="25.5" width="22" height="7" fill="#DC2626" rx="1" />
+      <circle cx="32" cy="29.5" r="12" fill="none" stroke="#FEE2E2" stroke-width="0.5" />
+    </svg>
+  `;
+  pinEl.appendChild(container);
+
+  if (event.vineta) {
+    renderVinetaBadge(container, event.vineta);
+  }
+}
+
+function renderClinicaMarker(
+  pinEl: HTMLDivElement,
+  event: TurismoEvent,
+  isSelected: boolean,
+  mapLayer: string,
+) {
+  pinEl.innerHTML = '';
+  const container = document.createElement('div');
+  container.className = 'marker-clinica-container';
+  Object.assign(container.style, {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '40px',
+    height: '40px',
+    transition: 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
+    transform: isSelected ? 'scale(1.2)' : 'scale(1)',
+    transformOrigin: 'bottom center',
+    filter: isSelected
+      ? 'drop-shadow(0px 8px 12px rgba(0,0,0,0.3))'
+      : 'drop-shadow(0px 4px 6px rgba(0,0,0,0.2))',
+  });
 
   container.innerHTML = `
     <svg width="40" height="40" viewBox="0 0 64 64">
-      <path d="M16 48 L48 48 L48 20 L16 20 Z" fill="${svgColorBase}" />
-      <path d="M12 20 L52 20 L52 16 L12 16 Z" fill="${svgColorRoof}" />
-      <path d="M28 32 L36 32 L36 36 L28 36 Z" fill="#E53E3E" />
-      <path d="M30 30 L34 30 L34 38 L30 38 Z" fill="#E53E3E" />
-      <path d="M28 48 L36 48 L36 42 L28 42 Z" fill="${svgColorDoor}" />
-      <rect x="20" y="24" width="4" height="4" fill="${svgColorWindow}" />
-      <rect x="40" y="24" width="4" height="4" fill="${svgColorWindow}" />
-      <rect x="20" y="32" width="4" height="4" fill="${svgColorWindow}" />
-      <rect x="40" y="32" width="4" height="4" fill="${svgColorWindow}" />
+      <ellipse cx="32" cy="54" rx="20" ry="6" fill="rgba(0,0,0,0.2)" />
+      <path d="M32 6 C21 6 12 15 12 26 C12 40 32 58 32 58 C32 58 52 40 52 26 C52 15 43 6 32 6 Z" fill="#FFFFFF" stroke="#CBD5E0" stroke-width="1.5" />
+      <rect x="28.5" y="18" width="7" height="18" fill="#F87171" rx="1" />
+      <rect x="21" y="25.5" width="22" height="7" fill="#F87171" rx="1" />
+      <circle cx="32" cy="29.5" r="11" fill="none" stroke="#FECACA" stroke-width="0.8" />
     </svg>
   `;
   pinEl.appendChild(container);
@@ -1023,7 +1054,6 @@ function renderBomberoMarker(
   mapLayer: string,
 ) {
   pinEl.innerHTML = '';
-  const isDark = mapLayer === 'dark' || mapLayer === 'satellite';
   const container = document.createElement('div');
   container.className = 'marker-bombero-container';
   Object.assign(container.style, {
@@ -1041,18 +1071,12 @@ function renderBomberoMarker(
       : 'drop-shadow(0px 4px 6px rgba(0,0,0,0.2))',
   });
 
-  const svgColorBase = isDark ? '#CBD5E0' : '#A0AEC0';
-  const svgColorTop = isDark ? '#718096' : '#4A5568';
-  const svgColorStroke = isDark ? '#4A5568' : '#718096';
-  const svgColorLabel = isDark ? '#FEFCBF' : '#ECC94B';
-
   container.innerHTML = `
     <svg width="40" height="40" viewBox="0 0 64 64">
-      <path d="M22 28 L42 28 L42 48 Q42 52 32 52 Q22 52 22 48 Z" fill="#E53E3E" />
-      <path d="M26 18 L38 18 L38 28 L26 28 Z" fill="${svgColorBase}" />
-      <path d="M30 14 L34 14 L34 18 L30 18 Z" fill="${svgColorTop}" />
-      <path d="M32 14 Q38 8 40 16" stroke="${svgColorStroke}" stroke-width="3" fill="none" />
-      <rect x="26" y="34" width="12" height="10" fill="${svgColorLabel}" />
+      <ellipse cx="32" cy="54" rx="20" ry="6" fill="rgba(0,0,0,0.2)" />
+      <path d="M32 6 C21 6 12 15 12 26 C12 40 32 58 32 58 C32 58 52 40 52 26 C52 15 43 6 32 6 Z" fill="#FFFFFF" stroke="#CBD5E0" stroke-width="1.5" />
+      <path d="M32 12 Q29 16 29 20 Q29 24 32 25 Q35 24 35 20 Q35 16 32 12 Z" fill="#E53E3E" />
+      <path d="M32 14 Q30 17 30 20 Q30 22 32 23 Q34 22 34 20 Q34 17 32 14 Z" fill="#F97316" />
     </svg>
   `;
   pinEl.appendChild(container);
@@ -1163,42 +1187,92 @@ function renderCamaraMarker(
   pinEl: HTMLDivElement,
   event: TurismoEvent,
   isSelected: boolean,
-  mapLayer: string,
+  _mapLayer: string,
 ) {
   pinEl.innerHTML = '';
-  const isDark = mapLayer === 'dark' || mapLayer === 'satellite';
-  const container = document.createElement('div');
-  container.className = 'marker-camara-container';
-  Object.assign(container.style, {
-    position: 'relative',
+
+  /*
+   * Estructura DOM (bottom = punto geo anclado en suelo):
+   *
+   *   [pinWrapper]        ← sube con elevation (translateY), contiene la lente
+   *     [stem]            ← estira hacia abajo desde la lente al suelo
+   *     [lens svg]        ← icono visible siempre
+   *
+   * El pinWrapper usa el mismo sistema de transformación que otros markers
+   * (translateY(-elevation)) para que la lente flote con pitch 3D.
+   * El stem rellena el gap entre lente y suelo.
+   */
+
+  // pinWrapper — se mueve con elevation igual que otros markers
+  const pinWrapper = document.createElement('div');
+  pinWrapper.className = 'marker-3d-pin-wrapper marker-camara-wrapper';
+  Object.assign(pinWrapper.style, {
+    position: 'absolute',
+    bottom: '0px',
+    left: '-12px',
     display: 'flex',
+    flexDirection: 'column',
     alignItems: 'center',
-    justifyContent: 'center',
-    width: '40px',
-    height: '40px',
-    transition: 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
-    transform: isSelected ? 'scale(1.2)' : 'scale(1)',
+    width: '24px',
+    transition: 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.15s ease',
     transformOrigin: 'bottom center',
-    filter: isSelected
-      ? 'drop-shadow(0px 8px 12px rgba(0,0,0,0.3))'
-      : 'drop-shadow(0px 4px 6px rgba(0,0,0,0.2))',
   });
 
-  const poleColor = isDark ? '#A0AEC0' : '#718096';
-  const bodyColor = isDark ? '#E2E8F0' : '#CBD5E0';
+  // Stem — se extiende desde base de lente hasta el suelo
+  const stem = document.createElement('div');
+  stem.className = 'marker-3d-stem-camara';
+  Object.assign(stem.style, {
+    width: '2px',
+    height: '0px',
+    background: 'linear-gradient(to bottom, rgba(113,128,150,0.9) 0%, rgba(113,128,150,0.2) 100%)',
+    opacity: '0',
+    transition: 'height 0.15s ease, opacity 0.15s ease',
+    pointerEvents: 'none',
+    flexShrink: '0',
+    order: '1',
+  });
+  pinWrapper.appendChild(stem);
 
-  container.innerHTML = `
-    <svg width="40" height="40" viewBox="0 0 64 64">
-      <rect x="30" y="24" width="4" height="40" fill="${poleColor}" />
-      <path d="M16 20 L40 20 L40 32 L16 32 Z" fill="${bodyColor}" transform="rotate(-15 32 26)" />
-      <rect x="12" y="22" width="6" height="8" fill="#2D3748" transform="rotate(-15 32 26)" />
-      <ellipse cx="38" cy="22" rx="2" ry="2" fill="#E53E3E" transform="rotate(-15 32 26)" />
+  // Lens svg — siempre visible, arriba del stem. NO escala al seleccionar.
+  const lens = document.createElement('div');
+  lens.className = 'marker-camara-lens-container';
+  Object.assign(lens.style, {
+    width: '24px',
+    height: '24px',
+    flexShrink: '0',
+    order: '0',
+    position: 'relative',
+    filter: 'drop-shadow(0px 1px 3px rgba(0,0,0,0.3))',
+  });
+  lens.innerHTML = `
+    <svg width="24" height="24" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="11" fill="#4A5568" />
+      <circle cx="12" cy="12" r="8"  fill="#718096" />
+      <circle cx="12" cy="12" r="5"  fill="#2D3748" />
+      <circle cx="12" cy="12" r="2.5" fill="#1A202C" />
+      <circle cx="9.5" cy="9.5" r="1.2" fill="#90CDF4" opacity="0.9" />
+      <circle cx="19.5" cy="4.5" r="1.8" fill="#E53E3E" opacity="0.95" />
     </svg>
   `;
-  pinEl.appendChild(container);
+
+  // Anchor para el modal — centrado sobre la lente
+  const modalAnchor = document.createElement('div');
+  modalAnchor.className = 'camara-modal-anchor';
+  Object.assign(modalAnchor.style, {
+    position: 'absolute',
+    bottom: '100%',
+    left: '50%',
+    width: '0px',
+    height: '0px',
+    pointerEvents: 'none',
+  });
+  lens.appendChild(modalAnchor);
+
+  pinWrapper.appendChild(lens);
+  pinEl.appendChild(pinWrapper);
 
   if (event.vineta) {
-    renderVinetaBadge(container, event.vineta);
+    renderVinetaBadge(lens, event.vineta);
   }
 }
 
@@ -1553,9 +1627,37 @@ function updateMapLibreStoreModal(
         justifyContent: 'center',
         zIndex: '100',
         pointerEvents: 'auto',
-        transition: 'opacity 0.2s ease, transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+        transition:
+          'opacity 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
         opacity: '0',
+        transform: 'scale(0.3) translateY(40px)',
+        transformOrigin: 'bottom center',
       });
+
+      // Solución basada en geometría ("Safe Triangle")
+      // Puente invisible entre el pin y el modal para evitar mouseleave
+      const safeBridge = document.createElement('div');
+      Object.assign(safeBridge.style, {
+        position: 'absolute',
+        top: '100%',
+        left: '-20px',
+        right: '-20px',
+        height: '20px',
+        backgroundColor: 'transparent',
+        zIndex: '-1',
+      });
+      modalContainer.appendChild(safeBridge);
+
+      // Eventos directos en el minimodal
+      // Aseguramos que se mantenga abierto mientras el cursor esté dentro
+      modalContainer.addEventListener('mouseenter', () => {
+        pinEl.dataset.hovered = 'true';
+        pinEl.dispatchEvent(new Event('mouseenter'));
+      });
+      modalContainer.addEventListener('mouseleave', () => {
+        pinEl.dispatchEvent(new Event('mouseleave'));
+      });
+
       pinEl.appendChild(modalContainer);
 
       const root = createRoot(modalContainer);
@@ -1563,13 +1665,16 @@ function updateMapLibreStoreModal(
 
       // Trigger fade-in on next frame
       requestAnimationFrame(() => {
-        if (modalContainer) modalContainer.style.opacity = '1';
+        if (modalContainer) {
+          modalContainer.style.opacity = '1';
+          modalContainer.style.transform = 'scale(1) translateY(0)';
+        }
       });
     }
 
     const root: Root = (modalContainer as any)._reactRoot;
     if (root) {
-      const isAuthorityEvent = ['hospital', 'bombero', 'carabinero'].includes(
+      const isAuthorityEvent = ['hospital', 'clinica', 'bombero', 'carabinero'].includes(
         event.category?.toLowerCase() || '',
       );
       root.render(
@@ -1583,6 +1688,7 @@ function updateMapLibreStoreModal(
   } else if (modalContainer) {
     // Punto 3: animación de salida — fade out antes de destruir el React root
     modalContainer.style.opacity = '0';
+    modalContainer.style.transform = 'scale(0.8) translateY(15px)';
     const capturedContainer = modalContainer;
     setTimeout(() => {
       const root = (capturedContainer as any)._reactRoot;
@@ -1838,6 +1944,8 @@ function updateMarkerDomRefs(markerObj: any) {
     pinWrapper: pinEl.querySelector('.marker-3d-pin-wrapper'),
     pin: pinEl.querySelector('.marker-3d-pin'),
     stem: pinEl.querySelector('.marker-3d-stem'),
+    stemCamara: pinEl.querySelector('.marker-3d-stem-camara'),
+    lensContainer: pinEl.querySelector('.marker-camara-lens-container'),
     icon: pinEl.querySelector('.marker-3d-icon'),
     flatContainer: flatEl ? flatEl.querySelector('.marker-flat-container') : null,
     shadowPin: flatEl ? flatEl.querySelector('.marker-3d-shadow-pin') : null,
@@ -1983,7 +2091,7 @@ export function MapLibreContainer({
     // Only override selectedEventRef with the external prop if there's no locally-selected minimodal event
     const hasLocalMiniModal = Object.values(markersRef.current).some(
       (m) =>
-        ['hospital', 'universidad', 'bombero', 'carabinero', 'camara'].includes(
+        ['hospital', 'clinica', 'universidad', 'bombero', 'carabinero', 'camara'].includes(
           m.event?.category?.toLowerCase() || '',
         ) && m.pinEl.dataset.localSelected === 'true',
     );
@@ -2018,6 +2126,9 @@ export function MapLibreContainer({
     onSectorPress,
     activeNestedZone,
   ]);
+
+  // Rain effect that activates based on weather data
+  useRainEffect(mapNodeRef.current, mapRef);
 
   // Effect to fetch the latest RainViewer radar path when weather is enabled
   useEffect(() => {
@@ -2815,8 +2926,10 @@ export function MapLibreContainer({
 
         // Dynamic Elevation: Selected pin floats even higher into the sky as zoom increases
         // to emphasize the 3D landmark pop-out effect.
-        const baseMaxElevation = isBoat ? 0 : isSelected ? 26 : isHovered ? 22 : 18;
-        const elevationGrow = isSelected && z > 13 ? (z - 13) * 5.0 : 0; // Floating height grows with zoom
+        const isCamara = cat === 'camara';
+
+        const baseMaxElevation = isBoat ? 0 : isCamara ? 0 : isSelected ? 26 : isHovered ? 22 : 18;
+        const elevationGrow = isSelected && !isCamara && z > 13 ? (z - 13) * 5.0 : 0;
         const maxElevation = baseMaxElevation + elevationGrow;
 
         const elevation = isVisible
@@ -2824,11 +2937,10 @@ export function MapLibreContainer({
           : 0;
 
         let selectedZoomGrow = 1.0;
-        if (isSelected && z > 13) {
-          // Crece de manera inteligente y progresiva cuando nos acercamos (hacemos zoom) al pin marcado
-          selectedZoomGrow = 1.0 + (z - 13) * 0.38; // Increased growth factor for zoom-responsive scaling
+        if (isSelected && !isCamara && z > 13) {
+          selectedZoomGrow = 1.0 + (z - 13) * 0.38;
         }
-        const baseScale = isSelected ? 1.25 * selectedZoomGrow : isHovered ? 1.15 : 1.0;
+        const baseScale = isCamara ? 1.0 : isSelected ? 1.25 * selectedZoomGrow : isHovered ? 1.15 : 1.0;
         const finalScale = baseScale * zoomScale;
 
         if (!markerObj.domRefs) {
@@ -2924,12 +3036,30 @@ export function MapLibreContainer({
                 stem.style.opacity = '0';
               }
             }
+
+            // Stem de cámara — llena el gap entre lente (elevada) y el suelo
+            const stemCamara = domRefs.stemCamara;
+            if (stemCamara) {
+              if (pitch > 0 && isVisible && elevation > 0) {
+                // Mismo elevation que el pinWrapper para conectar exacto
+                stemCamara.style.height = `${elevation + 12}px`;
+                stemCamara.style.opacity = `${Math.min(0.85, (pitch / 60) * 0.9)}`;
+              } else {
+                stemCamara.style.height = '0px';
+                stemCamara.style.opacity = '0';
+              }
+            }
           }
         }
 
         // Apply wrapper translation/scaling
         if (pinWrapper) {
-          pinWrapper.style.transform = `translateY(-${elevation}px) scale(${finalScale})`;
+          if (cat === 'camara') {
+            // Cámara: sin elevation (tooltip no sube) y sin scale (no crece al seleccionar)
+            pinWrapper.style.transform = 'translateY(0px) scale(1)';
+          } else {
+            pinWrapper.style.transform = `translateY(-${elevation}px) scale(${finalScale})`;
+          }
           pinWrapper.style.opacity = `${zoomOpacity}`;
         }
 
@@ -3024,8 +3154,10 @@ export function MapLibreContainer({
               'camara',
             ].includes(categoryLower)
           ) {
+            // Cámara: modal sale del anchor centrado en la lente, no del pinEl
+            const camaraAnchor = pinEl.querySelector('.camara-modal-anchor') as HTMLDivElement | null;
             updateMapLibreStoreModal(
-              pinEl,
+              camaraAnchor ?? pinEl,
               markerObj.event,
               isSelected,
               isHovered,
@@ -3502,7 +3634,7 @@ export function MapLibreContainer({
         if (event) {
           const categoryLower = event.category?.toLowerCase() || '';
           if (
-            ['hospital', 'universidad', 'bombero', 'carabinero', 'camara', 'fauna'].includes(
+            ['hospital', 'clinica', 'universidad', 'bombero', 'carabinero', 'camara', 'fauna'].includes(
               categoryLower,
             )
           ) {
@@ -3982,7 +4114,7 @@ export function MapLibreContainer({
           pinEl.style.width = '48px';
           pinEl.style.height = '48px';
         } else if (
-          ['camara', 'hospital', 'universidad', 'bombero', 'carabinero'].includes(catLower)
+          ['camara', 'hospital', 'clinica', 'universidad', 'bombero', 'carabinero'].includes(catLower)
         ) {
           pinEl.style.width = '40px';
           pinEl.style.height = '40px';
@@ -4003,7 +4135,10 @@ export function MapLibreContainer({
         pinEl.dataset.hovered = 'false';
         pinEl.dataset.category = event.category;
 
-        pinEl.addEventListener('mouseenter', () => {
+        // A11y: Accesibilidad y teclado
+        pinEl.tabIndex = 0;
+
+        const handleOpenMinimodal = () => {
           // Immediately force-close any other hovered/tooltip markers to prevent multiple mini-modals
           Object.values(markersRef.current).forEach((otherObj: any) => {
             if (otherObj.event?.id !== event.id && otherObj.pinEl) {
@@ -4028,18 +4163,17 @@ export function MapLibreContainer({
           pinEl.dataset.hovered = 'true';
 
           if (updateAestheticsRef.current) updateAestheticsRef.current();
-        });
+        };
 
-        pinEl.addEventListener('mouseleave', () => {
+        const handleCloseMinimodal = () => {
           const markerObj = markersRef.current[event.id];
           if (!markerObj) return;
 
           if (markerObj.closeTimeout) clearTimeout(markerObj.closeTimeout);
 
           // During drag, schedule closure to fire after drag ends instead of skipping entirely.
-          // This prevents tooltips from getting permanently stuck when the user drags the map
-          // while the cursor is over a marker.
-          const delayMs = isDraggingRef.current ? 1200 : 800;
+          // Reducimos la tolerancia a 400ms según el área de tolerancia solicitada
+          const delayMs = isDraggingRef.current ? 1200 : 400;
 
           markerObj.closeTimeout = setTimeout(() => {
             // If this timeout fires, the mouse has not re-entered the pin
@@ -4058,6 +4192,25 @@ export function MapLibreContainer({
             if (updateAestheticsRef.current) updateAestheticsRef.current();
             delete markerObj.closeTimeout;
           }, delayMs);
+        };
+
+        pinEl.addEventListener('mouseenter', handleOpenMinimodal);
+        pinEl.addEventListener('focus', handleOpenMinimodal); // A11y
+
+        pinEl.addEventListener('mouseleave', handleCloseMinimodal);
+        pinEl.addEventListener('blur', handleCloseMinimodal); // A11y
+
+        pinEl.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') {
+            const markerObj = markersRef.current[event.id];
+            if (markerObj && markerObj.closeTimeout) clearTimeout(markerObj.closeTimeout);
+            pinEl.dataset.hovered = 'false';
+            if (updateAestheticsRef.current) updateAestheticsRef.current();
+            pinEl.blur(); // Remove focus
+          } else if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            pinEl.click();
+          }
         });
 
         pinEl.addEventListener('click', (e) => {
@@ -4070,7 +4223,7 @@ export function MapLibreContainer({
             return;
           }
           if (
-            ['hospital', 'universidad', 'bombero', 'carabinero', 'camara'].includes(categoryLower)
+            ['hospital', 'clinica', 'universidad', 'bombero', 'carabinero', 'camara'].includes(categoryLower)
           ) {
             const isLocal = pinEl.dataset.localSelected === 'true';
             const nextLocal = !isLocal;
@@ -4078,7 +4231,7 @@ export function MapLibreContainer({
             if (nextLocal) {
               Object.values(markersRef.current).forEach((m) => {
                 if (
-                  ['hospital', 'universidad', 'bombero', 'carabinero', 'camara'].includes(
+                  ['hospital', 'clinica', 'universidad', 'bombero', 'carabinero', 'camara'].includes(
                     m.event?.category?.toLowerCase() || '',
                   ) &&
                   m.pinEl !== pinEl
@@ -4160,6 +4313,8 @@ export function MapLibreContainer({
           renderLoboMarinoMarker(pinEl, event, isSelected, mapLayer);
         } else if (event.category?.toLowerCase() === 'hospital') {
           renderHospitalMarker(pinEl, event, isSelected, mapLayer);
+        } else if (event.category?.toLowerCase() === 'clinica') {
+          renderClinicaMarker(pinEl, event, isSelected, mapLayer);
         } else if (event.category?.toLowerCase() === 'universidad') {
           renderUniversityMarker(pinEl, event, isSelected, mapLayer);
         } else if (event.category?.toLowerCase() === 'bombero') {
@@ -4185,6 +4340,9 @@ export function MapLibreContainer({
           didReRender = true;
         } else if (event.category?.toLowerCase() === 'hospital') {
           renderHospitalMarker(markerObj.pinEl, event, isSelected, mapLayer);
+          didReRender = true;
+        } else if (event.category?.toLowerCase() === 'clinica') {
+          renderClinicaMarker(markerObj.pinEl, event, isSelected, mapLayer);
           didReRender = true;
         } else if (event.category?.toLowerCase() === 'universidad') {
           renderUniversityMarker(markerObj.pinEl, event, isSelected, mapLayer);

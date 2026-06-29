@@ -362,7 +362,7 @@ const EventMarker = React.memo(
       'estatua',
       'arte',
     ].includes(event.category?.toLowerCase() || '');
-    const isAuthorityEvent = ['hospital', 'bombero', 'carabinero'].includes(
+    const isAuthorityEvent = ['hospital', 'clinica', 'bombero', 'carabinero'].includes(
       event.category?.toLowerCase() || '',
     );
     const isArtistic = [
@@ -372,6 +372,7 @@ const EventMarker = React.memo(
       'teatro',
       'fauna',
       'hospital',
+      'clinica',
       'universidad',
       'bombero',
       'carabinero',
@@ -741,6 +742,7 @@ function MapContainerInner({
       const isLocalSelection = [
         'fauna',
         'hospital',
+        'clinica',
         'bombero',
         'carabinero',
         'camara',

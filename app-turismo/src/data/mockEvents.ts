@@ -10,6 +10,7 @@ import {
   HOSPITALES_EVENTS,
   SEGURIDAD_EVENTS,
   ESTRUCTURAS_EVENTS,
+  MUNICIPALIDAD_EVENT,
 } from './polygonsData';
 
 export type CategoryFilter =
@@ -34,9 +35,11 @@ export type CategoryFilter =
   | 'humedal'
   | 'universidad'
   | 'hospital'
+  | 'clinica'
   | 'bombero'
   | 'carabinero'
-  | 'camara';
+  | 'camara'
+  | 'municipalidad';
 
 export const INITIAL_EVENTS: TurismoEvent[] = [
   ...PARQUES_EVENTS,
@@ -47,6 +50,7 @@ export const INITIAL_EVENTS: TurismoEvent[] = [
   ...SEGURIDAD_EVENTS,
   ...ESTRUCTURAS_EVENTS,
   CASINO_DREAMS_EVENT,
+  MUNICIPALIDAD_EVENT,
 ];
 
 export const WS_SIMULATION_POOL: Omit<TurismoEvent, 'id' | 'isRealTime'>[] = [];
@@ -76,9 +80,11 @@ export const CATEGORY_ICONS: Record<
   humedal: { name: 'grass', family: 'MaterialIcons' },
   universidad: { name: 'school', family: 'MaterialIcons' },
   hospital: { name: 'local-hospital', family: 'MaterialIcons' },
+  clinica: { name: 'health-and-safety', family: 'MaterialIcons' },
   bombero: { name: 'fire-extinguisher', family: 'MaterialIcons' },
   carabinero: { name: 'local-police', family: 'MaterialIcons' },
   camara: { name: 'videocam', family: 'MaterialIcons' },
+  municipalidad: { name: 'location-city', family: 'MaterialIcons' },
 };
 
 export const MAP_LAYER_OPTIONS: {

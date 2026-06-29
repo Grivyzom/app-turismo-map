@@ -281,6 +281,7 @@ function InnerGoogleMap({
           'teatro',
           'fauna',
           'hospital',
+          'clinica',
           'universidad',
           'bombero',
           'carabinero',

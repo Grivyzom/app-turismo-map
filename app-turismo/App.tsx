@@ -74,6 +74,10 @@ const getCategoryColor = (category: string, musicStyle?: string) => {
       return '#06B6D4'; // Cian
     case 'publico':
       return '#FBBF24'; // Amarillo/Ámbar
+    case 'hospital':
+      return '#DC2626'; // Rojo hospital
+    case 'clinica':
+      return '#F87171'; // Rojo más claro para clínica
     case 'choque':
       return '#EF4444'; // Rojo choque
     case 'incendio':
@@ -417,29 +421,75 @@ export default function App() {
       </View>
 
       {/* TARJETA DETALLADA FLOTANTE (Efecto Emerger) */}
-      {selectedEvent && 
-       selectedEvent.category?.toLowerCase() !== 'tienda' && 
-       selectedEvent.category?.toLowerCase() !== 'fauna' && (
-        <Animated.View
-          style={[
-            styles.detailsCard,
-            {
-              transform: [
-                {
-                  translateY: cardHeight.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [300, 0],
-                  }),
-                },
-              ],
-              opacity: cardHeight,
-            },
-          ]}
-        >
-          <View style={styles.cardHeader}>
-            <View
+      {selectedEvent &&
+        selectedEvent.category?.toLowerCase() !== 'tienda' &&
+        selectedEvent.category?.toLowerCase() !== 'fauna' && (
+          <Animated.View
+            style={[
+              styles.detailsCard,
+              {
+                transform: [
+                  {
+                    translateY: cardHeight.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [300, 0],
+                    }),
+                  },
+                ],
+                opacity: cardHeight,
+              },
+            ]}
+          >
+            <View style={styles.cardHeader}>
+              <View
+                style={[
+                  styles.cardBadge,
+                  {
+                    backgroundColor: getCategoryColor(
+                      selectedEvent.category,
+                      selectedEvent.musicStyle,
+                    ),
+                  },
+                ]}
+              >
+                <Text style={styles.cardBadgeText}>
+                  {['choque', 'incendio', 'accidente', 'calle_cortada'].includes(
+                    selectedEvent.category,
+                  )
+                    ? `🚨 ${selectedEvent.category.toUpperCase().replace('_', ' ')}`
+                    : selectedEvent.category.toUpperCase()}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setSelectedEvent(null)} style={styles.closeButton}>
+                <Text style={styles.closeButtonText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.cardTitle}>{selectedEvent.title}</Text>
+            <Text style={styles.cardOrganizer}>
+              {['choque', 'incendio', 'accidente', 'calle_cortada'].includes(selectedEvent.category)
+                ? 'Fuente / Reporte'
+                : 'Organizado por'}
+              : {selectedEvent.organizer}
+            </Text>
+            <Text style={styles.cardDesc}>{selectedEvent.description}</Text>
+
+            <View style={styles.cardDivider} />
+
+            <View style={styles.cardMetaRow}>
+              <View style={styles.cardMetaItem}>
+                <Text style={styles.metaLabel}>HORA</Text>
+                <Text style={styles.metaValue}>🕒 {selectedEvent.time}</Text>
+              </View>
+              <View style={styles.cardMetaItem}>
+                <Text style={styles.metaLabel}>ASISTENTES</Text>
+                <Text style={styles.metaValue}>👥 {selectedEvent.attendeesCount} en vivo</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
               style={[
-                styles.cardBadge,
+                styles.actionButton,
                 {
                   backgroundColor: getCategoryColor(
                     selectedEvent.category,
@@ -448,53 +498,10 @@ export default function App() {
                 },
               ]}
             >
-              <Text style={styles.cardBadgeText}>
-                {['choque', 'incendio', 'accidente', 'calle_cortada'].includes(
-                  selectedEvent.category,
-                )
-                  ? `🚨 ${selectedEvent.category.toUpperCase().replace('_', ' ')}`
-                  : selectedEvent.category.toUpperCase()}
-              </Text>
-            </View>
-            <TouchableOpacity onPress={() => setSelectedEvent(null)} style={styles.closeButton}>
-              <Text style={styles.closeButtonText}>✕</Text>
+              <Text style={styles.actionButtonText}>Asistir / Ver Detalles</Text>
             </TouchableOpacity>
-          </View>
-
-          <Text style={styles.cardTitle}>{selectedEvent.title}</Text>
-          <Text style={styles.cardOrganizer}>
-            {['choque', 'incendio', 'accidente', 'calle_cortada'].includes(selectedEvent.category)
-              ? 'Fuente / Reporte'
-              : 'Organizado por'}
-            : {selectedEvent.organizer}
-          </Text>
-          <Text style={styles.cardDesc}>{selectedEvent.description}</Text>
-
-          <View style={styles.cardDivider} />
-
-          <View style={styles.cardMetaRow}>
-            <View style={styles.cardMetaItem}>
-              <Text style={styles.metaLabel}>HORA</Text>
-              <Text style={styles.metaValue}>🕒 {selectedEvent.time}</Text>
-            </View>
-            <View style={styles.cardMetaItem}>
-              <Text style={styles.metaLabel}>ASISTENTES</Text>
-              <Text style={styles.metaValue}>👥 {selectedEvent.attendeesCount} en vivo</Text>
-            </View>
-          </View>
-
-          <TouchableOpacity
-            style={[
-              styles.actionButton,
-              {
-                backgroundColor: getCategoryColor(selectedEvent.category, selectedEvent.musicStyle),
-              },
-            ]}
-          >
-            <Text style={styles.actionButtonText}>Asistir / Ver Detalles</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      )}
+          </Animated.View>
+        )}
     </SafeAreaView>
   );
 }

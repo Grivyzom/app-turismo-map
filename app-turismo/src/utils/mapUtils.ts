@@ -61,6 +61,8 @@ export const getCategoryColor = (category: string, musicStyle?: string) => {
       return '#065F46'; // Forest green
     case 'hospital':
       return '#DC2626'; // Red (Hospital)
+    case 'clinica':
+      return '#F87171'; // Lighter red (Clinic)
     case 'bombero':
       return '#E53E3E'; // Red
     case 'carabinero':
@@ -144,6 +146,8 @@ export const getCategoryIcon = (category: string, musicStyle?: string): Category
       return 'forest';
     case 'hospital':
       return 'local-hospital';
+    case 'clinica':
+      return 'health-and-safety';
     case 'bombero':
       return 'fire-extinguisher';
     case 'carabinero':

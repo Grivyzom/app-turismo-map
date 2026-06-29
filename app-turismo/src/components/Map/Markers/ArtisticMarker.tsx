@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Image } from 'react-native';
-import Svg, { Path, G, Rect, Ellipse, Polygon, SvgXml } from 'react-native-svg';
+import Svg, { Path, G, Rect, Ellipse, Polygon, SvgXml, Circle } from 'react-native-svg';
 
 export type ArtisticMarkerType =
   | 'museo'
@@ -10,6 +10,7 @@ export type ArtisticMarkerType =
   | 'fauna'
   | 'parque'
   | 'hospital'
+  | 'clinica'
   | 'universidad'
   | 'bombero'
   | 'carabinero'
@@ -205,30 +206,52 @@ const HospitalIcon = ({ size, isLightMode }: { size: number; isLightMode?: boole
     {/* Shadow */}
     <Ellipse
       cx="32"
-      cy="52"
+      cy="54"
       rx="20"
       ry="6"
       fill={isLightMode ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.2)'}
     />
 
-    {/* Main Building */}
-    <Path d="M16 48 L48 48 L48 20 L16 20 Z" fill={isLightMode ? '#FFFFFF' : '#E2E8F0'} />
+    {/* Pin shape with white background */}
+    <Path
+      d="M32 6 C21 6 12 15 12 26 C12 40 32 58 32 58 C32 58 52 40 52 26 C52 15 43 6 32 6 Z"
+      fill="#FFFFFF"
+      stroke="#CBD5E0"
+      strokeWidth="1.5"
+    />
 
-    {/* Roof */}
-    <Path d="M12 20 L52 20 L52 16 L12 16 Z" fill={isLightMode ? '#CBD5E0' : '#A0AEC0'} />
+    {/* Medical Cross - centered in pin head */}
+    {/* Vertical bar of cross */}
+    <Rect x="29" y="13" width="6" height="13" fill="#DC2626" rx="1" />
+    {/* Horizontal bar of cross */}
+    <Rect x="23" y="18" width="18" height="6" fill="#DC2626" rx="1" />
+  </Svg>
+);
 
-    {/* Red Cross */}
-    <Path d="M28 32 L36 32 L36 36 L28 36 Z" fill="#E53E3E" />
-    <Path d="M30 30 L34 30 L34 38 L30 38 Z" fill="#E53E3E" />
+const ClinicaIcon = ({ size, isLightMode }: { size: number; isLightMode?: boolean }) => (
+  <Svg width={size} height={size} viewBox="0 0 64 64">
+    {/* Shadow */}
+    <Ellipse
+      cx="32"
+      cy="54"
+      rx="20"
+      ry="6"
+      fill={isLightMode ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.2)'}
+    />
 
-    {/* Doors */}
-    <Path d="M28 48 L36 48 L36 42 L28 42 Z" fill={isLightMode ? '#A0AEC0' : '#718096'} />
+    {/* Pin shape with white background */}
+    <Path
+      d="M32 6 C21 6 12 15 12 26 C12 40 32 58 32 58 C32 58 52 40 52 26 C52 15 43 6 32 6 Z"
+      fill="#FFFFFF"
+      stroke="#CBD5E0"
+      strokeWidth="1.5"
+    />
 
-    {/* Windows */}
-    <Rect x="20" y="24" width="4" height="4" fill={isLightMode ? '#90CDF4' : '#63B3ED'} />
-    <Rect x="40" y="24" width="4" height="4" fill={isLightMode ? '#90CDF4' : '#63B3ED'} />
-    <Rect x="20" y="32" width="4" height="4" fill={isLightMode ? '#90CDF4' : '#63B3ED'} />
-    <Rect x="40" y="32" width="4" height="4" fill={isLightMode ? '#90CDF4' : '#63B3ED'} />
+    {/* Medical Cross - Clinic version */}
+    {/* Vertical bar of cross */}
+    <Rect x="29" y="13" width="6" height="13" fill="#F87171" rx="1" />
+    {/* Horizontal bar of cross */}
+    <Rect x="23" y="18" width="18" height="6" fill="#F87171" rx="1" />
   </Svg>
 );
 
@@ -275,23 +298,39 @@ const BomberoIcon = ({ size, isLightMode }: { size: number; isLightMode?: boolea
     {/* Shadow */}
     <Ellipse
       cx="32"
-      cy="52"
+      cy="54"
       rx="20"
       ry="6"
       fill={isLightMode ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.2)'}
     />
-    {/* Fire Extinguisher / Base */}
-    <Path d="M22 28 L42 28 L42 48 Q42 52 32 52 Q22 52 22 48 Z" fill="#E53E3E" />
-    {/* Extinguisher Top */}
-    <Path d="M26 18 L38 18 L38 28 L26 28 Z" fill={isLightMode ? '#CBD5E0' : '#A0AEC0'} />
-    <Path d="M30 14 L34 14 L34 18 L30 18 Z" fill={isLightMode ? '#718096' : '#4A5568'} />
+
+    {/* Pin shape with white background */}
     <Path
-      d="M32 14 Q38 8 40 16"
-      stroke={isLightMode ? '#4A5568' : '#718096'}
-      strokeWidth="3"
-      fill="none"
+      d="M32 6 C21 6 12 15 12 26 C12 40 32 58 32 58 C32 58 52 40 52 26 C52 15 43 6 32 6 Z"
+      fill="#FFFFFF"
+      stroke="#CBD5E0"
+      strokeWidth="1.5"
     />
-    <Rect x="26" y="34" width="12" height="10" fill={isLightMode ? '#FEFCBF' : '#ECC94B'} />
+
+    {/* Flame icon - centered in pin head */}
+    {/* Outer flame */}
+    <Path d="M32 12 Q29 16 29 20 Q29 24 32 25 Q35 24 35 20 Q35 16 32 12 Z" fill="#E53E3E" />
+    {/* Inner flame */}
+    <Path d="M32 14 Q30 17 30 20 Q30 22 32 23 Q34 22 34 20 Q34 17 32 14 Z" fill="#F97316" />
+  </Svg>
+);
+
+const CamaraIcon = ({ size, isLightMode }: { size: number; isLightMode?: boolean }) => (
+  <Svg width={size} height={size} viewBox="0 0 64 64">
+    {/* Camera lens only - minimalista */}
+    {/* Outer lens */}
+    <Circle cx="32" cy="18" r="7" fill={isLightMode ? '#CBD5E0' : '#A0AEC0'} opacity="0.85" />
+    {/* Lens inner - shiny */}
+    <Circle cx="32" cy="18" r="4.5" fill={isLightMode ? '#E2E8F0' : '#CBD5E0'} opacity="0.9" />
+    {/* Lens center - dark */}
+    <Circle cx="32" cy="18" r="2.5" fill="#2D3748" />
+    {/* LED indicator */}
+    <Circle cx="30.5" cy="16.5" r="0.8" fill="#E53E3E" opacity="0.7" />
   </Svg>
 );
 
@@ -459,31 +498,6 @@ const CarabineroIcon = ({ size, isLightMode }: { size: number; isLightMode?: boo
         />
       </G>
     </G>
-  </Svg>
-);
-
-const CamaraIcon = ({ size, isLightMode }: { size: number; isLightMode?: boolean }) => (
-  <Svg width={size} height={size} viewBox="0 0 64 64">
-    {/* Shadow */}
-    <Ellipse
-      cx="32"
-      cy="52"
-      rx="20"
-      ry="6"
-      fill={isLightMode ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.2)'}
-    />
-    {/* Camera Pole */}
-    <Rect x="30" y="24" width="4" height="26" fill={isLightMode ? '#A0AEC0' : '#718096'} />
-    {/* Camera Body */}
-    <Path
-      d="M16 20 L40 20 L40 32 L16 32 Z"
-      fill={isLightMode ? '#E2E8F0' : '#CBD5E0'}
-      transform="rotate(-15 32 26)"
-    />
-    {/* Camera Lens */}
-    <Rect x="12" y="22" width="6" height="8" fill="#2D3748" transform="rotate(-15 32 26)" />
-    {/* Blinking Light */}
-    <Ellipse cx="38" cy="22" rx="2" ry="2" fill="#E53E3E" transform="rotate(-15 32 26)" />
   </Svg>
 );
 
@@ -755,6 +769,8 @@ export const ArtisticMarker = ({
         return <ParkIcon size={size} isLightMode={isLightMode} />;
       case 'hospital':
         return <HospitalIcon size={size} isLightMode={isLightMode} />;
+      case 'clinica':
+        return <ClinicaIcon size={size} isLightMode={isLightMode} />;
       case 'universidad':
         if (dynamicSvg) {
           return (

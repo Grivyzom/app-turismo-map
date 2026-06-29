@@ -59,7 +59,7 @@ export const AuthorityModal = ({ event, isLightMode }: AuthorityModalProps) => {
       let emergencyPhone = '';
       if (catLower === 'carabinero') emergencyPhone = '133';
       else if (catLower === 'bombero') emergencyPhone = '132';
-      else if (catLower === 'hospital') emergencyPhone = '131';
+      else if (catLower === 'hospital' || catLower === 'clinica') emergencyPhone = '131';
 
       if (emergencyPhone) {
         Linking.openURL(`tel:${emergencyPhone}`);
@@ -93,7 +93,7 @@ export const AuthorityModal = ({ event, isLightMode }: AuthorityModalProps) => {
     const catLower = event.category?.toLowerCase() || '';
     if (catLower === 'carabinero') return '133';
     if (catLower === 'bombero') return '132';
-    if (catLower === 'hospital') return '131';
+    if (catLower === 'hospital' || catLower === 'clinica') return '131';
     return '';
   };
 
@@ -101,8 +101,6 @@ export const AuthorityModal = ({ event, isLightMode }: AuthorityModalProps) => {
 
   return (
     <Animated.View
-      entering={ZoomIn.duration(300)}
-      exiting={ZoomOut.duration(200)}
       style={[
         styles.modalContainer,
         {

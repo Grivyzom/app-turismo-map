@@ -59,7 +59,60 @@ export const PARQUES_EVENTS = parseGeoJSON(parquesData, 'parque');
 export const AGUA_EVENTS = parseGeoJSON(aguaData, 'agua');
 export const HUMEDALES_EVENTS = parseGeoJSON(humedalesData, 'humedal');
 export const UNIVERSIDADES_EVENTS = parseGeoJSON(universidadesData, 'universidad');
-export const HOSPITALES_EVENTS = parseGeoJSON(hospitalesData, 'hospital');
+
+const parseHospitalesData = (data: any): TurismoEvent[] => {
+  if (!data || !data.features) return [];
+  return data.features.map((f: any, i: number) => {
+    let cat: TurismoEvent['category'] = 'hospital';
+    if (f.properties?.amenity === 'clinic') cat = 'clinica';
+
+    const idStr = (f.properties['@id'] || f.id || i).toString().replace(/\//g, '-');
+    const event: TurismoEvent = {
+      id: `${cat}-${idStr}`,
+      title: f.properties.name || (cat === 'clinica' ? 'Clínica' : 'Hospital'),
+      description:
+        f.properties.description ||
+        (cat === 'clinica' ? 'Centro de Salud / Clínica' : 'Hospital'),
+      latitude: 0,
+      longitude: 0,
+      category: cat,
+      organizer: f.properties.operator || 'Público',
+      time: f.properties.opening_hours || '24/7',
+      address: f.properties['addr:street'] || f.properties['object:street'] || '',
+      contactPhone: f.properties.phone || '',
+    };
+
+    if (f.geometry && f.geometry.type === 'Point') {
+      event.longitude = f.geometry.coordinates[0];
+      event.latitude = f.geometry.coordinates[1];
+    } else if (f.geometry && f.geometry.type === 'Polygon') {
+      const ring = f.geometry.coordinates[0];
+      event.polygon = ring.map((c: any) => ({ latitude: c[1], longitude: c[0] }));
+    } else if (f.geometry && f.geometry.type === 'MultiPolygon') {
+      const ring = f.geometry.coordinates[0][0];
+      event.polygon = ring.map((c: any) => ({ latitude: c[1], longitude: c[0] }));
+    } else if (f.geometry && f.geometry.type === 'LineString') {
+      event.polygon = f.geometry.coordinates.map((c: any) => ({ latitude: c[1], longitude: c[0] }));
+    }
+
+    if (f.properties.geometry && Array.isArray(f.properties.geometry)) {
+      event.polygon = f.properties.geometry.map((c: any) => ({
+        latitude: c.lat,
+        longitude: c.lon,
+      }));
+    }
+
+    if (event.polygon && event.polygon.length > 0) {
+      const center = getPolygonCenter(event.polygon);
+      event.latitude = center.latitude;
+      event.longitude = center.longitude;
+    }
+
+    return event;
+  });
+};
+
+export const HOSPITALES_EVENTS = parseHospitalesData(hospitalesData);
 
 const parseSeguridadData = (data: any): TurismoEvent[] => {
   if (!data || !data.features) return [];
@@ -226,4 +279,30 @@ export const CASINO_DREAMS_EVENT: TurismoEvent = {
       { level: -1, label: 'Subterráneo (Estacionamiento)' },
     ],
   },
+};
+
+export const MUNICIPALIDAD_EVENT: TurismoEvent = {
+  id: 'municipalidad-valdivia',
+  title: 'Ilustre Municipalidad de Valdivia',
+  description: 'Esta es la máxima autoridad regional, por ende debe estar bien representado.\nTeléfono: +56 63 228 8723\nSitio web oficial: Ilustre Municipalidad de Valdivia',
+  latitude: -39.8142,
+  longitude: -73.2459,
+  category: 'municipalidad',
+  organizer: 'Gobierno',
+  time: 'Lunes a Viernes de 08:30 a 14:00 horas',
+  openingHours: 'Lu-Vi 08:30-14:00',
+  contactPhone: '+56 63 228 8723',
+  address: 'Independencia 455, Valdivia, Región de Los Ríos, Chile',
+  polygon: [
+    { latitude: -39.8140, longitude: -73.2461 },
+    { latitude: -39.8140, longitude: -73.2457 },
+    { latitude: -39.8144, longitude: -73.2457 },
+    { latitude: -39.8144, longitude: -73.2461 },
+    { latitude: -39.8140, longitude: -73.2461 },
+  ],
+  vineta: {
+    type: 'calificacion',
+    label: 'Autoridad',
+    active: true
+  }
 };
