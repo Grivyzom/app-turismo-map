@@ -15,6 +15,7 @@ import {
   Linking,
   Share,
   Clipboard,
+  StyleSheet,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -57,10 +58,10 @@ import { CategoryFilter, CATEGORY_ICONS, MAP_LAYER_OPTIONS } from '../../src/dat
 import { ContextualSurveyWidget } from '../../src/components/ui/ContextualSurveyWidget';
 import { useAuth } from '../../src/context/AuthContext';
 import { lazyWithRetry } from '../../src/utils/lazyWithRetry';
+import { PlacesShelfTrigger, PlacesShelfPanel, PlaceItem } from '../../src/components/ui/BottomPlaceCarousel';
 
 import { useHomeScreenState } from './useHomeScreenState';
 import { styles, NAVBAR_CLEARANCE } from './styles';
-import { BottomPlaceCarousel, PlaceItem } from '../../src/components/ui/BottomPlaceCarousel';
 
 // --- Lazy-loaded screens ---
 const UserProfileScreen = lazyWithRetry(() => import('../../src/screens/UserProfileScreen'));
@@ -79,6 +80,107 @@ const prefetchHistorial = () => import('../../src/screens/PassportScreen');
 
 // @ts-ignore - Safety fallback for legacy build references
 const isEmergency = false;
+
+// ── ControlTooltip ─────────────────────────────────────────────────────────
+// Web: hover. Mobile: long-press (1.5s auto-hide).
+// buttonSize prop → posicionamiento numérico exacto (sin percentages frágiles).
+
+const TOOLTIP_H = 28; // approx: paddingVertical*2 + fontSize*lineHeight
+
+interface ControlTooltipProps {
+  label: string;
+  children: React.ReactNode;
+  buttonSize: number;
+}
+
+const ControlTooltip: React.FC<ControlTooltipProps> = ({ label, children, buttonSize }) => {
+  const [visible, setVisible] = React.useState(false);
+  const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const show = React.useCallback(() => setVisible(true), []);
+  const hide = React.useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setVisible(false);
+  }, []);
+  const showMobile = React.useCallback(() => {
+    setVisible(true);
+    timerRef.current = setTimeout(() => setVisible(false), 1500);
+  }, []);
+
+  React.useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+
+  // Web event handlers — objeto estable via useMemo
+  const webProps = React.useMemo(
+    () => Platform.OS === 'web' ? { onMouseEnter: show, onMouseLeave: hide } : null,
+    [show, hide],
+  );
+
+  // Inyecta onLongPress en el child sin sobreescribir el existente
+  const child = children as React.ReactElement;
+  const childWithPress = Platform.OS !== 'web'
+    ? React.cloneElement(child, {
+        onLongPress: () => {
+          child.props?.onLongPress?.();
+          showMobile();
+        },
+      })
+    : child;
+
+  // Posicionamiento numérico exacto: tooltip a la izquierda del botón
+  const tooltipRight = buttonSize + 10; // gap de 10px
+  const tooltipTop   = Math.round((buttonSize - TOOLTIP_H) / 2);
+
+  return (
+    <View style={tooltipWrap} {...(webProps as any)}>
+      {childWithPress}
+      {visible && (
+        <View
+          style={[tooltipStyles.bubble, { right: tooltipRight, top: tooltipTop }]}
+          pointerEvents="none"
+        >
+          <Text style={tooltipStyles.text} numberOfLines={1}>{label}</Text>
+          <View style={tooltipStyles.arrow} />
+        </View>
+      )}
+    </View>
+  );
+};
+
+const tooltipWrap = { position: 'relative' } as const;
+
+const tooltipStyles = StyleSheet.create({
+  bubble: {
+    position: 'absolute',
+    backgroundColor: 'rgba(10, 17, 32, 0.95)',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    zIndex: 9999,
+    ...Platform.select({ web: { backdropFilter: 'blur(12px)', whiteSpace: 'nowrap' } as any }),
+  },
+  text: {
+    color: '#CBD5E1',
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+  },
+  arrow: {
+    position: 'absolute',
+    right: -5,
+    top: 9,
+    width: 8,
+    height: 8,
+    backgroundColor: 'rgba(10, 17, 32, 0.95)',
+    borderRightWidth: 1,
+    borderTopWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    transform: [{ rotate: '45deg' }],
+  },
+});
+
+// ───────────────────────────────────────────────────────────────────────────
 
 interface MapLayerMenuProps {
   currentLayer: any;
@@ -139,6 +241,7 @@ export default function HomeScreen() {
   const [locationToSave, setLocationToSave] = useState<any>(null);
   const [showCoordsEditor, setShowCoordsEditor] = useState(false);
   const [showCollectionsIsland, setShowCollectionsIsland] = useState(false);
+  const [shelfOpen, setShelfOpen] = useState(false);
 
   const {
     events,
@@ -262,23 +365,23 @@ export default function HomeScreen() {
   // El modo (Mapa | Turismo | Comercial) viene del navbar (mapDisplayMode).
   const lugaresCarrusel = useMemo(() => {
     if (mapDisplayMode === 'mapa') return [];
-    
+
     // Configura qué categorías pertenecen a qué modo
     const turismoCats = ['cultura', 'naturaleza', 'museo', 'parque', 'teatro', 'monumento'];
     const comercialCats = ['gastronomia', 'tienda', 'casino', 'mercado', 'mall'];
 
     return filteredEvents
-      .filter(e => {
-         if (mapDisplayMode === 'turismo') return turismoCats.includes(e.category);
-         if (mapDisplayMode === 'comercial') return comercialCats.includes(e.category);
-         return false;
+      .filter((e) => {
+        if (mapDisplayMode === 'turismo') return turismoCats.includes(e.category);
+        if (mapDisplayMode === 'comercial') return comercialCats.includes(e.category);
+        return false;
       })
-      .map(e => ({
-         id: e.id,
-         name: e.title,
-         category: e.category,
-         imageUrl: e.imageUrl || 'https://via.placeholder.com/400x300',
-         distance: e.distance ? `${(e.distance / 1000).toFixed(1)} km` : undefined
+      .map((e) => ({
+        id: e.id,
+        name: e.title,
+        category: e.category,
+        imageUrl: e.imageUrl || 'https://via.placeholder.com/400x300',
+        distance: e.distance ? `${(e.distance / 1000).toFixed(1)} km` : undefined,
       }));
   }, [mapDisplayMode, filteredEvents]);
 
@@ -404,7 +507,9 @@ export default function HomeScreen() {
   const handleToggleViewModeWithNotification = useCallback(() => {
     handleToggleViewMode();
     showNotification(
-      viewMode === 'local' ? 'Modo Explorador (Turismo) activado.' : 'Modo Ciudadano (Local) activado.',
+      viewMode === 'local'
+        ? 'Modo Explorador (Turismo) activado.'
+        : 'Modo Ciudadano (Local) activado.',
       'info',
     );
   }, [handleToggleViewMode, viewMode, showNotification]);
@@ -425,7 +530,10 @@ export default function HomeScreen() {
   });
   const handleFiltersAnchorChange = useCallback(
     (pos: { top: number; left: number }) =>
-      setFiltersAnchor({ top: pos.top, left: Math.min(pos.left, screenWidth - FILTERS_PANEL_WIDTH - 16) }),
+      setFiltersAnchor({
+        top: pos.top,
+        left: Math.min(pos.left, screenWidth - FILTERS_PANEL_WIDTH - 16),
+      }),
     [screenWidth],
   );
   const handleNotificationsAnchorChange = useCallback(
@@ -764,15 +872,16 @@ export default function HomeScreen() {
         />
       </View>
 
-      {/* --- CARRUSEL INMERSIVO DE LUGARES (Flotante Abajo) --- */}
+      {/* Panel de lugares recomendados (absoluto, flota a la izquierda de la barra de controles) */}
       {activeTab === 'map' && (
-        <BottomPlaceCarousel
+        <PlacesShelfPanel
           visible={mapDisplayMode !== 'mapa'}
+          isOpen={shelfOpen}
+          onClose={() => setShelfOpen(false)}
           data={lugaresCarrusel}
+          bottomOffset={Math.max(insets.bottom, 20)}
           onPlacePress={(lugar) => {
-            console.log("Abrir detalles:", lugar);
-            // Aquí puedes conectar tu modal de detalles
-            setSelectedEvent(filteredEvents.find(e => e.id === lugar.id) || null);
+            setSelectedEvent(filteredEvents.find((e) => e.id === lugar.id) || null);
           }}
         />
       )}
@@ -968,67 +1077,72 @@ export default function HomeScreen() {
             { bottom: isDesktop ? 20 : Math.max(insets.bottom, 20) },
           ]}
         >
-          {/* Botón único de Zoom */}
-          <TouchableOpacity
-            style={[styles.controlButton, showZoomSlider && styles.controlButtonActive]}
-            onPress={() => setShowZoomSlider(!showZoomSlider)}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel="Zoom"
-          >
-            <MaterialIcons
-              name="zoom-in"
-              size={isDesktop ? 20 : 24}
-              color={showZoomSlider ? '#34D399' : '#9CA3AF'}
-            />
-          </TouchableOpacity>
+          {/* Zoom */}
+          <ControlTooltip label="Zoom" buttonSize={isDesktop ? 36 : 44}>
+            <TouchableOpacity
+              style={[styles.controlButton, showZoomSlider && styles.controlButtonActive]}
+              onPress={() => setShowZoomSlider(!showZoomSlider)}
+              activeOpacity={0.75}
+              accessibilityRole="button"
+              accessibilityLabel="Zoom"
+            >
+              <MaterialIcons
+                name="zoom-in"
+                size={isDesktop ? 20 : 24}
+                color={showZoomSlider ? '#34D399' : '#9CA3AF'}
+              />
+            </TouchableOpacity>
+          </ControlTooltip>
 
           <View style={styles.controlDivider} />
 
-          {/* Ubicarme (Location) */}
-          <MyLocationButton
-            isDesktop={isDesktop}
-            onCenterPress={() => setCenterTrigger((prev) => prev + 1)}
-          />
+          {/* Mi ubicación */}
+          <ControlTooltip label="Mi ubicación" buttonSize={isDesktop ? 36 : 44}>
+            <MyLocationButton
+              isDesktop={isDesktop}
+              onCenterPress={() => setCenterTrigger((prev) => prev + 1)}
+            />
+          </ControlTooltip>
 
           <View style={styles.controlDivider} />
 
-          {/* Modo Precisión (Modo Táctico) */}
-          <TouchableOpacity
-            style={[
-              styles.controlButton,
-              isTacticalModeActive && { backgroundColor: 'rgba(52, 211, 153, 0.12)' },
-            ]}
-            onPress={() => {
-              const nextState = !isTacticalModeActive;
-              setIsTacticalModeActive(nextState);
-            }}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel="Modo Táctico"
-          >
-            <MaterialIcons
-              name="center-focus-strong"
-              size={isDesktop ? 18 : 22}
-              color={isTacticalModeActive ? '#34D399' : '#9CA3AF'}
-            />
-          </TouchableOpacity>
+          {/* Modo Táctico */}
+          <ControlTooltip label="Modo Táctico" buttonSize={isDesktop ? 36 : 44}>
+            <TouchableOpacity
+              style={[
+                styles.controlButton,
+                isTacticalModeActive && { backgroundColor: 'rgba(52, 211, 153, 0.12)' },
+              ]}
+              onPress={() => {
+                const nextState = !isTacticalModeActive;
+                setIsTacticalModeActive(nextState);
+              }}
+              activeOpacity={0.75}
+              accessibilityRole="button"
+              accessibilityLabel="Modo Táctico"
+            >
+              <MaterialIcons
+                name="center-focus-strong"
+                size={isDesktop ? 18 : 22}
+                color={isTacticalModeActive ? '#34D399' : '#9CA3AF'}
+              />
+            </TouchableOpacity>
+          </ControlTooltip>
 
-          <View style={styles.controlDivider} />
-
-          {/* Filtros de Mapa */}
-          <TouchableOpacity
-            style={[styles.controlButton, showFilters && styles.controlButtonActive]}
-            onPress={() => setShowFilters(!showFilters)}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons
-              name="tune"
-              size={isDesktop ? 18 : 22}
-              color={showFilters ? '#34D399' : '#9CA3AF'}
-            />
-          </TouchableOpacity>
-
+          {/* Recomendados — solo en modo turismo/comercial */}
+          {mapDisplayMode !== 'mapa' && lugaresCarrusel.length > 0 && (
+            <>
+              <View style={styles.controlDivider} />
+              <ControlTooltip label="Recomendados" buttonSize={isDesktop ? 36 : 44}>
+                <PlacesShelfTrigger
+                  isOpen={shelfOpen}
+                  onPress={() => setShelfOpen((p) => !p)}
+                  count={lugaresCarrusel.length}
+                  isDesktop={isDesktop}
+                />
+              </ControlTooltip>
+            </>
+          )}
         </View>
       )}
 
@@ -1327,7 +1441,13 @@ export default function HomeScreen() {
             style={[
               styles.filterOverlay,
               isDesktop
-                ? { top: filtersAnchor.top, left: filtersAnchor.left, bottom: 'auto', right: 'auto', width: 300 }
+                ? {
+                    top: filtersAnchor.top,
+                    left: filtersAnchor.left,
+                    bottom: 'auto',
+                    right: 'auto',
+                    width: 300,
+                  }
                 : {
                     left: 0,
                     right: 0,
