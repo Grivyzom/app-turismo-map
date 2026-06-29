@@ -33,7 +33,7 @@ import { INITIAL_EVENTS, WS_SIMULATION_POOL, CategoryFilter } from '../../src/da
 // Categorías visibles por modo de mapa. 'mapa' = infraestructura/seguridad de la ciudad,
 // 'turismo' = atractivos y naturaleza, 'comercial' = comercio y gastronomía.
 const MODE_CATEGORIES: Record<MapDisplayMode, CategoryFilter[]> = {
-  mapa: ['hospital', 'universidad', 'bombero', 'carabinero', 'camara', 'emergencia', 'publico'],
+  mapa: ['hospital', 'universidad', 'bombero', 'carabinero', 'camara', 'emergencia', 'publico', 'municipalidad'],
   turismo: [
     'cultura',
     'naturaleza',
@@ -48,6 +48,11 @@ const MODE_CATEGORIES: Record<MapDisplayMode, CategoryFilter[]> = {
     'parque',
     'agua',
     'humedal',
+    'escultura',
+    'torreon',
+    'estatua',
+    'arte',
+    'bosque',
   ],
   comercial: ['tienda', 'gastronomia'],
 };
@@ -842,7 +847,8 @@ export function useHomeScreenState(token: string | null) {
         );
         const matchesCategory =
           selectedCategory === 'todos'
-            ? isEmergencyEvent || MODE_CATEGORIES[mapDisplayMode].includes(event.category as CategoryFilter)
+            ? isEmergencyEvent ||
+              MODE_CATEGORIES[mapDisplayMode].includes(event.category as CategoryFilter)
             : (selectedCategory === 'emergencia' && isEmergencyEvent) ||
               event.category === selectedCategory;
         const query = searchQuery.toLowerCase();
