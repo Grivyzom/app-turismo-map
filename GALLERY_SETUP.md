@@ -2,23 +2,18 @@
 
 ## Instalación
 
-### 1. Instalar LightGallery (Cuando npm funcione)
+### ✓ LightGallery ya instalado
 
 ```bash
-cd app-turismo
-npm install lightgallery lg-thumbnail lg-zoom
-# O con yarn
-yarn add lightgallery lg-thumbnail lg-zoom
+pnpm add lightgallery lg-thumbnail lg-zoom
 ```
 
-### 2. Incluir estilos en componentes web (opcional para avanzado)
+**Versiones instaladas:**
+- lightgallery@2.9.0
+- lg-thumbnail@1.2.1
+- lg-zoom@1.3.0
 
-Los estilos de LightGallery se cargan dinámicamente. Si necesitas customizar:
-
-```html
-<!-- En public/index.html o en _app.tsx -->
-<link type="text/css" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/lightgallery/2.7.2/lightgallery-bundle.min.css" />
-```
+Los estilos se cargan automáticamente. No requiere configuración adicional.
 
 ## Estructura
 
