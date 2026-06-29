@@ -1,20 +1,6 @@
 import React from 'react';
 
-type ToastType = 'info' | 'success' | 'warning' | 'error';
-type Listener = (msg: string, type: ToastType) => void;
-const listeners = new Set<Listener>();
-
-export const toastEmitter = {
-  subscribe: (listener: Listener) => {
-    listeners.add(listener);
-    return () => {
-      listeners.delete(listener);
-    };
-  },
-  emit: (msg: string, type: ToastType) => {
-    listeners.forEach((l) => l(msg, type));
-  }
-};
+export { toastEmitter } from './toastEmitter';
 
 export const ToastToaster: React.FC = () => {
   return null;
@@ -33,7 +19,7 @@ export const toast = {
   info: (opts: { title: string; description?: string }) => {
     toastEmitter.emit(opts.title, 'info');
   },
-  promise: <T>(
+  promise: <T,>(
     promise: Promise<T> | (() => Promise<T>),
     opts: {
       loading: { title: string; description?: string };
