@@ -1,6 +1,7 @@
 import React from 'react';
 
 export { toastEmitter } from './toastEmitter';
+import { toastEmitter } from './toastEmitter';
 
 export const ToastToaster: React.FC = () => {
   return null;

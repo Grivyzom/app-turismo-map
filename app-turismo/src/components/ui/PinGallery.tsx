@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, Platform, Dimensions } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -6,6 +6,8 @@ import {
   Image,
   Text,
   Pressable,
+  Platform,
+  Dimensions,
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
@@ -42,13 +44,12 @@ export const PinGallery = ({
       const { default: Zoom } = lgZoom;
 
       if (galleryRef.current) {
-        new LG(galleryRef.current, {
+        LG(galleryRef.current, {
           plugins: [Thumbnail, Zoom],
           speed: 500,
           counter: true,
-          showThumbByDefault: images.length > 1,
           licenseKey: 'free',
-        });
+        } as any);
       }
     } catch (error) {
       console.warn('LightGallery initialization skipped:', error);

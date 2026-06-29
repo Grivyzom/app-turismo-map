@@ -118,9 +118,9 @@ const ControlTooltip: React.FC<ControlTooltipProps> = ({ label, children, button
   // Inyecta onLongPress en el child sin sobreescribir el existente
   const child = children as React.ReactElement;
   const childWithPress = Platform.OS !== 'web'
-    ? React.cloneElement(child, {
+    ? React.cloneElement(child as React.ReactElement<any>, {
         onLongPress: () => {
-          child.props?.onLongPress?.();
+          (child.props as any)?.onLongPress?.();
           showMobile();
         },
       })
@@ -368,7 +368,7 @@ export default function HomeScreen() {
 
     // Configura qué categorías pertenecen a qué modo
     const turismoCats = ['cultura', 'naturaleza', 'museo', 'parque', 'teatro', 'monumento'];
-    const comercialCats = ['gastronomia', 'tienda', 'casino', 'mercado', 'mall'];
+    const comercialCats = ['gastronomia', 'tienda'];
 
     return filteredEvents
       .filter((e) => {
@@ -381,7 +381,7 @@ export default function HomeScreen() {
         name: e.title,
         category: e.category,
         imageUrl: e.imageUrl || 'https://via.placeholder.com/400x300',
-        distance: e.distance ? `${(e.distance / 1000).toFixed(1)} km` : undefined,
+        distance: e.distancia,
       }));
   }, [mapDisplayMode, filteredEvents]);
 
@@ -2205,7 +2205,7 @@ export default function HomeScreen() {
                   <View style={[styles.miniBadge, { backgroundColor: 'rgba(56, 189, 248, 0.2)' }]}>
                     <Ionicons name="business" size={12} color="#38BDF8" />
                     <Text style={[styles.miniBadgeText, { color: '#38BDF8' }]}>
-                      {selectedSector.category.toUpperCase()}
+                      {(selectedSector.category ?? '').toUpperCase()}
                     </Text>
                   </View>
                 </View>
