@@ -9,6 +9,7 @@ import {
   Pressable,
   ScrollView,
   LayoutChangeEvent,
+  Dimensions,
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import Animated, {
@@ -63,6 +64,9 @@ const GALLERY_HEIGHT = 196;
 export const MiniModal = ({ event, isLightMode, isSelected }: MiniModalProps) => {
   const isCamara = event.category?.toLowerCase() === 'camara';
   const isUniversidad = event.category?.toLowerCase() === 'universidad';
+
+  const windowHeight = Dimensions.get('window').height;
+  const maxModalHeight = Math.min(windowHeight * 0.6, 480);
 
   const [isExpanded, setIsExpanded] = useState(isSelected || false);
   const [galeriaIndex, setGaleriaIndex] = useState(0);
@@ -252,7 +256,7 @@ export const MiniModal = ({ event, isLightMode, isSelected }: MiniModalProps) =>
       exiting={ZoomOut.duration(150)}
       layout={LinearTransition.duration(400)}
       onLayout={onModalLayout}
-      style={[styles.modalContainer, { transformOrigin: 'bottom' } as any]}
+      style={[styles.modalContainer, { transformOrigin: 'bottom', maxHeight: maxModalHeight } as any]}
     >
       {/* ── Handle / drag indicator ─────────────────────────────── */}
       <Pressable onPress={handleToggleExpand} style={styles.handleContainer}>
@@ -325,7 +329,7 @@ export const MiniModal = ({ event, isLightMode, isSelected }: MiniModalProps) =>
       </View>
 
       {/* ── Body ────────────────────────────────────────────────── */}
-      <View style={styles.bodyContainer}>
+      <ScrollView contentContainerStyle={[styles.bodyContainer, { gap: isExpanded ? 10 : 14 }]} scrollEnabled={isExpanded} showsVerticalScrollIndicator={false}>
         {/* Descripción */}
         {descripcion ? (
           <Text style={styles.descriptionText} numberOfLines={isExpanded ? 15 : 2}>
@@ -519,7 +523,7 @@ export const MiniModal = ({ event, isLightMode, isSelected }: MiniModalProps) =>
             </LinearGradient>
           </AnimatedPressable>
         </View>
-      </View>
+      </ScrollView>
 
       {/* Pointer triangle */}
       <View style={[styles.pointer, { borderTopColor: '#0d1117' }]} />
@@ -668,9 +672,9 @@ const styles = StyleSheet.create({
 
   // ── Body ─────────────────────────────────────────────────
   bodyContainer: {
-    paddingTop: 18,
-    paddingHorizontal: 18,
-    paddingBottom: 20,
+    paddingTop: 12,
+    paddingHorizontal: 14,
+    paddingBottom: 12,
     width: '100%',
     gap: 14,
   },
