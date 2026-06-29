@@ -12,12 +12,11 @@ import {
   Building2,
   Pin,
   Settings,
-  Sparkles,
   Star,
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { Tooltip } from 'react-tooltip'
-import { sileo } from 'sileo'
+import { sileo } from './ui/Toast'
 
 export default function AdminLayout() {
   const { admin, logout } = useAuth()
@@ -58,7 +57,6 @@ export default function AdminLayout() {
     { to: '/mapa', icon: Map, label: 'Mapa Inteligente' },
     { to: '/empresas', icon: Building2, label: 'Empresas Suscritas' },
     { to: '/audit-log', icon: ScrollText, label: 'Log de Auditoría' },
-    { to: '/sileo', icon: Sparkles, label: 'Sileo Toasts' },
     { to: '/ratings', icon: Star, label: 'Valoraciones' },
   ]
 
