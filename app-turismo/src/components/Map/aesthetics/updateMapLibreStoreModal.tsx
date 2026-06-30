@@ -2,6 +2,8 @@ import React from 'react';
 import { createRoot, Root } from 'react-dom/client';
 import { MiniModal } from '../Markers/MiniModal';
 import { AuthorityModal } from '../Markers/AuthorityModal';
+import { UniversityModal } from '../Markers/UniversityModal';
+import { StoreModal } from '../Markers/StoreModal';
 import { TurismoEvent } from '../types';
 
 export function updateMapLibreStoreModal(
@@ -76,16 +78,25 @@ export function updateMapLibreStoreModal(
 
     const root: Root = (modalContainer as any)._reactRoot;
     if (root) {
-      const isAuthorityEvent = ['hospital', 'clinica', 'bombero', 'carabinero'].includes(
-        event.category?.toLowerCase() || '',
-      );
-      root.render(
-        isAuthorityEvent ? (
-          <AuthorityModal event={event} isLightMode={isLightMode} />
-        ) : (
+      const catLower = event.category?.toLowerCase() || '';
+      const isAuthorityEvent = ['hospital', 'clinica', 'bombero', 'carabinero'].includes(catLower);
+      const isUniversityEvent = catLower === 'universidad';
+      const isStoreEvent = ['tienda', 'gastronomia'].includes(catLower);
+
+      let modalContent;
+      if (isAuthorityEvent) {
+        modalContent = <AuthorityModal event={event} isLightMode={isLightMode} />;
+      } else if (isUniversityEvent) {
+        modalContent = <UniversityModal event={event} isLightMode={isLightMode} />;
+      } else if (isStoreEvent) {
+        modalContent = <StoreModal event={event} isLightMode={isLightMode} />;
+      } else {
+        modalContent = (
           <MiniModal event={event} isLightMode={isLightMode} isSelected={isSelected} />
-        ),
-      );
+        );
+      }
+
+      root.render(modalContent);
     }
   } else if (modalContainer) {
     // Punto 3: animación de salida — fade out antes de destruir el React root
