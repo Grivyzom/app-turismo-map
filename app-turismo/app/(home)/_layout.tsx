@@ -9,6 +9,8 @@ export default function HomeLayout() {
       }}
     >
       <Stack.Screen name="index" />
+      <Stack.Screen name="user-search" />
+      <Stack.Screen name="user/[id]" />
     </Stack>
   );
 }

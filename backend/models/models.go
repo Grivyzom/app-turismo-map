@@ -270,6 +270,42 @@ type Cycleway struct {
 	Coordinates json.RawMessage `json:"coordinates"` // Array of [lng, lat]
 }
 
+// ── Models para Perfil de Usuario y Seguimiento ──────────────────────────
+
+type MyProfile struct {
+	ID             int    `json:"id"`
+	Name           string `json:"name"`
+	Email          string `json:"email"`
+	Picture        string `json:"picture"`
+	Bio            string `json:"bio"`
+	UserType       string `json:"userType"`
+	FollowerCount  int    `json:"followerCount"`
+	FollowingCount int    `json:"followingCount"`
+}
+
+type PublicUserProfile struct {
+	ID             int    `json:"id"`
+	Name           string `json:"name"`
+	Picture        string `json:"picture"`
+	Bio            string `json:"bio"`
+	FollowerCount  int    `json:"followerCount"`
+	FollowingCount int    `json:"followingCount"`
+	IsFollowing    bool   `json:"isFollowing"`
+}
+
+type UpdateProfileRequest struct {
+	Name string `json:"name"`
+	Bio  string `json:"bio"`
+}
+
+type UserSearchResult struct {
+	ID            int    `json:"id"`
+	Name          string `json:"name"`
+	Picture       string `json:"picture"`
+	FollowerCount int    `json:"followerCount"`
+	IsFollowing   bool   `json:"isFollowing"`
+}
+
 // ── Models para Medios de Edificios (Building Media) ─────────────────────
 
 type BuildingMedia struct {

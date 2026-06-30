@@ -1,8 +1,58 @@
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { Shield, User, Mail, Clock, Lock, CheckCircle2, AlertCircle, Settings } from 'lucide-react'
+import { Shield, User, Mail, Clock, Lock, CheckCircle2, AlertCircle, Settings, MapPin, RefreshCw } from 'lucide-react'
+import { api } from '../lib/api'
+
+interface ExternalPlacesStat {
+  category: string
+  count: number
+  lastSync: string
+}
+
+interface ExternalPlacesStats {
+  total: number
+  byCategory: ExternalPlacesStat[]
+}
 
 export default function SettingsPage() {
   const { admin } = useAuth()
+  const [syncLoading, setSyncLoading] = useState(false)
+  const [syncResult, setSyncResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [externalStats, setExternalStats] = useState<ExternalPlacesStats | null>(null)
+
+  const loadStats = useCallback(async () => {
+    try {
+      const data = await api.get<ExternalPlacesStats>('/admin/api/v1/places/external-stats')
+      setExternalStats(data)
+    } catch {
+      // silencioso
+    }
+  }, [])
+
+  useEffect(() => {
+    loadStats()
+  }, [loadStats])
+
+  const handleGoogleSync = async () => {
+    setSyncLoading(true)
+    setSyncResult(null)
+    try {
+      const res = await api.post<{ success: boolean; synced: number; message?: string; errors?: string[] }>(
+        '/admin/api/v1/places/sync-google',
+        {}
+      )
+      setSyncResult({
+        success: res.success,
+        message: res.message || `${res.synced} lugares importados/actualizados`,
+      })
+      await loadStats()
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error desconocido'
+      setSyncResult({ success: false, message: msg })
+    } finally {
+      setSyncLoading(false)
+    }
+  }
 
   return (
     <div className="dashboard-page">
@@ -151,6 +201,104 @@ export default function SettingsPage() {
                 }}>Habilitado</span>
               </div>
             </div>
+          </div>
+        </div>
+        {/* Google Places Sync Card */}
+        <div className="dashboard-trend-card" style={{ gridColumn: '1 / -1' }}>
+          <h3>
+            <MapPin size={18} className="text-accent" />
+            <span>Sincronización de Google Places</span>
+          </h3>
+          <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+            Importa restaurantes, cafés, panaderías, supermercados y locales comerciales del centro de Valdivia desde Google Places API.
+            Los resultados se almacenan en la base de datos y aparecen en el mapa de la aplicación.
+          </p>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px', marginTop: '16px' }}>
+            <div style={{ flex: '1', minWidth: '200px' }}>
+              <h4 style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '10px' }}>
+                Estado actual
+              </h4>
+              {externalStats ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    {externalStats.total}
+                    <span style={{ fontSize: '0.8125rem', fontWeight: 400, color: 'var(--text-muted)', marginLeft: '6px' }}>lugares externos</span>
+                  </div>
+                  {externalStats.byCategory.map(s => (
+                    <div key={s.category} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+                      <span style={{ textTransform: 'capitalize' }}>{s.category}</span>
+                      <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{s.count}</span>
+                    </div>
+                  ))}
+                  {externalStats.total === 0 && (
+                    <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                      Sin datos aún. Ejecuta la sincronización.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Cargando estadísticas...</p>
+              )}
+            </div>
+
+            <div style={{ flex: '1', minWidth: '200px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <h4 style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                Categorías incluidas
+              </h4>
+              <ul style={{ paddingLeft: '18px', fontSize: '0.8125rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <li>Restaurantes y comida rápida</li>
+                <li>Cafés y cafeterías</li>
+                <li>Panaderías</li>
+                <li>Bares y pubs</li>
+                <li>Supermercados</li>
+                <li>Minimarkets y tiendas de conveniencia</li>
+              </ul>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                Radio: 3 km desde el centro de Valdivia · Requiere <code>GOOGLE_PLACES_API_KEY</code> en el entorno del backend.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ marginTop: '20px', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+            <button
+              onClick={handleGoogleSync}
+              disabled={syncLoading}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 20px',
+                borderRadius: 'var(--radius-sm)',
+                background: syncLoading ? 'var(--bg-hover)' : 'var(--accent-primary)',
+                color: syncLoading ? 'var(--text-muted)' : 'white',
+                border: 'none',
+                cursor: syncLoading ? 'not-allowed' : 'pointer',
+                fontWeight: 600,
+                fontSize: '0.875rem',
+                transition: 'background 0.2s',
+              }}
+            >
+              <RefreshCw size={16} style={{ animation: syncLoading ? 'spin 1s linear infinite' : 'none' }} />
+              {syncLoading ? 'Sincronizando...' : 'Sincronizar ahora'}
+            </button>
+
+            {syncResult && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 14px',
+                borderRadius: 'var(--radius-sm)',
+                background: syncResult.success ? 'var(--success-bg)' : 'var(--danger-bg)',
+                border: `1px solid ${syncResult.success ? 'var(--success)' : 'var(--danger)'}33`,
+                fontSize: '0.8125rem',
+                color: syncResult.success ? 'var(--success)' : 'var(--danger)',
+              }}>
+                {syncResult.success ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
+                {syncResult.message}
+              </div>
+            )}
           </div>
         </div>
       </div>

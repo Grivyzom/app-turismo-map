@@ -10,22 +10,23 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { router } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 
 import { API_URL } from '../config/api';
-import { getAuthTokenAsync } from '../utils/authStorage';
+import { getCachedToken } from '../utils/tokenCache';
 import { toast } from '../components/ui/ToastNotification';
+import { getMyProfile, updateProfile, uploadAvatar, type MyProfile } from '../utils/profileApi';
 import {
   buildTwoFactorOtpUri,
-  PROFILE_ICON_OPTIONS,
   getDefaultUserProfile,
   generateTwoFactorSecret,
   loadUserProfile,
   saveUserProfile,
   type NormalUserProfile,
-  type UserProfileIconName,
 } from '../utils/userProfileStorage';
 
 interface Collection {
@@ -44,6 +45,36 @@ interface SavedLocation {
   longitude: number;
   title: string;
   notes: string;
+}
+
+const MAX_AVATAR_BYTES = 5 * 1024 * 1024; // 5 MB
+
+const AVATAR_COLORS = ['#10B981', '#3B82F6', '#8B5CF6', '#F59E0B', '#EF4444', '#06B6D4'];
+
+function AvatarPlaceholder({ name, size }: { name: string; size: number }) {
+  const initials = name
+    .trim()
+    .split(/\s+/)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .slice(0, 2)
+    .join('');
+  const color = AVATAR_COLORS[(name.charCodeAt(0) ?? 0) % AVATAR_COLORS.length];
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: color,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Text style={{ color: '#FFFFFF', fontSize: size * 0.38, fontWeight: '800' }}>
+        {initials || '?'}
+      </Text>
+    </View>
+  );
 }
 
 const userTypeLabels: Record<NormalUserProfile['userType'], string> = {
@@ -70,12 +101,17 @@ export default function UserProfileScreen() {
   const [fullName, setFullName] = useState(profile.fullName);
   const [email, setEmail] = useState(profile.email);
   const [location, setLocation] = useState(profile.location);
+  const [bio, setBio] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [securityNotice, setSecurityNotice] = useState('');
   const [activeTab, setActiveTab] = useState<'colecciones' | 'asistencias' | 'likes' | 'ratings'>(
     'colecciones',
   );
   const [isEditing, setIsEditing] = useState(false);
+
+  // Backend profile state
+  const [backendProfile, setBackendProfile] = useState<MyProfile | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   // Collections state
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -84,11 +120,10 @@ export default function UserProfileScreen() {
   const [locations, setLocations] = useState<SavedLocation[]>([]);
   const [loadingLocations, setLoadingLocations] = useState(false);
 
-  // Mock metrics - ideally these come from a hook or backend
   const metrics = {
     posts: 0,
-    followers: 124,
-    following: 89,
+    followers: backendProfile?.followerCount ?? 0,
+    following: backendProfile?.followingCount ?? 0,
   };
 
   useEffect(() => {
@@ -100,7 +135,7 @@ export default function UserProfileScreen() {
   const fetchCollections = async () => {
     setLoadingCollections(true);
     try {
-      const token = await getAuthTokenAsync();
+      const token = await getCachedToken();
       if (!token) return;
 
       const response = await fetch(`${API_URL}/api/v1/collections`, {
@@ -125,7 +160,7 @@ export default function UserProfileScreen() {
     setSelectedCollection(collection);
     setLoadingLocations(true);
     try {
-      const token = await getAuthTokenAsync();
+      const token = await getCachedToken();
       if (!token) return;
 
       const response = await fetch(`${API_URL}/api/v1/collections/${collection.id}/locations`, {
@@ -148,7 +183,7 @@ export default function UserProfileScreen() {
 
   const createCollection = async (name: string) => {
     try {
-      const token = await getAuthTokenAsync();
+      const token = await getCachedToken();
       if (!token) return;
 
       const response = await fetch(`${API_URL}/api/v1/collections`, {
@@ -175,7 +210,7 @@ export default function UserProfileScreen() {
 
   const deleteCollection = async (collectionId: number, collectionName: string) => {
     try {
-      const token = await getAuthTokenAsync();
+      const token = await getCachedToken();
       if (!token) return;
 
       const response = await fetch(`${API_URL}/api/v1/collections/${collectionId}`, {
@@ -200,7 +235,7 @@ export default function UserProfileScreen() {
 
   const deleteLocation = async (locationId: number, locationTitle: string) => {
     try {
-      const token = await getAuthTokenAsync();
+      const token = await getCachedToken();
       if (!token) return;
 
       const response = await fetch(
@@ -229,10 +264,7 @@ export default function UserProfileScreen() {
     let isMounted = true;
 
     void loadUserProfile().then((storedProfile) => {
-      if (!isMounted) {
-        return;
-      }
-
+      if (!isMounted) return;
       const nextProfile = storedProfile ?? getDefaultUserProfile();
       setProfile(nextProfile);
       setFullName(nextProfile.fullName);
@@ -246,31 +278,100 @@ export default function UserProfileScreen() {
     };
   }, []);
 
-  const handleSelectIcon = async (avatarIcon: UserProfileIconName) => {
-    const nextProfile = await saveUserProfile({
-      ...profile,
-      fullName,
-      email,
-      location,
-      avatarIcon,
+  useEffect(() => {
+    void getMyProfile().then((p) => {
+      if (p) {
+        setBackendProfile(p);
+        setBio(p.bio ?? '');
+        if (p.name) setFullName(p.name);
+      }
     });
-    setProfile(nextProfile);
+  }, []);
+
+  const handlePickAvatar = async () => {
+    if (Platform.OS === 'web') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/jpeg,image/png,image/webp,image/gif';
+      input.onchange = async (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        if (!file) return;
+        if (file.size > MAX_AVATAR_BYTES) {
+          toast.error({ title: 'La imagen supera el límite de 5 MB' });
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+          const dataUri = ev.target?.result as string;
+          if (!dataUri) return;
+          setUploadingAvatar(true);
+          const uploadResult = await uploadAvatar(dataUri);
+          setUploadingAvatar(false);
+          if (uploadResult.ok) {
+            setBackendProfile((prev) => (prev ? { ...prev, picture: uploadResult.url } : prev));
+            toast.success({ title: 'Foto de perfil actualizada' });
+          } else {
+            toast.error({ title: uploadResult.error });
+          }
+        };
+        reader.readAsDataURL(file);
+      };
+      input.click();
+      return;
+    }
+
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permiso requerido', 'Se necesita acceso a la galería para cambiar la foto.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.75,
+    });
+
+    if (result.canceled || !result.assets[0]) return;
+
+    const asset = result.assets[0];
+    if (asset.fileSize !== undefined && asset.fileSize > MAX_AVATAR_BYTES) {
+      Alert.alert('Imagen muy grande', 'La imagen supera el límite de 5 MB. Elegí una imagen más pequeña.');
+      return;
+    }
+
+    setUploadingAvatar(true);
+    const uploadResult = await uploadAvatar(asset.uri);
+    setUploadingAvatar(false);
+
+    if (uploadResult.ok) {
+      setBackendProfile((prev) => (prev ? { ...prev, picture: uploadResult.url } : prev));
+      toast.success({ title: 'Foto de perfil actualizada' });
+    } else {
+      toast.error({ title: uploadResult.error });
+    }
   };
 
   const handleSaveProfile = async () => {
     try {
-      const nextProfile = await saveUserProfile({
-        ...profile,
-        fullName,
-        email,
-        location,
-      });
+      const [, backendOk] = await Promise.all([
+        saveUserProfile({ ...profile, fullName, email, location }),
+        updateProfile({ name: fullName, bio }),
+      ]);
 
+      const nextProfile = await saveUserProfile({ ...profile, fullName, email, location });
       setProfile(nextProfile);
       setFullName(nextProfile.fullName);
       setEmail(nextProfile.email);
       setLocation(nextProfile.location);
-      toast.success({ title: 'Perfil guardado exitosamente' });
+
+      if (backendOk) {
+        setBackendProfile((prev) => (prev ? { ...prev, name: fullName, bio } : prev));
+        toast.success({ title: 'Perfil guardado exitosamente' });
+      } else {
+        toast.success({ title: 'Guardado localmente (sin conexión al servidor)' });
+      }
     } catch (error) {
       console.error(error);
       toast.error({ title: 'Error al guardar el perfil' });
@@ -333,17 +434,35 @@ export default function UserProfileScreen() {
     <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.profileHeaderContainer}>
         <View style={styles.topRow}>
-          <View style={styles.avatarContainer}>
+          <TouchableOpacity
+            style={styles.avatarContainer}
+            onPress={() => void handlePickAvatar()}
+            activeOpacity={0.85}
+          >
             <View style={styles.avatarMain}>
-              <MaterialIcons name={profile.avatarIcon} size={48} color="#EAFBF1" />
+              {backendProfile?.picture ? (
+                <Image
+                  source={{
+                    uri: backendProfile.picture.startsWith('/static/')
+                      ? `${API_URL}${backendProfile.picture}`
+                      : backendProfile.picture,
+                  }}
+                  style={{ width: 80, height: 80, borderRadius: 40 }}
+                />
+              ) : (
+                <AvatarPlaceholder name={fullName || 'U'} size={80} />
+              )}
             </View>
-          </View>
+            <View style={styles.avatarCameraOverlay}>
+              {uploadingAvatar ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <MaterialIcons name="photo-camera" size={14} color="#FFFFFF" />
+              )}
+            </View>
+          </TouchableOpacity>
 
           <View style={styles.metricsRow}>
-            <View style={styles.metricItem}>
-              <Text style={styles.metricValue}>{metrics.posts}</Text>
-              <Text style={styles.metricLabel}>Posts</Text>
-            </View>
             <View style={styles.metricItem}>
               <Text style={styles.metricValue}>{metrics.followers}</Text>
               <Text style={styles.metricLabel}>Seguidores</Text>
@@ -352,6 +471,13 @@ export default function UserProfileScreen() {
               <Text style={styles.metricValue}>{metrics.following}</Text>
               <Text style={styles.metricLabel}>Seguidos</Text>
             </View>
+            <TouchableOpacity
+              style={styles.metricItem}
+              onPress={() => router.push('/(home)/user-search' as never)}
+            >
+              <MaterialIcons name="person-search" size={22} color="#6EE7B7" />
+              <Text style={styles.metricLabel}>Buscar</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -364,9 +490,7 @@ export default function UserProfileScreen() {
             <MaterialIcons name="location-on" size={14} color="#9CA3AF" />{' '}
             {profile.location || 'Sin ubicación'}
           </Text>
-          <Text style={styles.bioText}>
-            Explorador de la región de Los Ríos. Amante de la naturaleza y el turismo local.
-          </Text>
+          {bio ? <Text style={styles.bioText}>{bio}</Text> : null}
         </View>
 
         <View style={styles.actionButtonsRow}>
@@ -676,6 +800,23 @@ export default function UserProfileScreen() {
               />
             </View>
 
+            <View style={styles.fieldBlock}>
+              <Text style={styles.fieldLabel}>Bio</Text>
+              <TextInput
+                value={bio}
+                onChangeText={(t) => setBio(t.slice(0, 160))}
+                placeholder="Cuéntanos sobre vos..."
+                placeholderTextColor="#6B7280"
+                style={[styles.textInput, { height: 72, textAlignVertical: 'top' }]}
+                multiline
+                numberOfLines={3}
+                maxLength={160}
+              />
+              <Text style={{ color: '#6B7280', fontSize: 11, textAlign: 'right', marginTop: 2 }}>
+                {bio.length}/160
+              </Text>
+            </View>
+
             <TouchableOpacity
               activeOpacity={0.9}
               onPress={() => void handleSaveProfile()}
@@ -695,43 +836,6 @@ export default function UserProfileScreen() {
               {isLoading
                 ? 'Cargando datos...'
                 : 'Los datos base se toman de tu sesión y quedan visibles aquí.'}
-            </Text>
-          </View>
-
-          <View style={styles.iconCard}>
-            <View style={styles.iconHeader}>
-              <View>
-                <Text style={styles.cardTitle}>Icono de perfil</Text>
-                <Text style={styles.iconSubtitle}>
-                  Toca una opción para cambiar el icono que te representa.
-                </Text>
-              </View>
-              <Text style={styles.iconCounter}>{profile.avatarIcon}</Text>
-            </View>
-
-            <View style={styles.iconGrid}>
-              {PROFILE_ICON_OPTIONS.map((iconName) => {
-                const selected = profile.avatarIcon === iconName;
-
-                return (
-                  <TouchableOpacity
-                    key={iconName}
-                    activeOpacity={0.9}
-                    onPress={() => void handleSelectIcon(iconName)}
-                    style={[styles.iconChip, selected && styles.iconChipSelected]}
-                  >
-                    <MaterialIcons
-                      name={iconName}
-                      size={24}
-                      color={selected ? '#081018' : '#D8E6DE'}
-                    />
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <Text style={styles.footerNote}>
-              El cambio se guarda automáticamente en tu dispositivo.
             </Text>
           </View>
 
@@ -841,6 +945,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: '#0F172A',
+    overflow: 'hidden',
+  },
+  avatarCameraOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(110,231,183,0.4)',
   },
   metricsRow: {
     flex: 1,

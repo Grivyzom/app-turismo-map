@@ -11,6 +11,10 @@ import {
   SEGURIDAD_EVENTS,
   ESTRUCTURAS_EVENTS,
   MUNICIPALIDAD_EVENT,
+  FERIA_FLUVIAL_EVENT,
+  PENDULO_VALDIVIA_EVENT,
+  SUBMARINO_VALDIVIA_EVENT,
+  MERCADO_MUNICIPAL_VALDIVIA_EVENT,
 } from './polygonsData';
 
 export type CategoryFilter =
@@ -44,7 +48,8 @@ export type CategoryFilter =
   | 'torreon'
   | 'estatua'
   | 'arte'
-  | 'bosque';
+  | 'bosque'
+  | 'mercado';
 
 const COMERCIAL_EVENTS: TurismoEvent[] = [
   {
@@ -148,6 +153,10 @@ export const INITIAL_EVENTS: TurismoEvent[] = [
   ...COMERCIAL_EVENTS,
   CASINO_DREAMS_EVENT,
   MUNICIPALIDAD_EVENT,
+  FERIA_FLUVIAL_EVENT,
+  PENDULO_VALDIVIA_EVENT,
+  SUBMARINO_VALDIVIA_EVENT,
+  MERCADO_MUNICIPAL_VALDIVIA_EVENT,
 ];
 
 export const WS_SIMULATION_POOL: Omit<TurismoEvent, 'id' | 'isRealTime'>[] = [];
@@ -182,6 +191,7 @@ export const CATEGORY_ICONS: Record<
   carabinero: { name: 'local-police', family: 'MaterialIcons' },
   camara: { name: 'videocam', family: 'MaterialIcons' },
   municipalidad: { name: 'location-city', family: 'MaterialIcons' },
+  mercado: { name: 'storefront', family: 'MaterialIcons' },
 };
 
 export const MAP_LAYER_OPTIONS: {

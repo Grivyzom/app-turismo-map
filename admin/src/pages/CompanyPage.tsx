@@ -10,7 +10,7 @@ import {
   Calendar,
 } from 'lucide-react'
 import { api } from '../lib/api'
-import { sileo } from 'sileo'
+import { sileo } from '../components/ui/Toast'
 
 interface Company {
   id: number

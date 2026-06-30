@@ -91,13 +91,13 @@ func PlacesSearchHandler(w http.ResponseWriter, r *http.Request) {
 		SELECT id, title, description, lat, lng, category, organizer, address, time, image_url,
 		       COALESCE((SELECT name FROM zones z WHERE z.id = ANY(u.containing_zone_ids) LIMIT 1), '') as sector_name
 		FROM (
-			SELECT 
-				'branch-' || b.id::text as id, 
-				b.branch_name as title, 
-				COALESCE(b.description, '') as description, 
-				ST_Y(b.geom::geometry) as lat, 
-				ST_X(b.geom::geometry) as lng, 
-				b.category, 
+			SELECT
+				'branch-' || b.id::text as id,
+				b.branch_name as title,
+				COALESCE(b.description, '') as description,
+				ST_Y(b.geom::geometry) as lat,
+				ST_X(b.geom::geometry) as lng,
+				b.category,
 				COALESCE(c.business_name, 'Empresa Local') as organizer,
 				COALESCE(b.address, '') as address,
 				'Abierto ahora' as time,
@@ -111,13 +111,13 @@ func PlacesSearchHandler(w http.ResponseWriter, r *http.Request) {
 
 			UNION ALL
 
-			SELECT 
-				'event-' || e.id::text as id, 
-				e.title, 
-				COALESCE(e.description, '') as description, 
-				ST_Y(e.geom::geometry) as lat, 
-				ST_X(e.geom::geometry) as lng, 
-				e.category, 
+			SELECT
+				'event-' || e.id::text as id,
+				e.title,
+				COALESCE(e.description, '') as description,
+				ST_Y(e.geom::geometry) as lat,
+				ST_X(e.geom::geometry) as lng,
+				e.category,
 				COALESCE(c.business_name, 'Organizador') as organizer,
 				COALESCE(b.address, '') as address,
 				'Evento programado' as time,
@@ -129,6 +129,33 @@ func PlacesSearchHandler(w http.ResponseWriter, r *http.Request) {
 			FROM events e
 			LEFT JOIN company_branches b ON e.branch_emitter_id = b.id
 			LEFT JOIN companies c ON b.company_id = c.id
+
+			UNION ALL
+
+			SELECT
+				'ext-' || ep.id::text as id,
+				ep.name as title,
+				CASE WHEN ep.rating IS NOT NULL
+					THEN '⭐ ' || ep.rating::text || ' · ' || COALESCE(ep.address, '')
+					ELSE COALESCE(ep.address, '')
+				END as description,
+				ep.lat,
+				ep.lng,
+				ep.category,
+				CASE ep.category
+					WHEN 'gastronomia' THEN 'Gastronomía'
+					WHEN 'supermercado' THEN 'Supermercado'
+					WHEN 'tienda' THEN 'Comercio'
+					ELSE 'Google Places'
+				END as organizer,
+				COALESCE(ep.address, '') as address,
+				'Establecimiento' as time,
+				ep.geom,
+				COALESCE(ep.image_url, '') as image_url,
+				NULL::int as company_id,
+				COALESCE(ep.containing_zone_ids, '{}'::int[]) as containing_zone_ids,
+				ep.target_audience
+			FROM external_places ep
 		) u
 		WHERE 1=1
 	`

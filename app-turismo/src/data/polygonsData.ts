@@ -285,8 +285,8 @@ export const MUNICIPALIDAD_EVENT: TurismoEvent = {
   id: 'municipalidad-valdivia',
   title: 'Ilustre Municipalidad de Valdivia',
   description: 'Esta es la máxima autoridad regional, por ende debe estar bien representado.\nTeléfono: +56 63 228 8723\nSitio web oficial: Ilustre Municipalidad de Valdivia',
-  latitude: -39.8142,
-  longitude: -73.2459,
+  latitude: -39.812864,
+  longitude: -73.246993,
   category: 'municipalidad',
   organizer: 'Gobierno',
   time: 'Lunes a Viernes de 08:30 a 14:00 horas',
@@ -294,15 +294,84 @@ export const MUNICIPALIDAD_EVENT: TurismoEvent = {
   contactPhone: '+56 63 228 8723',
   address: 'Independencia 455, Valdivia, Región de Los Ríos, Chile',
   polygon: [
-    { latitude: -39.8140, longitude: -73.2461 },
-    { latitude: -39.8140, longitude: -73.2457 },
-    { latitude: -39.8144, longitude: -73.2457 },
-    { latitude: -39.8144, longitude: -73.2461 },
-    { latitude: -39.8140, longitude: -73.2461 },
+    { latitude: -39.813027, longitude: -73.246623 },
+    { latitude: -39.812805, longitude: -73.246581 },
+    { latitude: -39.812688, longitude: -73.247352 },
+    { latitude: -39.812935, longitude: -73.247417 },
+    { latitude: -39.813027, longitude: -73.246623 },
   ],
   vineta: {
     type: 'calificacion',
     label: 'Autoridad',
     active: true
   }
+};
+
+export const FERIA_FLUVIAL_EVENT: TurismoEvent = {
+  id: 'feria-fluvial-valdivia',
+  title: 'Feria Fluvial de Valdivia',
+  description: 'Mercado tradicional a orillas del río Calle-Calle con pescados, mariscos y productos locales.\nTeléfono: +56 63 221 3000',
+  latitude: -39.812851,
+  longitude: -73.248370,
+  category: 'gastronomia',
+  organizer: 'Municipalidad de Valdivia',
+  time: 'Lunes a Domingo 08:00 - 18:00',
+  openingHours: 'Lu-Do 08:00-18:00',
+  address: 'Av. Arturo Prat s/n, Valdivia',
+  polygon: [
+    { latitude: -39.813177, longitude: -73.248591 },
+    { latitude: -39.813212, longitude: -73.248384 },
+    { latitude: -39.812524, longitude: -73.248146 },
+    { latitude: -39.812489, longitude: -73.248358 },
+    { latitude: -39.813177, longitude: -73.248591 },
+  ],
+  vineta: {
+    type: 'calificacion',
+    label: 'Mercado',
+    active: true
+  }
+};
+
+export const PENDULO_VALDIVIA_EVENT: TurismoEvent = {
+  id: 'pendulo-valdivia',
+  title: 'Péndulo de Valdivia',
+  description: 'Escultura cinética icónica ubicada en el centro de Valdivia.',
+  latitude: -39.814060,
+  longitude: -73.248595,
+  category: 'escultura',
+  organizer: 'Municipalidad de Valdivia',
+  time: 'Acceso libre',
+  address: 'Centro, Valdivia',
+};
+
+export const SUBMARINO_VALDIVIA_EVENT: TurismoEvent = {
+  id: 'submarino-valdivia',
+  title: 'Submarino de Valdivia',
+  description: 'Monumento histórico en forma de submarino ubicado a orillas del río.',
+  latitude: -39.816053,
+  longitude: -73.249304,
+  category: 'estatua',
+  organizer: 'Municipalidad de Valdivia',
+  time: 'Acceso libre',
+  address: 'Ribera, Valdivia',
+};
+
+export const MERCADO_MUNICIPAL_VALDIVIA_EVENT: TurismoEvent = {
+  id: 'mercado-municipal-valdivia',
+  title: 'Mercado Municipal de Valdivia',
+  description: 'Mercado municipal con productos locales, frutas, verduras y artículos diversos.',
+  latitude: -39.812963,
+  longitude: -73.247765,
+  category: 'mercado',
+  organizer: 'Municipalidad de Valdivia',
+  time: 'Lunes a Domingo 08:00 - 18:00',
+  openingHours: 'Lu-Do 08:00-18:00',
+  address: 'Valdivia',
+  polygon: [
+    { latitude: -39.812791, longitude: -73.247944 },
+    { latitude: -39.812855, longitude: -73.247541 },
+    { latitude: -39.813116, longitude: -73.247588 },
+    { latitude: -39.813057, longitude: -73.248026 },
+    { latitude: -39.812791, longitude: -73.247944 },
+  ],
 };

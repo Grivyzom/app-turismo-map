@@ -11,7 +11,7 @@ import {
   Compass,
   Download,
 } from 'lucide-react'
-import { sileo } from 'sileo'
+import { sileo } from '../components/ui/Toast'
 
 type MapLayer = 'dark' | 'streets' | 'light' | 'satellite' | 'terrain'
 

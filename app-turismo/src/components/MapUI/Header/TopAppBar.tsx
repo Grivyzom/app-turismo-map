@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -23,6 +23,7 @@ import { loadUserProfile, NormalUserProfile } from '../../../utils/userProfileSt
 import { ContextualSurveyWidget } from '../../ui/ContextualSurveyWidget';
 import { SidebarSubmenu } from '../../ui/SidebarSubmenu';
 import { getRecentSearches, removeRecentSearch, RecentSearch } from '../../../utils/recentSearches';
+import { INITIAL_EVENTS } from '../../../data/mockEvents';
 
 // ─── Design Tokens (Premium Glassmorphism) ──────────────────────────────────
 const C = {
@@ -141,13 +142,7 @@ const styles = StyleSheet.create({
     gap: 6,
     ...Platform.select({ web: { cursor: 'pointer', transition: 'all 0.2s ease' } }),
   },
-  modeButtonActive: {
-    backgroundColor: C.accentBg,
-    borderWidth: 1,
-    borderColor: 'rgba(110, 231, 183, 0.25)',
-  },
   modeButtonText: { color: C.textInactive, fontSize: 13, fontWeight: '600' },
-  modeButtonTextActive: { color: C.accent, fontWeight: '700' },
 
   flexSpacer: { flex: 1 },
 
@@ -195,7 +190,12 @@ const styles = StyleSheet.create({
       web: { backgroundColor: C.bgGlass, backdropFilter: 'blur(12px)' } as any,
     }),
   },
-  recentSearchItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 16 },
+  recentSearchItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
   recentSearchItemHovered: { backgroundColor: 'rgba(255, 255, 255, 0.06)' },
   recentSearchText: { flex: 1, color: C.textPrimary, fontSize: 13 },
   recentSearchDeleteBtn: { padding: 4, marginLeft: 8 },
@@ -255,8 +255,6 @@ const styles = StyleSheet.create({
     ...Platform.select({ web: { cursor: 'pointer', transition: 'all 0.2s ease' } }),
   },
   estadoButtonText: { fontSize: 12, fontWeight: '700' },
-  // Fila del toggle Turista/Local dentro del menú overflow "⋮"
-  overflowEstadoRow: { flexDirection: 'row', justifyContent: 'center', paddingVertical: 6, paddingHorizontal: 8 },
 
   // ── Avatar button ─────────────────────────────────────────────────────────
   avatarButton: {
@@ -293,11 +291,21 @@ const styles = StyleSheet.create({
     ...Platform.select({ web: { cursor: 'pointer', transition: 'all 0.2s ease' } }),
   },
   dropdownItemText: { fontSize: 13, fontWeight: '600' },
-  dropdownDivider: { height: 1, backgroundColor: C.divider, marginVertical: 4, marginHorizontal: 8 },
+  dropdownDivider: {
+    height: 1,
+    backgroundColor: C.divider,
+    marginVertical: 4,
+    marginHorizontal: 8,
+  },
 
   // ── Settings dropdown ─────────────────────────────────────────────────────
   settingsBody: { gap: 18, padding: 14 },
-  settingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 },
+  settingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
   settingInfo: { flex: 1, paddingRight: 16 },
   settingLabel: { color: C.textPrimary, fontSize: 14, fontWeight: '600' },
   settingDesc: { color: C.textMuted, fontSize: 12, marginTop: 2 },
@@ -366,7 +374,11 @@ const NavIconButton = React.memo(
         //@ts-ignore
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        style={[styles.iconBtn, active && styles.iconBtnActive, isHovered && !active && styles.iconBtnHovered]}
+        style={[
+          styles.iconBtn,
+          active && styles.iconBtnActive,
+          isHovered && !active && styles.iconBtnHovered,
+        ]}
         accessibilityRole="button"
         accessibilityLabel={label}
       >
@@ -404,14 +416,24 @@ const DropdownItem = React.memo(function DropdownItem({
       onMouseLeave={() => setIsHovered(false)}
       style={[
         styles.dropdownItem,
-        isHovered && { backgroundColor: isDestructive ? C.destructiveBg : 'rgba(255, 255, 255, 0.06)' },
+        isHovered && {
+          backgroundColor: isDestructive ? C.destructiveBg : 'rgba(255, 255, 255, 0.06)',
+        },
       ]}
     >
-      <MaterialIcons name={icon as any} size={18} color={isDestructive ? C.destructive : isHovered ? C.accent : C.textMuted} />
+      <MaterialIcons
+        name={icon as any}
+        size={18}
+        color={isDestructive ? C.destructive : isHovered ? C.accent : C.textMuted}
+      />
       <Text
         style={[
           styles.dropdownItemText,
-          isDestructive ? { color: C.destructive } : isHovered ? { color: C.textPrimary } : { color: '#E5E7EB' },
+          isDestructive
+            ? { color: C.destructive }
+            : isHovered
+              ? { color: C.textPrimary }
+              : { color: '#E5E7EB' },
         ]}
       >
         {label}
@@ -437,7 +459,11 @@ const RecentSearchRow = React.memo(function RecentSearchRow({
       onMouseLeave={() => setIsHovered(false)}
       style={[styles.recentSearchItem, isHovered && styles.recentSearchItemHovered]}
     >
-      <TouchableOpacity style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }} onPress={onSelect} activeOpacity={0.7}>
+      <TouchableOpacity
+        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }}
+        onPress={onSelect}
+        activeOpacity={0.7}
+      >
         <Ionicons name="time-outline" size={16} color={C.textMuted} />
         <Text style={styles.recentSearchText} numberOfLines={1}>
           {item.query}
@@ -454,13 +480,12 @@ const RecentSearchRow = React.memo(function RecentSearchRow({
 const BP_OVERFLOW = 680; // < : acciones secundarias colapsan en menú "⋮"
 const BP_MODE_LABELS = 820; // ≥ : etiquetas de Mapa/Turismo/Comercial
 const BP_LOGO_TEXT = 940; // ≥ : "Valdivia / PORTAL TURÍSTICO" junto al logo
-const BP_ESTADO_LABELS = 1100; // ≥ : etiquetas Turista/Local
 
 // ─── Mode/estado definitions ─────────────────────────────────────────────────
-const MODE_OPTIONS: { id: MapDisplayMode; label: string; icon: string }[] = [
-  { id: 'mapa', label: 'Mapa', icon: 'map' },
-  { id: 'turismo', label: 'Turismo', icon: 'explore' },
-  { id: 'comercial', label: 'Comercial', icon: 'storefront' },
+const MODE_OPTIONS: { id: MapDisplayMode; label: string; icon: string; color: string; bgColor: string }[] = [
+  { id: 'mapa', label: 'Mapa', icon: 'map', color: '#60A5FA', bgColor: 'rgba(96, 165, 250, 0.15)' },
+  { id: 'turismo', label: 'Turismo', icon: 'explore', color: '#F59E0B', bgColor: 'rgba(245, 158, 11, 0.15)' },
+  { id: 'comercial', label: 'Comercial', icon: 'storefront', color: '#A78BFA', bgColor: 'rgba(167, 139, 250, 0.15)' },
 ];
 
 const PROFILE_LINKS: { tab: TabType; label: string; icon: string }[] = [
@@ -471,53 +496,6 @@ const PROFILE_LINKS: { tab: TabType; label: string; icon: string }[] = [
   { tab: 'historial', label: 'Recientes', icon: 'history' },
   { tab: 'forum', label: 'Foro', icon: 'forum' },
 ];
-
-// ─── Estado (Turista / Local) ─────────────────────────────────────────────────
-/** Toggle compartido entre la navbar inline y el menú overflow. */
-const EstadoToggle = React.memo(function EstadoToggle({
-  viewMode,
-  onSelect,
-  showLabels,
-}: {
-  viewMode: 'local' | 'tourist';
-  onSelect: (target: 'local' | 'tourist') => void;
-  showLabels: boolean;
-}) {
-  return (
-    <View style={styles.estadoGroup}>
-      <TouchableOpacity
-        style={[styles.estadoButton, viewMode === 'tourist' && { backgroundColor: C.touristBg }]}
-        onPress={() => onSelect('tourist')}
-        activeOpacity={0.8}
-        accessibilityRole="button"
-        accessibilityState={{ selected: viewMode === 'tourist' }}
-        accessibilityLabel="Modo Turista"
-      >
-        <MaterialIcons name="explore" size={15} color={viewMode === 'tourist' ? C.tourist : C.textInactive} />
-        {showLabels && (
-          <Text style={[styles.estadoButtonText, { color: viewMode === 'tourist' ? C.tourist : C.textInactive }]}>
-            Turista
-          </Text>
-        )}
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.estadoButton, viewMode === 'local' && { backgroundColor: C.localBg }]}
-        onPress={() => onSelect('local')}
-        activeOpacity={0.8}
-        accessibilityRole="button"
-        accessibilityState={{ selected: viewMode === 'local' }}
-        accessibilityLabel="Modo Local"
-      >
-        <MaterialIcons name="home" size={15} color={viewMode === 'local' ? C.local : C.textInactive} />
-        {showLabels && (
-          <Text style={[styles.estadoButtonText, { color: viewMode === 'local' ? C.local : C.textInactive }]}>
-            Local
-          </Text>
-        )}
-      </TouchableOpacity>
-    </View>
-  );
-});
 
 // ─── Main export ─────────────────────────────────────────────────────────────
 export const TopAppBar: React.FC<
@@ -557,12 +535,22 @@ export const TopAppBar: React.FC<
   const isNarrow = windowWidth < BP_OVERFLOW;
   const showLogoText = windowWidth >= BP_LOGO_TEXT;
   const showModeLabels = windowWidth >= BP_MODE_LABELS;
-  const showEstadoLabels = windowWidth >= BP_ESTADO_LABELS;
 
   // ── Search state ──────────────────────────────────────────────────────────
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [isSearchHovered, setIsSearchHovered] = useState(false);
   const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const suggestions = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const lowerQuery = searchQuery.toLowerCase();
+    return INITIAL_EVENTS.filter(
+      (e) =>
+        e.title.toLowerCase().includes(lowerQuery) ||
+        (e.category && e.category.toLowerCase().includes(lowerQuery))
+    ).slice(0, 5); // Limit to 5 suggestions
+  }, [searchQuery]);
 
   // ── Profile state ─────────────────────────────────────────────────────────
   const [profile, setProfile] = useState<NormalUserProfile | null>(null);
@@ -702,19 +690,14 @@ export const TopAppBar: React.FC<
     [onMapDisplayModeChange, onTabChange, currentTab],
   );
 
-  const handleEstadoSelect = useCallback(
-    (target: 'local' | 'tourist') => {
-      if (target !== viewMode) {
-        onToggleViewMode?.();
-      }
-    },
-    [viewMode, onToggleViewMode],
-  );
-
   const handleToggleSearch = useCallback(
     (active: boolean) => {
       LayoutAnimation.configureNext(
-        LayoutAnimation.create(250, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity),
+        LayoutAnimation.create(
+          250,
+          LayoutAnimation.Types.easeInEaseOut,
+          LayoutAnimation.Properties.opacity,
+        ),
       );
       if (active) {
         onSearchFocus?.();
@@ -727,7 +710,12 @@ export const TopAppBar: React.FC<
 
   const handleRecentSearchSelect = useCallback(
     (item: RecentSearch) => {
-      onVoiceSearch?.({ query: item.query, category: item.category, originalText: item.query, isFinal: true });
+      onVoiceSearch?.({
+        query: item.query,
+        category: item.category,
+        originalText: item.query,
+        isFinal: true,
+      });
     },
     [onVoiceSearch],
   );
@@ -826,16 +814,22 @@ export const TopAppBar: React.FC<
               return (
                 <TouchableOpacity
                   key={mode.id}
-                  style={[styles.modeButton, isActive && styles.modeButtonActive]}
+                  style={[styles.modeButton, isActive && { backgroundColor: mode.bgColor }]}
                   onPress={() => handleModeSelect(mode.id)}
                   activeOpacity={0.8}
                   accessibilityRole="button"
                   accessibilityState={{ selected: isActive }}
                   accessibilityLabel={`Modo ${mode.label}`}
                 >
-                  <MaterialIcons name={mode.icon as any} size={16} color={isActive ? C.accent : C.textInactive} />
+                  <MaterialIcons
+                    name={mode.icon as any}
+                    size={15}
+                    color={isActive ? mode.color : C.textInactive}
+                  />
                   {showModeLabels && (
-                    <Text style={[styles.modeButtonText, isActive && styles.modeButtonTextActive]}>{mode.label}</Text>
+                    <Text style={[styles.modeButtonText, isActive && { color: mode.color, fontWeight: '700' }]}>
+                      {mode.label}
+                    </Text>
                   )}
                 </TouchableOpacity>
               );
@@ -847,7 +841,11 @@ export const TopAppBar: React.FC<
           {/* ━━━ Searchbar ━━━ */}
           <View style={styles.searchAnchor}>
             <View
-              style={[styles.searchBox, isSearchActive && styles.searchBoxFocused, isSearchHovered && !isSearchActive && styles.searchBoxHovered]}
+              style={[
+                styles.searchBox,
+                isSearchActive && styles.searchBoxFocused,
+                isSearchHovered && !isSearchActive && styles.searchBoxHovered,
+              ]}
               //@ts-ignore
               onMouseEnter={() => setIsSearchHovered(true)}
               onMouseLeave={() => setIsSearchHovered(false)}
@@ -857,35 +855,76 @@ export const TopAppBar: React.FC<
                   <SmartVoiceSearch
                     isEmbedded={true}
                     onPartialResult={(text) => onVoicePartialSearch?.(text)}
+                    onChangeText={setSearchQuery}
                     onSearchComplete={(res) => {
+                      setSearchQuery('');
                       getRecentSearches().then(setRecentSearches);
                       onVoiceSearch?.(res);
                     }}
                   />
-                  <TouchableOpacity onPress={() => handleToggleSearch(false)} style={styles.searchBackBtn} activeOpacity={0.7}>
+                  <TouchableOpacity
+                    onPress={() => handleToggleSearch(false)}
+                    style={styles.searchBackBtn}
+                    activeOpacity={0.7}
+                  >
                     <Ionicons name="close" size={16} color={C.textPrimary} />
                   </TouchableOpacity>
                 </View>
               ) : (
-                <TouchableOpacity onPress={() => handleToggleSearch(true)} activeOpacity={0.8} style={styles.searchCollapsedBtn}>
+                <TouchableOpacity
+                  onPress={() => handleToggleSearch(true)}
+                  activeOpacity={0.8}
+                  style={styles.searchCollapsedBtn}
+                >
                   <Ionicons name="search" size={17} color={C.textMuted} />
                 </TouchableOpacity>
               )}
             </View>
 
-            {isSearchActive && recentSearches.length > 0 && (
+            {isSearchActive && (searchQuery.trim() ? suggestions.length > 0 : recentSearches.length > 0) && (
               <View style={styles.recentSearchesDropdown}>
-                <View style={styles.recentSearchHeader}>
-                  <Text style={styles.recentSearchHeaderText}>Búsquedas Recientes</Text>
-                </View>
-                {recentSearches.map((item) => (
-                  <RecentSearchRow
-                    key={item.id}
-                    item={item}
-                    onSelect={() => handleRecentSearchSelect(item)}
-                    onDelete={() => handleDeleteRecentSearch(item.id)}
-                  />
-                ))}
+                {searchQuery.trim() ? (
+                  <>
+                    <View style={styles.recentSearchHeader}>
+                      <Text style={styles.recentSearchHeaderText}>Sugerencias</Text>
+                    </View>
+                    {suggestions.map((item) => (
+                      <TouchableOpacity
+                        key={item.id}
+                        style={[styles.recentSearchItem, { gap: 12 }]}
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          setSearchQuery('');
+                          onVoiceSearch?.({
+                            query: item.title,
+                            category: item.category || 'todos',
+                            originalText: item.title,
+                            isFinal: true,
+                          });
+                        }}
+                      >
+                        <Ionicons name="location-outline" size={16} color={C.textMuted} />
+                        <Text style={styles.recentSearchText} numberOfLines={1}>
+                          {item.title}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </>
+                ) : (
+                  <>
+                    <View style={styles.recentSearchHeader}>
+                      <Text style={styles.recentSearchHeaderText}>Búsquedas Recientes</Text>
+                    </View>
+                    {recentSearches.map((item) => (
+                      <RecentSearchRow
+                        key={item.id}
+                        item={item}
+                        onSelect={() => handleRecentSearchSelect(item)}
+                        onDelete={() => handleDeleteRecentSearch(item.id)}
+                      />
+                    ))}
+                  </>
+                )}
               </View>
             )}
           </View>
@@ -918,13 +957,12 @@ export const TopAppBar: React.FC<
                 ref={notifBtnRef}
                 icon="notifications-outline"
                 iconSet="Ionicons"
-                label={notificationsCount > 0 ? `${notificationsCount} notificaciones` : 'Notificaciones'}
+                label={
+                  notificationsCount > 0 ? `${notificationsCount} notificaciones` : 'Notificaciones'
+                }
                 badge={notificationsCount > 0}
                 onClick={handleNotificationsPress}
               />
-
-              {/* ━━━ Estado: Turista / Local ━━━ */}
-              <EstadoToggle viewMode={viewMode} onSelect={handleEstadoSelect} showLabels={showEstadoLabels} />
 
               {/* ━━━ Ajustes ━━━ */}
               <NavIconButton
@@ -946,7 +984,11 @@ export const TopAppBar: React.FC<
             //@ts-ignore
             onMouseEnter={() => setIsAvatarHovered(true)}
             onMouseLeave={() => setIsAvatarHovered(false)}
-            style={[styles.avatarButton, isAvatarActive && styles.avatarButtonActive, isAvatarHovered && !isAvatarActive && styles.iconBtnHovered]}
+            style={[
+              styles.avatarButton,
+              isAvatarActive && styles.avatarButtonActive,
+              isAvatarHovered && !isAvatarActive && styles.iconBtnHovered,
+            ]}
             accessibilityRole="button"
             accessibilityLabel="Perfil"
           >
@@ -991,7 +1033,12 @@ export const TopAppBar: React.FC<
               />
             ))}
             <View style={styles.dropdownDivider} />
-            <DropdownItem icon="logout" label="Cerrar sesión" onPress={handleSignOut} isDestructive />
+            <DropdownItem
+              icon="logout"
+              label="Cerrar sesión"
+              onPress={handleSignOut}
+              isDestructive
+            />
           </>
         ) : (
           <DropdownItem
@@ -1019,7 +1066,9 @@ export const TopAppBar: React.FC<
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
               <Text style={styles.settingLabel}>Notificaciones Push</Text>
-              <Text style={styles.settingDesc}>Recibe alertas de eventos cercanos en tiempo real</Text>
+              <Text style={styles.settingDesc}>
+                Recibe alertas de eventos cercanos en tiempo real
+              </Text>
             </View>
             <Switch
               value={pushNotifications}
@@ -1051,8 +1100,19 @@ export const TopAppBar: React.FC<
             </View>
             <View style={styles.selectorGroup}>
               {(['es', 'en'] as const).map((lang) => (
-                <TouchableOpacity key={lang} style={[styles.selectorBtn, language === lang && styles.selectorBtnActive]} onPress={() => handleLanguageChange(lang)}>
-                  <Text style={[styles.selectorBtnText, language === lang && styles.selectorBtnTextActive]}>{lang.toUpperCase()}</Text>
+                <TouchableOpacity
+                  key={lang}
+                  style={[styles.selectorBtn, language === lang && styles.selectorBtnActive]}
+                  onPress={() => handleLanguageChange(lang)}
+                >
+                  <Text
+                    style={[
+                      styles.selectorBtnText,
+                      language === lang && styles.selectorBtnTextActive,
+                    ]}
+                  >
+                    {lang.toUpperCase()}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -1065,11 +1125,31 @@ export const TopAppBar: React.FC<
               <Text style={styles.settingDesc}>Personaliza los colores de la interfaz</Text>
             </View>
             <View style={styles.selectorGroup}>
-              <TouchableOpacity style={[styles.selectorBtn, themeMode === 'dark' && styles.selectorBtnActive]} onPress={() => handleThemeChange('dark')}>
-                <Text style={[styles.selectorBtnText, themeMode === 'dark' && styles.selectorBtnTextActive]}>Oscuro</Text>
+              <TouchableOpacity
+                style={[styles.selectorBtn, themeMode === 'dark' && styles.selectorBtnActive]}
+                onPress={() => handleThemeChange('dark')}
+              >
+                <Text
+                  style={[
+                    styles.selectorBtnText,
+                    themeMode === 'dark' && styles.selectorBtnTextActive,
+                  ]}
+                >
+                  Oscuro
+                </Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.selectorBtn, themeMode === 'light' && styles.selectorBtnActive]} onPress={() => handleThemeChange('light')}>
-                <Text style={[styles.selectorBtnText, themeMode === 'light' && styles.selectorBtnTextActive]}>Claro</Text>
+              <TouchableOpacity
+                style={[styles.selectorBtn, themeMode === 'light' && styles.selectorBtnActive]}
+                onPress={() => handleThemeChange('light')}
+              >
+                <Text
+                  style={[
+                    styles.selectorBtnText,
+                    themeMode === 'light' && styles.selectorBtnTextActive,
+                  ]}
+                >
+                  Claro
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1085,14 +1165,12 @@ export const TopAppBar: React.FC<
         width={240}
         maxHeight={windowHeight * 0.7}
       >
-        <View style={styles.overflowEstadoRow}>
-          <EstadoToggle viewMode={viewMode} onSelect={handleEstadoSelect} showLabels />
-        </View>
-        <View style={styles.dropdownDivider} />
         <DropdownItem icon="tune" label="Herramientas" onPress={handleFiltersPress} />
         <DropdownItem
           icon="notifications-none"
-          label={notificationsCount > 0 ? `Notificaciones (${notificationsCount})` : 'Notificaciones'}
+          label={
+            notificationsCount > 0 ? `Notificaciones (${notificationsCount})` : 'Notificaciones'
+          }
           onPress={handleNotificationsPress}
         />
         <DropdownItem icon="settings" label="Ajustes" onPress={handleToggleSettings} />

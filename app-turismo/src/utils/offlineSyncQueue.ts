@@ -1,77 +1,85 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { API_URL } from '../config/api';
+
+import { getCachedToken } from './tokenCache';
+
 export interface QueuedReport {
   id: string;
   payload: any;
   timestamp: number;
+  retries: number;
 }
 
 const OFFLINE_QUEUE_KEY = '@turismo_offline_reports';
-// 12 hours in milliseconds
 const TTL_MS = 12 * 60 * 60 * 1000;
+const MAX_RETRIES = 3;
 
-/**
- * Agrega un reporte a la cola offline.
- */
 export async function enqueueReport(payload: any): Promise<void> {
   try {
-    const currentQueueStr = await AsyncStorage.getItem(OFFLINE_QUEUE_KEY);
-    let queue: QueuedReport[] = currentQueueStr ? JSON.parse(currentQueueStr) : [];
+    const raw = await AsyncStorage.getItem(OFFLINE_QUEUE_KEY);
+    const queue: QueuedReport[] = raw ? JSON.parse(raw) : [];
 
-    const newReport: QueuedReport = {
-      id: Date.now().toString() + Math.random().toString(36).substring(7),
+    queue.push({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
       payload,
       timestamp: Date.now(),
-    };
+      retries: 0,
+    });
 
-    queue.push(newReport);
     await AsyncStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
-    console.log('[OfflineSync] Reporte encolado:', newReport.id);
   } catch (error) {
     console.error('[OfflineSync] Error al encolar reporte:', error);
   }
 }
 
-/**
- * Sincroniza la cola con el servidor, descartando los que hayan superado el TTL.
- */
 export async function syncPendingReports(): Promise<void> {
   try {
-    const currentQueueStr = await AsyncStorage.getItem(OFFLINE_QUEUE_KEY);
-    if (!currentQueueStr) return;
+    const raw = await AsyncStorage.getItem(OFFLINE_QUEUE_KEY);
+    if (!raw) return;
 
-    const queue: QueuedReport[] = JSON.parse(currentQueueStr);
+    const queue: QueuedReport[] = JSON.parse(raw);
     if (queue.length === 0) return;
 
     const now = Date.now();
-    const validReports = queue.filter((r) => now - r.timestamp < TTL_MS);
+    const valid = queue.filter((r) => now - r.timestamp < TTL_MS && r.retries < MAX_RETRIES);
 
-    const discardedCount = queue.length - validReports.length;
-    if (discardedCount > 0) {
-      console.log(
-        `[OfflineSync] Descartados ${discardedCount} reportes por superar el TTL de 12 horas.`,
-      );
+    const discarded = queue.length - valid.length;
+    if (discarded > 0) {
+      console.log(`[OfflineSync] Descartados ${discarded} reportes (TTL o reintentos agotados).`);
     }
 
-    // Aquí iteraríamos y enviaríamos a nuestro backend de Go:
-    // fetch('/api/v1/reports', ...)
-    let successCount = 0;
-    for (const report of validReports) {
-      try {
-        // TODO: Reemplazar con llamada real a Go. Simulamos éxito:
-        console.log(`[OfflineSync] Enviando reporte ${report.id} al servidor...`);
-        // await api.post('/api/v1/reports', report.payload);
-        successCount++;
-      } catch (err) {
-        console.error(`[OfflineSync] Falló envío del reporte ${report.id}`, err);
-        // Podríamos mantenerlo en la cola si falla por red
-      }
-    }
+    const token = await getCachedToken();
+    const failed: QueuedReport[] = [];
 
-    // Por simplicidad del MVP, vaciamos la cola
-    await AsyncStorage.removeItem(OFFLINE_QUEUE_KEY);
-    console.log(`[OfflineSync] Sincronización completada. ${successCount} reportes enviados.`);
+    await Promise.all(
+      valid.map(async (report) => {
+        try {
+          const res = await fetch(`${API_URL}/api/v1/reports`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify(report.payload),
+          });
+
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        } catch (err) {
+          console.error(`[OfflineSync] Falló reporte ${report.id}:`, err);
+          failed.push({ ...report, retries: report.retries + 1 });
+        }
+      }),
+    );
+
+    if (failed.length > 0) {
+      await AsyncStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(failed));
+      console.log(`[OfflineSync] ${failed.length} reportes retenidos para reintento.`);
+    } else {
+      await AsyncStorage.removeItem(OFFLINE_QUEUE_KEY);
+      console.log(`[OfflineSync] Cola vaciada. ${valid.length} reportes enviados.`);
+    }
   } catch (error) {
-    console.error('[OfflineSync] Error sincronizando reportes:', error);
+    console.error('[OfflineSync] Error sincronizando:', error);
   }
 }

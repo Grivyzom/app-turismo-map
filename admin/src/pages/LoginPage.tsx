@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Shield, Eye, EyeOff, AlertTriangle, Loader2 } from 'lucide-react'
-import { sileo } from 'sileo'
+import { sileo } from '../components/ui/Toast'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')

@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 
 import { getAuthTokenAsync, saveAuthTokenAsync, clearAuthTokenAsync } from '../utils/authStorage';
 import { loadUserProfile, clearUserProfile } from '../utils/userProfileStorage';
+import { clearTokenCache } from '../utils/collectionsApi';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -153,6 +154,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const signOut = async () => {
+    clearTokenCache();
     await clearAuthTokenAsync();
     await clearUserProfile();
     setState({

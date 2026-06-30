@@ -19,12 +19,14 @@ import { addRecentSearch } from '../../utils/recentSearches';
 interface SmartVoiceSearchProps {
   onSearchComplete: (result: ParsedSearch) => void;
   onPartialResult?: (text: string) => void;
+  onChangeText?: (text: string) => void;
   isEmbedded?: boolean;
 }
 
 export function SmartVoiceSearch({
   onSearchComplete,
   onPartialResult,
+  onChangeText,
   isEmbedded = false,
 }: SmartVoiceSearchProps) {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -189,7 +191,10 @@ export function SmartVoiceSearch({
             Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
           ]}
           value={searchText}
-          onChangeText={setSearchText}
+          onChangeText={(text) => {
+            setSearchText(text);
+            if (onChangeText) onChangeText(text);
+          }}
           onSubmitEditing={handleSubmit}
           placeholder={statusText}
           placeholderTextColor="#9CA3AF"

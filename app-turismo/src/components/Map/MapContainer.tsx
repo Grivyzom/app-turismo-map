@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { StyleSheet, View, Text, Platform, TouchableOpacity, Animated, Alert } from 'react-native';
+import { StyleSheet, View, Text, Platform, TouchableOpacity, Animated, Alert, Dimensions } from 'react-native';
 import AnimatedReanimated, {
   useSharedValue,
   useAnimatedStyle,
@@ -409,9 +409,6 @@ const EventMarker = React.memo(
           zIndex: isSelected ? 9999 : 1,
         }}
       >
-        {isSelected && isMiniModalEvent && (
-          <MiniModal event={event} isLightMode={isLightMode} isSelected={isSelected} />
-        )}
         {isSelected && isAuthorityEvent && (
           <AuthorityModal event={event} isLightMode={isLightMode} />
         )}
@@ -747,6 +744,11 @@ function MapContainerInner({
         'carabinero',
         'camara',
         'universidad',
+        'escultura',
+        'torreon',
+        'estatua',
+        'arte',
+        'bosque',
       ].includes(event?.category?.toLowerCase() || '');
       const isAlreadySelected = selectedEvent?.id === event?.id || localLoboMarinoId === event?.id;
       const nextEvent = isAlreadySelected ? null : event;
@@ -834,14 +836,19 @@ function MapContainerInner({
       const nextZoom = Math.max(currentZoom, 16);
       const deltas = zoomToDeltas(nextZoom);
 
+      // Desplazar el centro hacia el norte para que el pin quede visible debajo del header.
+      const screenHeight = Dimensions.get('window').height;
+      const headerOffsetPx = NAVBAR_CLEARANCE + 80;
+      const latOffset = deltas.latitudeDelta * (headerOffsetPx / screenHeight);
+
       mapRef.current.animateToRegion(
         {
-          latitude: selectedEvent.latitude,
+          latitude: selectedEvent.latitude + latOffset,
           longitude: selectedEvent.longitude,
           ...deltas,
         },
         800,
-      ); // Ligeramente más rápido para sensación de fluidez
+      );
     }
   }, [selectedEvent]);
 
@@ -1415,6 +1422,28 @@ function MapContainerInner({
           <View style={styles.tacticalCrosshairDot} />
         </View>
       )}
+
+      {/* Floating MiniModal — fuera del Marker para no quedar cortado por el header */}
+      {(() => {
+        const MINI_MODAL_CATS = [
+          'fauna', 'camara', 'universidad', 'escultura', 'torreon', 'estatua', 'arte', 'bosque',
+        ];
+        let miniEvent: TurismoEvent | null = null;
+        if (localLoboMarinoId) {
+          miniEvent = events.find((e) => e.id === localLoboMarinoId) ?? null;
+        } else if (
+          selectedEvent &&
+          MINI_MODAL_CATS.includes(selectedEvent.category?.toLowerCase() || '')
+        ) {
+          miniEvent = selectedEvent;
+        }
+        if (!miniEvent) return null;
+        return (
+          <View style={styles.floatingMiniModalContainer} pointerEvents="box-none">
+            <MiniModal event={miniEvent} isLightMode={isMapLight} isSelected={true} />
+          </View>
+        );
+      })()}
     </View>
   );
 }
@@ -1580,6 +1609,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
+  },
+  floatingMiniModalContainer: {
+    position: 'absolute',
+    top: NAVBAR_CLEARANCE + 8,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 200,
   },
   tacticalCrosshairDot: {
     position: 'absolute',

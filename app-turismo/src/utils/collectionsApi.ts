@@ -1,6 +1,8 @@
 import { API_URL } from '../config/api';
 
-import { getAuthTokenAsync } from './authStorage';
+import { getCachedToken, clearTokenCache } from './tokenCache';
+
+export { clearTokenCache };
 
 export interface BackendCollection {
   id: number;
@@ -22,7 +24,7 @@ export interface BackendSavedLocation {
 
 export async function fetchCollectionsFromBackend(): Promise<BackendCollection[]> {
   try {
-    const token = await getAuthTokenAsync();
+    const token = await getCachedToken();
     if (!token) return [];
 
     const response = await fetch(`${API_URL}/api/v1/collections`, {
@@ -47,7 +49,7 @@ export async function fetchCollectionLocations(
   collectionId: number,
 ): Promise<BackendSavedLocation[]> {
   try {
-    const token = await getAuthTokenAsync();
+    const token = await getCachedToken();
     if (!token) return [];
 
     const response = await fetch(`${API_URL}/api/v1/collections/${collectionId}/locations`, {
@@ -70,7 +72,7 @@ export async function fetchCollectionLocations(
 
 export async function createCollectionOnBackend(name: string): Promise<BackendCollection | null> {
   try {
-    const token = await getAuthTokenAsync();
+    const token = await getCachedToken();
     if (!token) return null;
 
     const response = await fetch(`${API_URL}/api/v1/collections`, {
@@ -96,7 +98,7 @@ export async function createCollectionOnBackend(name: string): Promise<BackendCo
 
 export async function deleteCollectionOnBackend(collectionId: number): Promise<boolean> {
   try {
-    const token = await getAuthTokenAsync();
+    const token = await getCachedToken();
     if (!token) return false;
 
     const response = await fetch(`${API_URL}/api/v1/collections/${collectionId}`, {
@@ -118,7 +120,7 @@ export async function addLocationToCollection(
   location: Omit<BackendSavedLocation, 'id' | 'collectionId' | 'createdAt'>,
 ): Promise<BackendSavedLocation | null> {
   try {
-    const token = await getAuthTokenAsync();
+    const token = await getCachedToken();
     if (!token) return null;
 
     const response = await fetch(`${API_URL}/api/v1/collections/${collectionId}/locations`, {
@@ -147,7 +149,7 @@ export async function removeLocationFromCollection(
   locationId: number,
 ): Promise<boolean> {
   try {
-    const token = await getAuthTokenAsync();
+    const token = await getCachedToken();
     if (!token) return false;
 
     const response = await fetch(

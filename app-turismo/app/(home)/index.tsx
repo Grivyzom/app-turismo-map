@@ -242,6 +242,16 @@ export default function HomeScreen() {
   const [showCoordsEditor, setShowCoordsEditor] = useState(false);
   const [showCollectionsIsland, setShowCollectionsIsland] = useState(false);
   const [shelfOpen, setShelfOpen] = useState(false);
+  const unifiedControlsAnim = React.useRef(new Animated.Value(1)).current;
+
+  React.useEffect(() => {
+    Animated.spring(unifiedControlsAnim, {
+      toValue: shelfOpen ? 0 : 1,
+      useNativeDriver: true,
+      tension: 50,
+      friction: 8,
+    }).start();
+  }, [shelfOpen, unifiedControlsAnim]);
 
   const {
     events,
@@ -1071,10 +1081,28 @@ export default function HomeScreen() {
         />
       </View>
       {showMainUI && (
-        <View
+        <Animated.View
+          pointerEvents={shelfOpen ? 'none' : 'auto'}
           style={[
             styles.unifiedControlsContainer,
-            { bottom: isDesktop ? 20 : Math.max(insets.bottom, 20) },
+            { 
+              bottom: isDesktop ? 20 : Math.max(insets.bottom, 20),
+              opacity: unifiedControlsAnim,
+              transform: [
+                {
+                  translateY: unifiedControlsAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [20, 0], // slide down when hiding
+                  }),
+                },
+                {
+                  scale: unifiedControlsAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.95, 1], // slight shrink when hiding
+                  }),
+                }
+              ]
+            },
           ]}
         >
           {/* Zoom */}
@@ -1143,7 +1171,7 @@ export default function HomeScreen() {
               </ControlTooltip>
             </>
           )}
-        </View>
+        </Animated.View>
       )}
 
       {/* Zoom Slider Flotante */}

@@ -13,7 +13,7 @@ import {
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
-import { getAuthTokenAsync } from '../utils/authStorage';
+import { getCachedToken } from '../utils/tokenCache';
 
 interface FeedItem {
   id: string;
@@ -123,7 +123,7 @@ export default function FeedScreen() {
   const fetchRecommendations = async () => {
     setIsLoadingRecommendations(true);
     try {
-      const token = await getAuthTokenAsync();
+      const token = await getCachedToken();
       if (!token) return;
 
       const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8080';

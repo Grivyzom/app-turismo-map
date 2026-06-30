@@ -13,7 +13,7 @@ import {
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { API_URL } from '../../config/api';
-import { getAuthTokenAsync } from '../../utils/authStorage';
+import { getCachedToken } from '../../utils/tokenCache';
 
 export interface SaveToCollectionModalProps {
   visible: boolean;
@@ -55,14 +55,10 @@ export function SaveToCollectionModal({
     }
   }, [visible]);
 
-  const getAuthToken = async () => {
-    return await getAuthTokenAsync();
-  };
-
   const fetchCollections = async () => {
     setLoading(true);
     try {
-      const token = await getAuthToken();
+      const token = await getCachedToken();
       if (!token) throw new Error('No token');
 
       const response = await fetch(`${API_URL}/api/v1/collections`, {
@@ -88,7 +84,7 @@ export function SaveToCollectionModal({
     if (!newCollectionName.trim()) return;
     setSaving(true);
     try {
-      const token = await getAuthToken();
+      const token = await getCachedToken();
       if (!token) throw new Error('No token');
 
       const response = await fetch(`${API_URL}/api/v1/collections`, {
@@ -119,7 +115,7 @@ export function SaveToCollectionModal({
     if (!locationData) return;
     setSaving(true);
     try {
-      const token = await getAuthToken();
+      const token = await getCachedToken();
       if (!token) throw new Error('No token');
 
       const payload = {

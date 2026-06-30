@@ -129,12 +129,31 @@ func main() {
 	mux.HandleFunc("POST /admin/api/v1/cycleways", middleware.AdminMiddleware(handlers.AdminSaveCyclewayHandler))
 	mux.HandleFunc("POST /admin/api/v1/cycleways/delete", middleware.AdminMiddleware(handlers.AdminDeleteCyclewayHandler))
 
+	// ── Google Places API sync ────────────────────────────────────────────
+	mux.HandleFunc("POST /admin/api/v1/places/sync-google", middleware.AdminMiddleware(handlers.SyncGooglePlacesHandler))
+	mux.HandleFunc("GET /admin/api/v1/places/external-stats", middleware.AdminMiddleware(handlers.GetExternalPlacesStatsHandler))
+
+	// ── Rutas de Perfil de Ciudadano ─────────────────────────────────────
+	mux.HandleFunc("GET /api/v1/profile/me", middleware.AuthMiddleware(handlers.GetMyProfileHandler))
+	mux.HandleFunc("PATCH /api/v1/profile", middleware.AuthMiddleware(handlers.UpdateProfileHandler))
+	mux.HandleFunc("POST /api/v1/profile/avatar", middleware.AuthMiddleware(handlers.UploadAvatarHandler))
+
+	// ── Rutas de Usuarios Ciudadanos (búsqueda y seguimiento) ─────────────
+	mux.HandleFunc("GET /api/v1/users/search", middleware.AuthMiddleware(handlers.SearchUsersHandler))
+	mux.HandleFunc("GET /api/v1/users/{id}/profile", middleware.OptionalAuthMiddleware(handlers.GetPublicProfileHandler))
+	mux.HandleFunc("POST /api/v1/users/{id}/follow", middleware.AuthMiddleware(handlers.FollowUserHandler))
+	mux.HandleFunc("DELETE /api/v1/users/{id}/follow", middleware.AuthMiddleware(handlers.UnfollowUserHandler))
+	mux.HandleFunc("POST /api/v1/search/history", middleware.AuthMiddleware(handlers.SaveSearchHistoryHandler))
+
 	// Serve static SVG icons for both web and mobile
 	svgDir := "./assets/svg"
 	if _, err := os.Stat(svgDir); os.IsNotExist(err) {
 		svgDir = "../app-turismo/assets/svg"
 	}
 	mux.Handle("/assets/svg/", http.StripPrefix("/assets/svg/", http.FileServer(http.Dir(svgDir))))
+
+	// Serve uploaded avatars
+	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./uploads"))))
 
 	// ── Ruta de prueba ───────────────────────────────────────────────────
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

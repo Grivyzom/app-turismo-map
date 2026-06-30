@@ -7,11 +7,9 @@ import AuditLogPage from './pages/AuditLogPage'
 import MapPage from './pages/MapPage'
 import CompanyPage from './pages/CompanyPage'
 import SettingsPage from './pages/SettingsPage'
-import SileoPage from './pages/SileoPage'
 import RatingShowcasePage from './pages/RatingShowcasePage'
 import AdminLayout from './components/AdminLayout'
-import { Toaster } from 'sileo'
-import 'sileo/styles.css'
+import { Toaster } from './components/ui/Toast'
 import 'react-tooltip/dist/react-tooltip.css'
 
 
@@ -37,7 +35,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <>
-      <Toaster position="top-right" />
+      <Toaster position="top-right" offset={{ top: 80, right: 24 }} />
       <Routes>
         <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
         <Route path="/verify-2fa" element={<PublicRoute><TwoFactorPage /></PublicRoute>} />
@@ -47,7 +45,6 @@ export default function App() {
           <Route path="/map" element={<MapPage />} />
           <Route path="/empresas" element={<CompanyPage />} />
           <Route path="/audit-log" element={<AuditLogPage />} />
-          <Route path="/sileo" element={<SileoPage />} />
           <Route path="/ratings" element={<RatingShowcasePage />} />
           <Route path="/configuracion" element={<SettingsPage />} />
         </Route>

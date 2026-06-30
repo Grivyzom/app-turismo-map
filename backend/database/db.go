@@ -305,6 +305,18 @@ func InitDB() {
 		);`,
 		`CREATE INDEX IF NOT EXISTS idx_user_follows_company ON user_follows (company_id);`,
 
+		// ── Tabla de Seguimiento entre Ciudadanos ─────────────────────────────
+		`CREATE TABLE IF NOT EXISTS user_user_follows (
+			follower_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			followed_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (follower_id, followed_id)
+		);`,
+		`CREATE INDEX IF NOT EXISTS idx_uuf_followed ON user_user_follows (followed_id);`,
+
+		// ── Bio en perfil de ciudadano ────────────────────────────────────────
+		`ALTER TABLE citizen_profiles ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT '';`,
+
 		// Asegurar restricciones de tipo de entidad en base de datos existente
 		`ALTER TABLE companies DROP CONSTRAINT IF EXISTS chk_entity_type;`,
 		`ALTER TABLE companies ADD CONSTRAINT chk_entity_type CHECK (entity_type IN ('business', 'independent', 'authority', 'independiente', 'pymes', 'empresas'));`,
@@ -448,6 +460,53 @@ func InitDB() {
 		`UPDATE public.events
 		SET zone_id = containing_zone_ids[1]
 		WHERE zone_id IS NULL AND array_length(containing_zone_ids, 1) > 0;`,
+
+		// ── Tabla de Lugares Externos (Google Places cache) ─────────────────
+		`CREATE TABLE IF NOT EXISTS external_places (
+			id SERIAL PRIMARY KEY,
+			google_place_id VARCHAR(255) UNIQUE NOT NULL,
+			name VARCHAR(255) NOT NULL,
+			category VARCHAR(100) NOT NULL DEFAULT 'gastronomia',
+			address TEXT,
+			phone VARCHAR(50),
+			rating DECIMAL(3,1),
+			lat DOUBLE PRECISION NOT NULL,
+			lng DOUBLE PRECISION NOT NULL,
+			geom GEOGRAPHY(Point, 4326),
+			image_url TEXT,
+			containing_zone_ids INT[] DEFAULT '{}',
+			zone_id INT REFERENCES zones(id) ON DELETE SET NULL,
+			synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			target_audience VARCHAR(50) DEFAULT 'all'
+		);`,
+		`CREATE INDEX IF NOT EXISTS external_places_geom_idx ON external_places USING GIST (geom);`,
+		`CREATE INDEX IF NOT EXISTS external_places_google_id_idx ON external_places (google_place_id);`,
+		`CREATE INDEX IF NOT EXISTS external_places_containing_zones_idx ON external_places USING GIN (containing_zone_ids);`,
+		`DROP TRIGGER IF EXISTS trg_assign_zone_external_places ON external_places;`,
+		`CREATE TRIGGER trg_assign_zone_external_places
+		BEFORE INSERT OR UPDATE OF geom ON external_places
+		FOR EACH ROW
+		EXECUTE FUNCTION fn_automatic_zone_assignment();`,
+
+		// Extender fn_recalculate_all_zones para incluir external_places
+		`CREATE OR REPLACE FUNCTION fn_recalculate_all_zones()
+		RETURNS TRIGGER AS $$
+		BEGIN
+			UPDATE public.company_branches
+			SET containing_zone_ids = ARRAY(SELECT id FROM public.zones z WHERE ST_Intersects(company_branches.geom, z.geom));
+			UPDATE public.company_branches
+			SET zone_id = CASE WHEN array_length(containing_zone_ids, 1) > 0 THEN containing_zone_ids[1] ELSE NULL END;
+			UPDATE public.events
+			SET containing_zone_ids = ARRAY(SELECT id FROM public.zones z WHERE ST_Intersects(events.geom, z.geom));
+			UPDATE public.events
+			SET zone_id = CASE WHEN array_length(containing_zone_ids, 1) > 0 THEN containing_zone_ids[1] ELSE NULL END;
+			UPDATE public.external_places
+			SET containing_zone_ids = ARRAY(SELECT id FROM public.zones z WHERE ST_Intersects(external_places.geom, z.geom));
+			UPDATE public.external_places
+			SET zone_id = CASE WHEN array_length(containing_zone_ids, 1) > 0 THEN containing_zone_ids[1] ELSE NULL END;
+			RETURN NULL;
+		END;
+		$$ LANGUAGE plpgsql;`,
 	}
 
 	for _, query := range queries {
@@ -456,6 +515,11 @@ func InitDB() {
 		}
 	}
 	log.Println("Estructura de Base de Datos y Entidades verificada/creada exitosamente en PostgreSQL")
+
+	if err := os.MkdirAll("uploads/avatars", 0755); err != nil {
+		log.Printf("Aviso: No se pudo crear directorio de avatares: %v", err)
+	}
+
 	SeedCycleways()
 }
 

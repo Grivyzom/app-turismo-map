@@ -20,7 +20,7 @@ import {
   Building,
   Info
 } from 'lucide-react'
-import { sileo } from 'sileo'
+import { sileo } from '../components/ui/Toast'
 
 interface Review {
   id: string

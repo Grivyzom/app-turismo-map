@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { QRCodeSVG } from 'qrcode.react'
 import { ShieldCheck, ArrowLeft, AlertTriangle, Loader2, Copy, Check } from 'lucide-react'
-import { sileo } from 'sileo'
+import { sileo } from '../components/ui/Toast'
 
 export default function TwoFactorPage() {
   const { challengeId, totpSetupUri, totpSetupKey, pendingAdmin, verify2FA, resetChallenge } = useAuth()

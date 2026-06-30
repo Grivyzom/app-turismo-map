@@ -1,4 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_URL } from '../config/api';
+import { getCachedToken } from './tokenCache';
 
 const RECENT_SEARCHES_KEY = 'app-turismo.recent-searches';
 const MAX_RECENT_SEARCHES = 10;
@@ -11,7 +13,7 @@ export interface RecentSearch {
 }
 
 /**
- * Agrega una búsqueda al historial reciente de forma ultra ligera.
+ * Agrega una búsqueda al historial reciente y sincroniza con backend si el usuario está logueado.
  */
 export async function addRecentSearch(query: string, category: string = 'todos'): Promise<void> {
   if (!query.trim()) return;
@@ -39,8 +41,29 @@ export async function addRecentSearch(query: string, category: string = 'todos')
     }
 
     await AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(searches));
+
+    // Sincronizar con backend en segundo plano (fire and forget)
+    syncSearchToBackend(query.trim(), category);
   } catch (error) {
     console.error('Error saving recent search:', error);
+  }
+}
+
+async function syncSearchToBackend(query: string, category: string) {
+  try {
+    const token = await getCachedToken();
+    if (!token) return; // Si no hay token, no sincronizar remotamente
+    
+    await fetch(`${API_URL}/api/v1/search/history`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ query, category }),
+    });
+  } catch (error) {
+    console.warn('Error syncing search history to backend:', error);
   }
 }
 

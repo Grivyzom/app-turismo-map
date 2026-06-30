@@ -92,6 +92,18 @@ func SuperAdminMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	})
 }
 
+// OptionalAuthMiddleware intenta extraer el token JWT pero no falla si no está presente.
+// Si el token es válido, inyecta los claims en el contexto igual que AuthMiddleware.
+func OptionalAuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		claims, err := ExtractAndValidateToken(r)
+		if err == nil {
+			r = r.WithContext(context.WithValue(r.Context(), UserContextKey, claims))
+		}
+		next.ServeHTTP(w, r)
+	}
+}
+
 // ExtractAndValidateToken extrae y valida un JWT del header Authorization.
 func ExtractAndValidateToken(r *http.Request) (jwt.MapClaims, error) {
 	authHeader := r.Header.Get("Authorization")

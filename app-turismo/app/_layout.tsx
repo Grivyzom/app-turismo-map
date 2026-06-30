@@ -16,13 +16,10 @@ import '../global.css';
 let SileoToaster: React.FC | null = null;
 if (Platform.OS === 'web') {
   try {
-    // Dynamic require so native bundler never sees sileo
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { Toaster } = require('sileo');
-    require('sileo/styles.css');
-    SileoToaster = () => <Toaster position="top-right" />;
+    const { SileoToaster: LocalToaster } = require('../src/components/ui/ToastNotification.web');
+    SileoToaster = () => <LocalToaster offset={{ top: 80, right: 24 }} />;
   } catch (e) {
-    console.warn('[Layout] sileo not available', e);
+    console.warn('[Layout] Local toaster not available', e);
   }
 }
 

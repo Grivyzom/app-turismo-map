@@ -71,6 +71,8 @@ export const getCategoryColor = (category: string, musicStyle?: string) => {
       return '#718096'; // Gray
     case 'tienda':
       return '#8B5CF6'; // Violeta/Tienda
+    case 'supermercado':
+      return '#059669'; // Verde supermercado
     case 'escultura':
       return '#6B7280'; // Gray (sculpture/art)
     case 'torreon':
@@ -156,6 +158,8 @@ export const getCategoryIcon = (category: string, musicStyle?: string): Category
       return 'videocam';
     case 'tienda':
       return 'store';
+    case 'supermercado':
+      return 'shopping-cart';
     case 'escultura':
       return 'art-track';
     case 'torreon':
