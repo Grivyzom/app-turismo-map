@@ -23,6 +23,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { StatusBar } from 'expo-status-bar';
 
+import { SidebarSubmenu } from '../../src/components/MapUI/SidebarSubmenu';
+import { PlaceDetailsIsland } from '../../src/components/MapUI/PlaceDetailsIsland';
 import { TelemetryWidget } from '../../src/components/MapUI/TelemetryWidget';
 import {
   TopAppBar,
@@ -35,6 +37,7 @@ import { TelemetryHUD } from '../../src/components/MapUI/TelemetryHUD';
 import { BuildingGallery } from '../../src/components/MapUI/BuildingGallery';
 import { ParkImageSlider } from '../../src/components/MapUI/ParkImageSlider';
 import { MyLocationButton } from '../../src/components/MapUI/MyLocationButton';
+import { useUserLocationContext } from '../../src/context/UserLocationContext';
 import {
   EventCheckInSection,
   LocationErrorNotifier,
@@ -43,6 +46,8 @@ import {
 import { MapContainer } from '../../src/components/Map/MapContainer';
 import { getCategoryColor, getCategoryIcon } from '../../src/utils/mapUtils';
 import { CHECKIN_EXCLUDED_CATEGORIES } from '../../src/utils/checkInStorage';
+import { getMockEvents, subscribeToEvents } from '../../src/data/mockEvents';
+import { calculateDistance } from '../../src/utils/locationUtils';
 import { getZoneCentroid } from '../../src/utils/locationUtils';
 import FloatingIsland from '../../src/components/ui/FloatingIsland';
 import { ContextualRadialMenu, SearchableSelect } from '../../src/components/ui';
@@ -62,6 +67,8 @@ import { PlacesShelfTrigger, PlacesShelfPanel, PlaceItem } from '../../src/compo
 
 import { useHomeScreenState } from './useHomeScreenState';
 import { styles, NAVBAR_CLEARANCE } from './styles';
+import { NavigationHUD } from '../../src/components/MapUI/NavigationHUD';
+import { fetchOsrmRoute, OsrmRoute } from '../../src/utils/osrmService';
 
 // --- Lazy-loaded screens ---
 const UserProfileScreen = lazyWithRetry(() => import('../../src/screens/UserProfileScreen'));
@@ -233,6 +240,7 @@ const MapLayerMenu: React.FC<MapLayerMenuProps> = ({ currentLayer, onSelectLayer
 
 export default function HomeScreen() {
   const { token } = useAuth();
+  const { userLocation, retryLocation } = useUserLocationContext();
   console.log('[DEBUG] Rendering HomeScreen v2.2');
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
@@ -259,6 +267,8 @@ export default function HomeScreen() {
     setSelectedCategory,
     selectedEvent,
     setSelectedEvent,
+    selectedSpot,
+    setSelectedSpot,
     searchQuery,
     setSearchQuery,
     simulationIndex,
@@ -314,6 +324,10 @@ export default function HomeScreen() {
     pinchoSlide,
     showRightSheet,
     rightSheetSlide,
+    showDetailsIsland,
+    detailsIslandSlide,
+    openDetailsIsland,
+    closeDetailsIsland,
     checkInModalRecord,
     setCheckInModalRecord,
     showCheckInModal,
@@ -386,14 +400,42 @@ export default function HomeScreen() {
         if (mapDisplayMode === 'comercial') return comercialCats.includes(e.category);
         return false;
       })
-      .map((e) => ({
-        id: e.id,
-        name: e.title,
-        category: e.category,
-        imageUrl: e.imageUrl || 'https://via.placeholder.com/400x300',
-        distance: e.distancia,
-      }));
-  }, [mapDisplayMode, filteredEvents]);
+      .map((e) => {
+        let dist = e.distancia;
+        let distNum = NaN;
+
+        if (dist) {
+          distNum = parseFloat(dist.replace(/[^0-9.]/g, ''));
+        } else if (userLocation) {
+          const meters = calculateDistance(
+            userLocation.latitude,
+            userLocation.longitude,
+            e.latitude,
+            e.longitude
+          );
+          distNum = meters / 1000;
+          dist = distNum.toFixed(1) + ' km';
+        }
+
+        return {
+          id: e.id,
+          name: e.title,
+          category: e.category,
+          imageUrl: e.imageUrl || 'https://via.placeholder.com/400x300',
+          distance: dist,
+          address: e.address,
+          time: e.time,
+          description: e.description,
+          _rawDist: distNum, // For filtering
+        };
+      })
+      .filter((e) => {
+        // If we don't know the distance, we include it to avoid empty lists,
+        // but if we do know, it must be <= 2km
+        if (isNaN(e._rawDist)) return true;
+        return e._rawDist <= 2;
+      });
+  }, [mapDisplayMode, filteredEvents, userLocation]);
 
   useEffect(() => {
     if (params.action === 'create_sector') {
@@ -413,6 +455,51 @@ export default function HomeScreen() {
     : false;
 
   const isInformative = selectedEvent?.category?.toLowerCase() === 'fauna';
+
+  // ── OSRM In-app Navigation ──────────────────────────────────────────────
+  const [navRoute, setNavRoute] = useState<OsrmRoute | null>(null);
+  const [navLoading, setNavLoading] = useState(false);
+  const userLocationRef = React.useRef(userLocation);
+  useEffect(() => { userLocationRef.current = userLocation; }, [userLocation]);
+
+  const handleNavigateTo = useCallback(
+    async (destLat: number, destLng: number) => {
+      setNavLoading(true);
+      try {
+        // Si no hay GPS, pedir permiso y esperar hasta 6s
+        let origin = userLocationRef.current;
+        if (!origin) {
+          retryLocation();
+          await new Promise<void>((resolve) => {
+            const check = setInterval(() => {
+              if (userLocationRef.current) { clearInterval(check); resolve(); }
+            }, 300);
+            setTimeout(() => { clearInterval(check); resolve(); }, 6000);
+          });
+          origin = userLocationRef.current;
+        }
+
+        // Fallback: centro de Valdivia si GPS sigue sin responder
+        const originLat = origin?.latitude  ?? -39.8142;
+        const originLng = origin?.longitude ?? -73.2459;
+
+        console.log('[NAV] Calculando ruta OSRM:', originLat, originLng, '→', destLat, destLng);
+        const route = await fetchOsrmRoute(originLat, originLng, destLat, destLng);
+        console.log('[NAV] Ruta obtenida:', route.distance, 'm,', route.duration, 's');
+        setNavRoute(route);
+      } catch (err) {
+        console.error('[NAV] OSRM falló:', err);
+        Linking.openURL(
+          `https://www.google.com/maps/dir/?api=1&destination=${destLat},${destLng}`,
+        );
+      } finally {
+        setNavLoading(false);
+      }
+    },
+    [retryLocation],
+  );
+
+  const handleCancelNav = useCallback(() => setNavRoute(null), []);
 
   const handleSectorPress = useCallback(
     (zone: any) => {
@@ -879,8 +966,19 @@ export default function HomeScreen() {
           savedRoutes={showSavedRoutes ? savedRoutes : []}
           onRateRoute={rateRoute}
           activeNestedZone={activeNestedZone}
+          navRouteGeojson={navRoute?.geojson ?? null}
         />
       </View>
+
+      {/* OSRM Navigation HUD */}
+      {navRoute && selectedEvent && (
+        <NavigationHUD
+          route={navRoute}
+          destinationName={selectedEvent.title}
+          destinationColor={getCategoryColor(selectedEvent.category)}
+          onCancel={handleCancelNav}
+        />
+      )}
 
       {/* Panel de lugares recomendados (absoluto, flota a la izquierda de la barra de controles) */}
       {activeTab === 'map' && (
@@ -1080,7 +1178,7 @@ export default function HomeScreen() {
           onCollectionsClick={() => setShowCollectionsIsland(true)}
         />
       </View>
-      {showMainUI && (
+      {showMainUI && !selectedEvent && (
         <Animated.View
           pointerEvents={shelfOpen ? 'none' : 'auto'}
           style={[
@@ -1239,7 +1337,7 @@ export default function HomeScreen() {
       )}
 
       {/* Menú de Herramientas Flotante (State-based) */}
-      {showMainUI && !activeNestedZone && <WeatherForecastWidget isDark={mapLayer === 'dark'} />}
+      {showMainUI && !activeNestedZone && !selectedEvent && <WeatherForecastWidget isDark={mapLayer === 'dark'} />}
 
       {/* HUD for Nested Zone Exit with Vertical Floor Selector */}
       {activeNestedZone && (
@@ -1859,102 +1957,9 @@ export default function HomeScreen() {
                   </Text>
                 </View>
 
-                {/* Subcabecera de Organizador Compacta */}
-                <View style={styles.subHeaderRowPremium}>
-                  <Text style={styles.subHeaderTextPremium}>
-                    {isEmergencyEvent
-                      ? '⚠️ Reportado por'
-                      : isInformative
-                        ? '📍 Punto de Interés'
-                        : '👤 Organizado por'}
-                    <Text
-                      style={[
-                        styles.subHeaderOrganizerPremium,
-                        {
-                          color: getCategoryColor(selectedEvent.category, selectedEvent.musicStyle),
-                        },
-                      ]}
-                    >
-                      {' '}
-                      {selectedEvent.organizer}
-                    </Text>
-                  </Text>
-                </View>
 
                 <Text style={styles.cardDescPremium}>{selectedEvent.description}</Text>
 
-                {/* Micro-Timeline de Progreso (Sleek LED Tracker) - Hidden for informative */}
-                {!isInformative && (
-                  <View style={styles.microTimelineContainer}>
-                    {['agendado', 'en_proceso', 'finalizado'].map((status, index) => {
-                      const eventStatus =
-                        selectedEvent.status ||
-                        (selectedEvent.isRealTime ? 'en_proceso' : 'agendado');
-                      const isActive = eventStatus === status;
-                      const isPast =
-                        ['agendado', 'en_proceso', 'finalizado'].indexOf(eventStatus) > index;
-                      const isCompleted = isActive || isPast;
-
-                      const getLabel = (s: string) => {
-                        if (s === 'agendado') return 'Agendado';
-                        if (s === 'en_proceso') return 'En proceso';
-                        return 'Finalizado';
-                      };
-
-                      const activeColor = getCategoryColor(
-                        selectedEvent.category,
-                        selectedEvent.musicStyle,
-                      );
-
-                      return (
-                        <React.Fragment key={status}>
-                          <View style={styles.microNodeWrapper}>
-                            {isActive ? (
-                              <View style={styles.microNodeActiveContainer}>
-                                <View
-                                  style={[
-                                    styles.microNodeActiveShadow,
-                                    { backgroundColor: activeColor },
-                                  ]}
-                                />
-                                <View
-                                  style={[
-                                    styles.microNodeActiveCore,
-                                    { backgroundColor: activeColor },
-                                  ]}
-                                />
-                              </View>
-                            ) : (
-                              <View
-                                style={[
-                                  styles.microNode,
-                                  isPast && {
-                                    backgroundColor: activeColor,
-                                    borderColor: activeColor,
-                                  },
-                                ]}
-                              />
-                            )}
-                            <Text
-                              style={[
-                                styles.microLabel,
-                                isCompleted && styles.microLabelCompleted,
-                                isActive && { color: activeColor },
-                              ]}
-                            >
-                              {getLabel(status)}
-                            </Text>
-                          </View>
-                          {index < 2 && (
-                            <View
-                              style={[styles.microLine, isPast && { backgroundColor: activeColor }]}
-                            />
-                          )}
-                        </React.Fragment>
-                      );
-                    })}
-                  </View>
-                )}
 
                 {/* Rejilla Horizontal de Metadatos (Info Hub) */}
                 <View style={styles.metaInfoGrid}>
@@ -1984,16 +1989,6 @@ export default function HomeScreen() {
                     </Text>
                   </View>
 
-                  {!isInformative && <View style={styles.metaGridDivider} />}
-
-                  {!isInformative && (
-                    <View style={styles.metaGridItem}>
-                      <Ionicons name="people-outline" size={14} color="#A0AEC0" />
-                      <Text style={styles.metaGridText} numberOfLines={1}>
-                        {selectedEvent.attendeesCount || 24} asistirán
-                      </Text>
-                    </View>
-                  )}
 
                   {isInformative && (
                     <>
@@ -2008,21 +2003,50 @@ export default function HomeScreen() {
                   )}
                 </View>
 
-                {/* Dirección Física */}
-                {selectedEvent.address && (
-                  <View style={styles.addressRowContainer}>
-                    <Ionicons
-                      name="location-sharp"
-                      size={16}
-                      color={getCategoryColor(selectedEvent.category, selectedEvent.musicStyle)}
-                    />
-                    <Text style={styles.addressText} numberOfLines={2}>
-                      {selectedEvent.address}
-                    </Text>
+
+                <TouchableOpacity
+                  style={[styles.premiumActionButton, { marginTop: 12 }]}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    openDetailsIsland();
+                  }}
+                >
+                  <Text style={styles.premiumActionButtonText}>
+                    {selectedEvent.category === 'gastronomia' ? 'Ver menú' : 'Ver todo'}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Botonera de Acciones con Check-in Inteligente */}
+                {selectedEvent.spots && selectedEvent.spots.length > 0 && (
+                  <View style={styles.spotsSection}>
+                    <Text style={styles.spotsSectionTitle}>Puntos destacados</Text>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      style={styles.spotsCarousel}
+                    >
+                      {selectedEvent.spots.map((spot) => (
+                        <TouchableOpacity
+                          key={spot.id}
+                          style={styles.spotCard}
+                          onPress={() => setSelectedSpot(spot)}
+                          activeOpacity={0.7}
+                        >
+                          {spot.imageUrl && (
+                            <Image source={{ uri: spot.imageUrl }} style={styles.spotCardImage} />
+                          )}
+                          <View style={styles.spotCardBadge}>
+                            <Text style={styles.spotCardBadgeText}>{spot.spotType}</Text>
+                          </View>
+                          <Text style={styles.spotCardName} numberOfLines={2}>
+                            {spot.name}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
                   </View>
                 )}
 
-                {/* Botonera de Acciones con Check-in Inteligente */}
                 <EventCheckInSection
                   selectedEvent={selectedEvent}
                   setCheckInModalRecord={setCheckInModalRecord}
@@ -2093,6 +2117,67 @@ export default function HomeScreen() {
               </View>
             </View>
           </Animated.View>
+
+          {/* Mini-modal for Spot */}
+          {selectedSpot && (
+            <Pressable
+              style={styles.spotModalOverlay}
+              onPress={() => setSelectedSpot(null)}
+            >
+              <View style={[styles.spotModal, { marginBottom: isDesktop ? 0 : insets.bottom + 40 }]}>
+                <TouchableOpacity
+                  style={styles.spotModalClose}
+                  onPress={() => setSelectedSpot(null)}
+                >
+                  <Ionicons name="close" size={24} color="#94A3B8" />
+                </TouchableOpacity>
+
+                {selectedSpot.imageUrl && (
+                  <Image source={{ uri: selectedSpot.imageUrl }} style={styles.spotModalImage} />
+                )}
+
+                <View style={styles.spotModalContent}>
+                  <View
+                    style={[
+                      styles.spotModalBadge,
+                      { backgroundColor: getCategoryColor(selectedEvent?.category || 'naturaleza') + '20' },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.spotModalBadgeText,
+                        { color: getCategoryColor(selectedEvent?.category || 'naturaleza') },
+                      ]}
+                    >
+                      {selectedSpot.spotType.toUpperCase()}
+                    </Text>
+                  </View>
+
+                  <Text style={styles.spotModalName}>{selectedSpot.name}</Text>
+                  <Text style={styles.spotModalDesc}>{selectedSpot.description}</Text>
+
+                  <TouchableOpacity
+                    style={styles.spotModalButton}
+                    onPress={() => handleNavigateTo(selectedSpot.latitude, selectedSpot.longitude)}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="navigate" size={16} color="#fff" style={{ marginRight: 8 }} />
+                    <Text style={styles.spotModalButtonText}>Cómo llegar</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Pressable>
+          )}
+
+          {/* Island for Place Details (Right side or sliding up overlay) */}
+          {showDetailsIsland && selectedEvent && (
+            <PlaceDetailsIsland
+              selectedEvent={selectedEvent}
+              slideAnim={detailsIslandSlide}
+              onClose={closeDetailsIsland}
+              isDesktop={isDesktop}
+            />
+          )}
         </View>
       )}
 
@@ -2171,13 +2256,18 @@ export default function HomeScreen() {
                   { backgroundColor: getCategoryColor(selectedEvent.category) },
                 ]}
                 activeOpacity={0.8}
-                onPress={() => {
-                  const url = `https://www.google.com/maps/dir/?api=1&destination=${selectedEvent.latitude},${selectedEvent.longitude}`;
-                  Linking.openURL(url);
-                }}
+                onPress={() =>
+                  handleNavigateTo(selectedEvent.latitude, selectedEvent.longitude)
+                }
               >
-                <Ionicons name="navigate" size={16} color="#FFFFFF" />
-                <Text style={styles.miniPrimaryBtnText}>Cómo llegar</Text>
+                {navLoading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Ionicons name="navigate" size={16} color="#FFFFFF" />
+                )}
+                <Text style={styles.miniPrimaryBtnText}>
+                  {navLoading ? 'Calculando...' : 'Cómo llegar'}
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.miniIconBtn} activeOpacity={0.7}>

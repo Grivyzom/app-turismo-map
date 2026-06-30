@@ -15,6 +15,29 @@ export interface Vineta {
   active?: boolean; // Si la viñeta está activa/visible (default true)
 }
 
+export type SpotType =
+  | 'mirador'
+  | 'sendero'
+  | 'picnic'
+  | 'entrada'
+  | 'cascada'
+  | 'fauna'
+  | 'flora'
+  | 'historico'
+  | 'otro';
+
+export interface Spot {
+  id: string;
+  parentId: string;
+  name: string;
+  description: string;
+  latitude: number;
+  longitude: number;
+  spotType: SpotType;
+  images?: string[];
+  imageUrl?: string;
+}
+
 export interface TurismoEvent {
   id: string;
   title: string;
@@ -83,6 +106,8 @@ export interface TurismoEvent {
   contactPhone?: string;
   contactEmail?: string;
   branchId?: number;
+  hasActiveUpdate?: boolean;
+  activeUpdates?: any[];
   extrusionHeight?: number; // Altura para relieve 3D específico (metros)
   floor_level?: number; // Para filtros dinámicos en Malls/Edificios (Piso 1, Piso 2, etc.)
   // Viñeta (Badge) properties
@@ -100,6 +125,8 @@ export interface TurismoEvent {
     floors: { level: number; label: string }[];
     defaultFloor: number;
   };
+  // Spots (sub-puntos de interés dentro de parques/reservas)
+  spots?: Spot[];
 }
 
 /** Sector/Zona delimitada (polígono) creada en el backend, p.ej. Parques/Reservas, Edificios */
@@ -214,6 +241,9 @@ export interface MapContainerProps {
   savedRoutes?: Route[];
   onRateRoute?: (routeId: string, rating: number) => void;
   activeFloor?: number | null;
+
+  // OSRM Navigation
+  navRouteGeojson?: GeoJSON.LineString | null;
 }
 
 export interface Cluster {

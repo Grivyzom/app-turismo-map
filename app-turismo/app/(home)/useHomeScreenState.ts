@@ -80,6 +80,7 @@ export function useHomeScreenState(token: string | null) {
   const [events, setEvents] = useState<TurismoEvent[]>(INITIAL_EVENTS);
   const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>('todos');
   const [selectedEvent, setSelectedEvent] = useState<TurismoEvent | null>(null);
+  const [selectedSpot, setSelectedSpot] = useState<any>(null);
   const [viewMode, setViewMode] = useState<'local' | 'tourist'>('local');
   const [mapDisplayMode, setMapDisplayMode] = useState<MapDisplayMode>('mapa');
 
@@ -103,6 +104,10 @@ export function useHomeScreenState(token: string | null) {
   const [sectors, setSectors] = useState<any[]>([]);
   const [visibleSectorIds, setVisibleSectorIds] = useState<number[]>([]);
   const [showWeather, setShowWeather] = useState(false);
+
+  useEffect(() => {
+    if (!selectedEvent) setSelectedSpot(null);
+  }, [selectedEvent]);
 
   useEffect(() => {
     const fetchCycleways = async () => {
@@ -346,6 +351,10 @@ export function useHomeScreenState(token: string | null) {
   const [panelSlide] = useState(() => new Animated.Value(0));
   const [showRightSheet, setShowRightSheet] = useState(false);
   const [rightSheetSlide] = useState(() => new Animated.Value(0));
+
+  const [showDetailsIsland, setShowDetailsIsland] = useState(false);
+  const [detailsIslandSlide] = useState(() => new Animated.Value(0));
+
   const [pinchoSlide] = useState(() => new Animated.Value(0));
 
   // ── Check-in modal state ──────────────────────────────────────────────────
@@ -659,9 +668,19 @@ export function useHomeScreenState(token: string | null) {
     (result: ParsedSearch) => {
       setSelectedCategory(result.category as CategoryFilter);
       setSearchQuery(result.query);
-      showNotification(`Búsqueda: "${result.originalText}"`);
+      
+      if (result.query === '') {
+         setSelectedEvent(null);
+      } else {
+        if (result.eventId) {
+          const ev = events.find(e => String(e.id) === String(result.eventId));
+          if (ev) {
+            setSelectedEvent(ev);
+          }
+        }
+      }
     },
-    [showNotification],
+    [events],
   );
 
   const handleVoicePartialSearch = useCallback((text: string) => {
@@ -797,12 +816,28 @@ export function useHomeScreenState(token: string | null) {
   const closeRightSheet = useCallback(() => {
     Animated.timing(rightSheetSlide, {
       toValue: 0,
-      duration: 220,
-      useNativeDriver: false,
-    }).start(() => {
-      setShowRightSheet(false);
-    });
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => setShowRightSheet(false));
   }, [rightSheetSlide]);
+
+  const openDetailsIsland = useCallback(() => {
+    setShowDetailsIsland(true);
+    Animated.spring(detailsIslandSlide, {
+      toValue: 1,
+      tension: 50,
+      friction: 7,
+      useNativeDriver: true,
+    }).start();
+  }, [detailsIslandSlide]);
+
+  const closeDetailsIsland = useCallback(() => {
+    Animated.timing(detailsIslandSlide, {
+      toValue: 0,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => setShowDetailsIsland(false));
+  }, [detailsIslandSlide]);
 
   useEffect(() => {
     if (selectedEvent) {
@@ -1194,10 +1229,17 @@ export function useHomeScreenState(token: string | null) {
   return {
     events,
     setEvents,
+    closeRightSheet,
+    showDetailsIsland,
+    detailsIslandSlide,
+    openDetailsIsland,
+    closeDetailsIsland,
     selectedCategory,
     setSelectedCategory,
     selectedEvent,
     setSelectedEvent,
+    selectedSpot,
+    setSelectedSpot,
     searchQuery,
     setSearchQuery,
     simulationIndex,
@@ -1288,7 +1330,6 @@ export function useHomeScreenState(token: string | null) {
     screenWidth,
     panelWidth,
     openRightSheet,
-    closeRightSheet,
     filteredEvents,
     handleSelectEvent,
     closeEventPanel,

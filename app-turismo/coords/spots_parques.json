@@ -1,0 +1,112 @@
+[
+  {
+    "id": "spot-catrico-mirador-1",
+    "parentId": "parque-relation-14617762",
+    "name": "Mirador Cerro Catrico",
+    "description": "Punto elevado con vista panorámica del Río Calle-Calle y la ciudad. Ideal para fotografía al atardecer.",
+    "latitude": -39.8420,
+    "longitude": -73.2250,
+    "spotType": "mirador",
+    "imageUrl": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400"
+  },
+  {
+    "id": "spot-catrico-picnic-1",
+    "parentId": "parque-relation-14617762",
+    "name": "Zona de Picnic Norte",
+    "description": "Área con mesas de picnic y sombra natural. Perfecta para familias y grupos.",
+    "latitude": -39.8428,
+    "longitude": -73.2245,
+    "spotType": "picnic",
+    "imageUrl": "https://images.unsplash.com/photo-1552817881-73b90c5326f5?w=400"
+  },
+  {
+    "id": "spot-catrico-sendero-1",
+    "parentId": "parque-relation-14617762",
+    "name": "Sendero Bosque Nativo",
+    "description": "Camino de 1.5 km entre bosque nativo con helechos y canelos. Moderado de dificultad.",
+    "latitude": -39.8435,
+    "longitude": -73.2240,
+    "spotType": "sendero",
+    "imageUrl": "https://images.unsplash.com/photo-1469022563149-aa64dbd37dae?w=400"
+  },
+  {
+    "id": "spot-catrico-entrada-1",
+    "parentId": "parque-relation-14617762",
+    "name": "Entrada Principal",
+    "description": "Caseta de acceso con estacionamiento. Atención de 9am a 6pm.",
+    "latitude": -39.8440,
+    "longitude": -73.2260,
+    "spotType": "entrada",
+    "imageUrl": "https://images.unsplash.com/photo-1464207687429-7505649dae38?w=400"
+  },
+  {
+    "id": "spot-harnecker-cascada-1",
+    "parentId": "parque-way-103402995",
+    "name": "Cascada del Arroyo",
+    "description": "Pequeña cascada de agua en el arroyo que atraviesa el parque. Espectacular en época de lluvias.",
+    "latitude": -39.8315,
+    "longitude": -73.2380,
+    "spotType": "cascada",
+    "imageUrl": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400"
+  },
+  {
+    "id": "spot-harnecker-mirador-1",
+    "parentId": "parque-way-103402995",
+    "name": "Mirador Sur",
+    "description": "Punto de observación de aves acuáticas. Lleva binoculares.",
+    "latitude": -39.8318,
+    "longitude": -73.2375,
+    "spotType": "mirador",
+    "imageUrl": "https://images.unsplash.com/photo-1490806896916-7a12d4f1c4de?w=400"
+  },
+  {
+    "id": "spot-harnecker-flora-1",
+    "parentId": "parque-way-103402995",
+    "name": "Jardín Botánico Mini",
+    "description": "Zona con especies nativas etiquetadas. Educativo y accesible.",
+    "latitude": -39.8320,
+    "longitude": -73.2385,
+    "spotType": "flora",
+    "imageUrl": "https://images.unsplash.com/photo-1437221692034-01657059b569?w=400"
+  },
+  {
+    "id": "spot-bolívar-historico-1",
+    "parentId": "parque-way-103402977",
+    "name": "Monumento a Simón Bolívar",
+    "description": "Estatua histórica del libertador. Punto de encuentro tradicional en la ciudad.",
+    "latitude": -39.8265,
+    "longitude": -73.2420,
+    "spotType": "historico",
+    "imageUrl": "https://images.unsplash.com/photo-1564339714803-4a393dc77ae7?w=400"
+  },
+  {
+    "id": "spot-republica-flora-1",
+    "parentId": "parque-way-103403002",
+    "name": "Rosedal",
+    "description": "Jardín de rosas con más de 50 variedades. Floración principal en primavera.",
+    "latitude": -39.8235,
+    "longitude": -73.2450,
+    "spotType": "flora",
+    "imageUrl": "https://images.unsplash.com/photo-1518895949257-7621c3c786d7?w=400"
+  },
+  {
+    "id": "spot-republica-fauna-1",
+    "parentId": "parque-way-103403002",
+    "name": "Zona de Aves",
+    "description": "Observatorio natural de aves autóctonas. Mejor en madrugada.",
+    "latitude": -39.8238,
+    "longitude": -73.2445,
+    "spotType": "fauna",
+    "imageUrl": "https://images.unsplash.com/photo-1464207687429-7505649dae38?w=400"
+  },
+  {
+    "id": "spot-luis-entrada-1",
+    "parentId": "parque-way-102439591",
+    "name": "Acceso Plaza",
+    "description": "Plaza Población San Luis. Centro histórico con ambiente tradicional.",
+    "latitude": -39.8270,
+    "longitude": -73.2390,
+    "spotType": "entrada",
+    "imageUrl": "https://images.unsplash.com/photo-1446776653964-20c1d3a81b06?w=400"
+  }
+]

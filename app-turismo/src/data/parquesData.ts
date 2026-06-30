@@ -1,6 +1,10 @@
-import { TurismoEvent } from '../components/Map/types';
+import { TurismoEvent, Spot } from '../components/Map/types';
 import data from '../../coords/parques_valdivia.json';
+import spotsData from '../../coords/spots_parques.json';
 import { getPolygonCenter } from '../utils/locationUtils';
+
+const ALL_SPOTS: Spot[] = spotsData as Spot[];
+
 // We dynamically parse the geojson at runtime so that if the user updates the file with polygons, it will render them!
 export const PARQUES_EVENTS: TurismoEvent[] = data.features.map((f: any, i: number) => {
   const event: TurismoEvent = {
@@ -42,6 +46,10 @@ export const PARQUES_EVENTS: TurismoEvent[] = data.features.map((f: any, i: numb
     event.latitude = center.latitude;
     event.longitude = center.longitude;
   }
+
+  // Inyectar spots del parque
+  const parkId = event.id;
+  event.spots = ALL_SPOTS.filter(s => s.parentId === parkId);
 
   return event;
 });
