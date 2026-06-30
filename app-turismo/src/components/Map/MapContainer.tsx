@@ -1057,9 +1057,11 @@ function MapContainerInner({
             <Polygon
               key={`poly-${event.id}`}
               coordinates={event.polygon!}
-              fillColor={`${getCategoryColor(event.category, event.musicStyle)}40`}
-              strokeColor="transparent"
-              strokeWidth={0}
+              fillColor={`${getCategoryColor(event.category, event.musicStyle)}${
+                event.category === 'humedal' ? '60' : '40'
+              }`}
+              strokeColor={event.category === 'humedal' ? getCategoryColor(event.category) : 'transparent'}
+              strokeWidth={event.category === 'humedal' ? 1.5 : 0}
               onPress={() => handleSelectEvent(event)}
             />
           ))}

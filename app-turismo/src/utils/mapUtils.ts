@@ -26,7 +26,7 @@ export const getCategoryColor = (category: string, musicStyle?: string) => {
     case 'parque':
       return '#10B981'; // Emerald
     case 'humedal':
-      return '#8B6F47'; // Café natural (juncos)
+      return '#6B5A47'; // Marrón oscuro (juncos vista aérea)
     case 'agua':
       return '#3B82F6'; // Blue
     case 'universidad':
@@ -113,7 +113,7 @@ export const getCategoryIcon = (category: string, musicStyle?: string): Category
     case 'parque':
       return 'park';
     case 'humedal':
-      return 'grass';
+      return 'water-waves'; // Humedal = agua + juncos
     case 'agua':
       return 'water';
     case 'universidad':
