@@ -77,7 +77,12 @@ export interface TurismoEvent {
     | 'escultura'
     | 'torreon'
     | 'estatua'
-    | 'arte';
+    | 'arte'
+    | 'new_item'
+    | 'invitation_club'
+    | 'invitation_sports'
+    | 'new_spot'
+    | 'mercado';
   organizer: string;
   time: string;
   attendeesCount?: number;
@@ -112,6 +117,9 @@ export interface TurismoEvent {
   floor_level?: number; // Para filtros dinámicos en Malls/Edificios (Piso 1, Piso 2, etc.)
   // Viñeta (Badge) properties
   vineta?: Vineta;
+  // Smart Notification Properties
+  isSmartNotification?: boolean;
+  recommendationType?: string;
   // Modal Standalone Properties
   distancia?: string;
   anioFundacion?: string;

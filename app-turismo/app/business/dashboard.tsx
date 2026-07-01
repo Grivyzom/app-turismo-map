@@ -60,6 +60,12 @@ export default function BusinessDashboardScreen() {
       roles: ['partner_owner', 'partner_manager', 'partner_worker', 'partner_staff'],
     },
     {
+      label: 'Novedades',
+      icon: 'campaign',
+      route: '/business/updates',
+      roles: ['partner_owner', 'partner_manager', 'partner_worker'],
+    },
+    {
       label: 'Sucursales',
       icon: 'store',
       route: '/business/branches',

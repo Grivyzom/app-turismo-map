@@ -11,17 +11,20 @@ import (
 )
 
 type Place struct {
-	ID          string  `json:"id"`
-	Title       string  `json:"title"`
-	Description string  `json:"description"`
-	Latitude    float64 `json:"latitude"`
-	Longitude   float64 `json:"longitude"`
-	Category    string  `json:"category"`
-	Organizer   string  `json:"organizer"`
-	Time        string  `json:"time"`
-	ImageUrl    string  `json:"imageUrl,omitempty"`
-	Address     string  `json:"address,omitempty"`
-	SectorName  string  `json:"sectorName,omitempty"`
+	ID                  string  `json:"id"`
+	Title               string  `json:"title"`
+	Description         string  `json:"description"`
+	Latitude            float64 `json:"latitude"`
+	Longitude           float64 `json:"longitude"`
+	Category            string  `json:"category"`
+	Organizer           string  `json:"organizer"`
+	Time                string  `json:"time"`
+	ImageUrl            string  `json:"imageUrl,omitempty"`
+	Address             string  `json:"address,omitempty"`
+	SectorName          string  `json:"sectorName,omitempty"`
+	HasActiveUpdate     bool    `json:"hasActiveUpdate,omitempty"`
+	RecommendationType  string  `json:"recommendationType,omitempty"`
+	IsSmartNotification bool    `json:"isSmartNotification,omitempty"`
 }
 
 type PlacesResponse struct {
@@ -89,7 +92,8 @@ func PlacesSearchHandler(w http.ResponseWriter, r *http.Request) {
 
 	sqlQuery := `
 		SELECT id, title, description, lat, lng, category, organizer, address, time, image_url,
-		       COALESCE((SELECT name FROM zones z WHERE z.id = ANY(u.containing_zone_ids) LIMIT 1), '') as sector_name
+		       COALESCE((SELECT name FROM zones z WHERE z.id = ANY(u.containing_zone_ids) LIMIT 1), '') as sector_name,
+		       has_active_update
 		FROM (
 			SELECT
 				'branch-' || b.id::text as id,
@@ -105,7 +109,8 @@ func PlacesSearchHandler(w http.ResponseWriter, r *http.Request) {
 				COALESCE(b.image_url, '') as image_url,
 				b.company_id,
 				b.containing_zone_ids,
-				COALESCE(b.target_audience, 'all') as target_audience
+				COALESCE(b.target_audience, 'all') as target_audience,
+				EXISTS (SELECT 1 FROM branch_updates bu WHERE bu.branch_id = b.id AND bu.is_active = true AND (bu.expires_at IS NULL OR bu.expires_at > CURRENT_TIMESTAMP)) as has_active_update
 			FROM company_branches b
 			LEFT JOIN companies c ON b.company_id = c.id
 
@@ -125,7 +130,8 @@ func PlacesSearchHandler(w http.ResponseWriter, r *http.Request) {
 				'' as image_url,
 				b.company_id,
 				e.containing_zone_ids,
-				COALESCE(e.target_audience, 'all') as target_audience
+				COALESCE(e.target_audience, 'all') as target_audience,
+				false as has_active_update
 			FROM events e
 			LEFT JOIN company_branches b ON e.branch_emitter_id = b.id
 			LEFT JOIN companies c ON b.company_id = c.id
@@ -154,7 +160,8 @@ func PlacesSearchHandler(w http.ResponseWriter, r *http.Request) {
 				COALESCE(ep.image_url, '') as image_url,
 				NULL::int as company_id,
 				COALESCE(ep.containing_zone_ids, '{}'::int[]) as containing_zone_ids,
-				ep.target_audience
+				ep.target_audience,
+				false as has_active_update
 			FROM external_places ep
 		) u
 		WHERE 1=1
@@ -210,7 +217,7 @@ func PlacesSearchHandler(w http.ResponseWriter, r *http.Request) {
 	places := []Place{}
 	for rows.Next() {
 		var p Place
-		if err := rows.Scan(&p.ID, &p.Title, &p.Description, &p.Latitude, &p.Longitude, &p.Category, &p.Organizer, &p.Address, &p.Time, &p.ImageUrl, &p.SectorName); err != nil {
+		if err := rows.Scan(&p.ID, &p.Title, &p.Description, &p.Latitude, &p.Longitude, &p.Category, &p.Organizer, &p.Address, &p.Time, &p.ImageUrl, &p.SectorName, &p.HasActiveUpdate); err != nil {
 			log.Printf("Error escaneando fila: %v\n", err)
 			continue
 		}

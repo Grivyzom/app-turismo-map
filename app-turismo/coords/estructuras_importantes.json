@@ -64,6 +64,53 @@
         "type": "Point",
         "coordinates": [-73.2530, -39.8140]
       }
+    },
+    {
+      "type": "Feature",
+      "id": "mercado-persa-1",
+      "properties": {
+        "@id": "mercado-persa-1",
+        "name": "Mercado Persa",
+        "description": "Mercado artesanal con productos variados",
+        "tourism": "marketplace",
+        "addr:street": "Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-73.247740, -39.813268]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "feria-artesanal-camino-luna",
+      "properties": {
+        "@id": "feria-artesanal-camino-luna",
+        "name": "Feria Artesanal Camino de Luna",
+        "description": "Feria artesanal local",
+        "tourism": "marketplace",
+        "addr:street": "Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-73.248006, -39.813182]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "pendulo-foucault-1",
+      "properties": {
+        "@id": "pendulo-foucault-1",
+        "name": "Péndulo de Foucault",
+        "description": "Péndulo de Foucault en la Costanera",
+        "tourism": "artwork",
+        "artwork_type": "sculpture",
+        "man_made": "pendulum",
+        "addr:street": "Costanera, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-73.2450, -39.8170]
+      }
     }
   ]
 }

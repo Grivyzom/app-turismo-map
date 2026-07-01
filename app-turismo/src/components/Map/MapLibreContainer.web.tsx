@@ -86,6 +86,7 @@ export function MapLibreContainer({
   activeFloor,
   isMagicWandActive = false,
   onMagicWandSelect,
+  navRouteGeojson,
 }: MapContainerProps) {
   const mapNodeRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -578,10 +579,10 @@ export function MapLibreContainer({
           type: 'circle',
           source: 'clusters-source',
           paint: {
-            'circle-color': '#0B0F19',
+            'circle-color': ['get', 'color'],
             'circle-radius': ['get', 'radius'],
-            'circle-stroke-width': 3,
-            'circle-stroke-color': ['get', 'color'],
+            'circle-stroke-width': 2,
+            'circle-stroke-color': 'rgba(255, 255, 255, 0.85)',
             'circle-pitch-alignment': 'map',
             'circle-opacity': 1,
             'circle-stroke-opacity': 1,
@@ -604,7 +605,7 @@ export function MapLibreContainer({
           },
           paint: {
             'text-color': '#ffffff',
-            'text-halo-color': 'rgba(0,0,0,0.6)',
+            'text-halo-color': 'rgba(0,0,0,0.2)',
             'text-halo-width': 1,
           },
         });
@@ -3048,6 +3049,80 @@ export function MapLibreContainer({
       };
     }
   }, [showCycleways, cyclewaysData]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── OSRM Navigation Route Layer ───────────────────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const SOURCE = 'osrm-nav-route';
+    const LAYER_BG = 'osrm-nav-route-bg';
+    const LAYER_FG = 'osrm-nav-route-fg';
+
+    const data: GeoJSON.Feature = navRouteGeojson
+      ? { type: 'Feature', geometry: navRouteGeojson, properties: {} }
+      : { type: 'Feature', geometry: { type: 'LineString', coordinates: [] }, properties: {} };
+
+    const applyRoute = () => {
+      if (!map.getSource(SOURCE)) {
+        map.addSource(SOURCE, { type: 'geojson', data });
+        map.addLayer({
+          id: LAYER_BG,
+          type: 'line',
+          source: SOURCE,
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: { 'line-color': '#1E3A5F', 'line-width': 10, 'line-opacity': 0.85 },
+        });
+        map.addLayer({
+          id: LAYER_FG,
+          type: 'line',
+          source: SOURCE,
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: { 'line-color': '#3B82F6', 'line-width': 5, 'line-opacity': 1 },
+        });
+      } else {
+        (map.getSource(SOURCE) as maplibregl.GeoJSONSource).setData(data);
+        // Asegurar que las capas estén encima tras recargas de estilo
+        if (!map.getLayer(LAYER_BG)) {
+          map.addLayer({
+            id: LAYER_BG, type: 'line', source: SOURCE,
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: { 'line-color': '#1E3A5F', 'line-width': 10, 'line-opacity': 0.85 },
+          });
+        }
+        if (!map.getLayer(LAYER_FG)) {
+          map.addLayer({
+            id: LAYER_FG, type: 'line', source: SOURCE,
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: { 'line-color': '#3B82F6', 'line-width': 5, 'line-opacity': 1 },
+          });
+        }
+      }
+
+      // Encuadrar la cámara sobre toda la ruta
+      const coords = navRouteGeojson?.coordinates;
+      if (coords && coords.length > 1) {
+        let minLng = coords[0][0], minLat = coords[0][1];
+        let maxLng = coords[0][0], maxLat = coords[0][1];
+        for (const [lng, lat] of coords) {
+          if (lng < minLng) minLng = lng;
+          if (lng > maxLng) maxLng = lng;
+          if (lat < minLat) minLat = lat;
+          if (lat > maxLat) maxLat = lat;
+        }
+        map.fitBounds(
+          [[minLng, minLat], [maxLng, maxLat]],
+          { padding: { top: 100, bottom: 260, left: 60, right: 60 }, duration: 800, maxZoom: 16 },
+        );
+      }
+    };
+
+    if (map.isStyleLoaded()) {
+      applyRoute();
+    } else {
+      map.once('idle', applyRoute);
+    }
+  }, [navRouteGeojson]); // eslint-disable-line react-hooks/exhaustive-deps
   // ───────────────────────────────────────────────────────────────────────────
 
   // Sync Style (with dynamic maxZoom per layer)

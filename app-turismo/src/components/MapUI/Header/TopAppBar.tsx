@@ -716,8 +716,23 @@ export const TopAppBar: React.FC<
         originalText: item.query,
         isFinal: true,
       });
+
+      // Cambiar modo del mapa basado en la categoría
+      if (item.category) {
+        const turismoCats = ['cultura', 'naturaleza', 'museo', 'parque', 'teatro', 'monumento', 'turistica'];
+        const comercialCats = ['gastronomia', 'tienda', 'comercial', 'restaurant'];
+        
+        const catLower = item.category.toLowerCase();
+        if (turismoCats.includes(catLower)) {
+          onMapDisplayModeChange?.('turismo');
+        } else if (comercialCats.includes(catLower)) {
+          onMapDisplayModeChange?.('comercial');
+        } else {
+          onMapDisplayModeChange?.('mapa');
+        }
+      }
     },
-    [onVoiceSearch],
+    [onVoiceSearch, onMapDisplayModeChange],
   );
 
   const handleDeleteRecentSearch = useCallback(async (id: string) => {
@@ -855,7 +870,17 @@ export const TopAppBar: React.FC<
                   <SmartVoiceSearch
                     isEmbedded={true}
                     onPartialResult={(text) => onVoicePartialSearch?.(text)}
-                    onChangeText={setSearchQuery}
+                    onChangeText={(text) => {
+                      setSearchQuery(text);
+                      if (text.trim() === '') {
+                        onVoiceSearch?.({
+                          query: '',
+                          category: 'todos',
+                          originalText: '',
+                          isFinal: true,
+                        });
+                      }
+                    }}
                     onSearchComplete={(res) => {
                       setSearchQuery('');
                       getRecentSearches().then(setRecentSearches);
@@ -900,7 +925,23 @@ export const TopAppBar: React.FC<
                             category: item.category || 'todos',
                             originalText: item.title,
                             isFinal: true,
+                            eventId: item.id,
                           });
+                          
+                          // Cambiar modo del mapa basado en la categoría
+                          if (item.category) {
+                            const turismoCats = ['cultura', 'naturaleza', 'museo', 'parque', 'teatro', 'monumento', 'turistica'];
+                            const comercialCats = ['gastronomia', 'tienda', 'comercial', 'restaurant'];
+                            
+                            const catLower = item.category.toLowerCase();
+                            if (turismoCats.includes(catLower)) {
+                              onMapDisplayModeChange?.('turismo');
+                            } else if (comercialCats.includes(catLower)) {
+                              onMapDisplayModeChange?.('comercial');
+                            } else {
+                              onMapDisplayModeChange?.('mapa');
+                            }
+                          }
                         }}
                       >
                         <Ionicons name="location-outline" size={16} color={C.textMuted} />

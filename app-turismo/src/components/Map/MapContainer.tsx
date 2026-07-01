@@ -10,9 +10,9 @@ import AnimatedReanimated, {
   interpolate,
   FadeIn,
   FadeOut,
+  LinearTransition,
   ZoomIn,
   ZoomOut,
-  LinearTransition,
 } from 'react-native-reanimated';
 import MapView, {
   Marker,
@@ -52,6 +52,8 @@ import { StoreMarker } from './Markers/StoreMarker';
 import { MiniModal } from './Markers/MiniModal';
 import { AuthorityModal } from './Markers/AuthorityModal';
 import { FurnitureMarker } from './Markers/FurnitureMarker';
+import { SmartNotificationMarker } from './Markers/SmartNotificationMarker';
+import { ClusterPin } from './Markers/ClusterPin';
 
 // ─── UserMarkerAnimated ──────────────────────────────────────────────────────
 const UserMarkerAnimated = React.memo(
@@ -437,6 +439,11 @@ const EventMarker = React.memo(
                   ]}
                 />
               )}
+              {event.hasActiveUpdate && (
+                <View style={styles.updateIndicator}>
+                  <Text style={styles.updateIndicatorText}>!</Text>
+                </View>
+              )}
               <View
                 style={[
                   styles.markerPin,
@@ -536,6 +543,7 @@ const ClusterMarker = React.memo(
   }) => {
     const count = cluster.events.length;
     const dominantColor = getClusterDominantColor(cluster.events);
+    const dominantCategory = cluster.events[0]?.category || 'publico';
 
     const [trackChanges, setTrackChanges] = useState(true);
     const prevLightMode = useRef(isLightMode);
@@ -544,7 +552,7 @@ const ClusterMarker = React.memo(
       setTrackChanges(true);
       const timer = setTimeout(() => {
         setTrackChanges(false);
-      }, 3000); // 3s para capturar la animación inicial y el pulso
+      }, 3000);
       return () => clearTimeout(timer);
     }, []);
 
@@ -572,7 +580,7 @@ const ClusterMarker = React.memo(
         onPress={handlePress}
         tracksViewChanges={trackChanges}
         anchor={{ x: 0.5, y: 0.5 }}
-        zIndex={5} // Encima de pines normales, debajo del seleccionado
+        zIndex={5}
       >
         <AnimatedReanimated.View
           entering={ZoomIn.duration(500)}
@@ -580,20 +588,7 @@ const ClusterMarker = React.memo(
           layout={LinearTransition.springify().damping(15)}
           style={[styles.clusterWrapper, { overflow: 'visible' }]}
         >
-          <View
-            style={[
-              styles.clusterInner,
-              {
-                backgroundColor: isLightMode ? '#FFFFFF' : '#0B0F19',
-                borderColor: dominantColor,
-                shadowColor: isLightMode ? 'rgba(0,0,0,0.1)' : '#000',
-              },
-            ]}
-          >
-            <Text style={[styles.clusterText, { color: isLightMode ? '#1F2937' : '#FFFFFF' }]}>
-              {count}
-            </Text>
-          </View>
+          <ClusterPin count={count} dominantCategory={dominantCategory} color={dominantColor} />
         </AnimatedReanimated.View>
       </Marker>
     );
@@ -1093,7 +1088,14 @@ function MapContainerInner({
                     onPress={() => handleSelectEvent(event)}
                   />
                 )}
-                {event.category === 'publico' ? (
+                {event.isSmartNotification ? (
+                  <SmartNotificationMarker
+                    event={event}
+                    isSelected={isSelected}
+                    onPress={handleSelectEvent}
+                    isLightMode={isMapLight}
+                  />
+                ) : event.category === 'publico' ? (
                   <PublicEventMarkerAnimated
                     event={event}
                     isSelected={isSelected}
@@ -1133,6 +1135,17 @@ function MapContainerInner({
                 strokeWidth={2}
                 // @ts-expect-error Circle onPress type is sometimes missing in community typings
                 onPress={() => handleSelectEvent(event)}
+              />
+            );
+          }
+          if (event.isSmartNotification) {
+            return (
+              <SmartNotificationMarker
+                key={event.id}
+                event={event}
+                isSelected={selectedEvent?.id === event.id || localLoboMarinoId === event.id}
+                onPress={handleSelectEvent}
+                isLightMode={isMapLight}
               />
             );
           }
@@ -1639,26 +1652,25 @@ const styles = StyleSheet.create({
   clusterWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 120, // Aumentado
-    height: 120,
   },
   clusterInner: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 3,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.5,
-    shadowRadius: 5,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
   },
   clusterText: {
     color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '800',
+    fontSize: 14,
+    fontWeight: 'bold',
     textAlign: 'center',
   },
   routePointLabel: {
@@ -1682,5 +1694,25 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     borderWidth: 1,
     borderColor: '#FFFFFF',
+  },
+  updateIndicator: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#FF3B30', // Red for attention
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    zIndex: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  updateIndicatorText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: 'bold',
+    lineHeight: 11,
   },
 });

@@ -34,8 +34,10 @@ export class RainEffect {
   private animationFrameId: number | null = null;
   private isActive = false;
   private lastTime = Date.now();
-  private windAngle = 0;
+  private globalWindAngle = 0;
   private windSpeed = 0.3;
+  private mapPitch = 0;
+  private mapBearing = 0;
 
   private readonly dropPoolSize = 200;
   private readonly wavePoolSize = 40;
@@ -122,27 +124,54 @@ export class RainEffect {
     return null;
   }
 
-  // Project 3D point to 2D screen coordinates using perspective
-  private project3D(x: number, y: number, z: number): [number, number] {
-    const scale = this.cameraZ / (this.cameraZ + z);
-    const screenX = this.viewportWidth / 2 + x * scale;
-    const screenY = this.viewportHeight / 2 + y * scale;
-    return [screenX, screenY];
+  // Project 3D world point to 2D screen coordinates with pitch & bearing
+  private project3D(wx: number, wy: number, wz: number): [number, number, number] {
+    const radBearing = (-this.mapBearing * Math.PI) / 180;
+    const cosB = Math.cos(radBearing);
+    const sinB = Math.sin(radBearing);
+    const rx = wx * cosB - wy * sinB;
+    const ry = wx * sinB + wy * cosB;
+
+    const cx = rx;
+    const cy = -ry;
+    const cz = -wz;
+
+    const radPitch = (this.mapPitch * Math.PI) / 180;
+    const cosP = Math.cos(radPitch);
+    const sinP = Math.sin(radPitch);
+
+    const px = cx;
+    const py = cy * cosP + cz * sinP;
+    const pz = cz * cosP - cy * sinP;
+
+    const D = this.cameraZ;
+    const depth = pz + D;
+
+    if (depth <= 0.1) return [-9999, -9999, 0];
+
+    const scale = D / depth;
+    const screenX = this.viewportWidth / 2 + px * scale;
+    const screenY = this.viewportHeight / 2 + py * scale;
+
+    return [screenX, screenY, scale];
   }
 
   private createRaindrop() {
     const drop = this.getInactiveRaindrop();
     if (!drop || !this.canvas) return;
 
-    // Spawn spread across entire viewport, high above camera
-    drop.x = (Math.random() - 0.5) * this.viewportWidth * 2;
-    drop.y = (Math.random() - 0.5) * this.viewportHeight * 2;
-    drop.z = this.rainFieldDepth - Math.random() * 50; // Start far (positive Z)
-    drop.vx = Math.cos(this.windAngle) * this.windSpeed * 2;
-    drop.vy = 0;
-    drop.vz = -(25 + Math.random() * 15); // Falls toward ground (negative Z)
+    // Spawn in world coordinates
+    const areaSize = this.viewportWidth * 3;
+    drop.x = (Math.random() - 0.5) * areaSize;
+    drop.y = (Math.random() - 0.5) * areaSize * 2;
+    drop.z = this.rainFieldDepth + Math.random() * 200; // altitude
+    
+    drop.vx = Math.cos(this.globalWindAngle) * this.windSpeed * 15;
+    drop.vy = Math.sin(this.globalWindAngle) * this.windSpeed * 15;
+    drop.vz = -(25 + Math.random() * 15); // falls down
+    
     drop.opacity = 0.5 + Math.random() * 0.3;
-    drop.length = 25 + Math.random() * 12;
+    drop.length = 25; // fallback
     drop.active = true;
   }
 
@@ -163,8 +192,8 @@ export class RainEffect {
     if (!this.canvas) return;
 
     // Update wind
-    this.windAngle += 0.001;
-    this.windSpeed = 0.3 + Math.sin(this.windAngle * 0.5) * 0.15;
+    this.globalWindAngle += 0.001;
+    this.windSpeed = 0.3 + Math.sin(this.globalWindAngle * 0.5) * 0.15;
 
     // Update raindrops
     for (const drop of this.raindrops) {
@@ -176,19 +205,11 @@ export class RainEffect {
 
       // Create wave when reaching ground plane (Z near 0)
       if (drop.z < 10 && drop.z > -10 && Math.random() < 0.75) {
-        const [screenX, screenY] = this.project3D(drop.x, drop.y, 0);
-        if (
-          screenX >= -100 &&
-          screenX <= this.viewportWidth + 100 &&
-          screenY >= -100 &&
-          screenY <= this.viewportHeight + 100
-        ) {
-          this.createWave(screenX, screenY);
-        }
+        this.createWave(drop.x, drop.y);
       }
 
       // Deactivate if past ground plane
-      if (drop.z < -50) {
+      if (drop.z < -20) {
         drop.active = false;
       }
     }
@@ -225,29 +246,30 @@ export class RainEffect {
     for (const drop of this.raindrops) {
       if (!drop.active) continue;
 
-      const [screenX, screenY] = this.project3D(drop.x, drop.y, drop.z);
+      const [screenX, screenY, scale] = this.project3D(drop.x, drop.y, drop.z);
 
-      // Only draw if visible
       if (
         screenX < -100 ||
         screenX > this.viewportWidth + 100 ||
         screenY < -100 ||
-        screenY > this.viewportHeight + 100
+        screenY > this.viewportHeight + 100 ||
+        scale === 0
       ) {
         continue;
       }
 
-      // Tail position (behind in 3D space)
-      const tailZ = drop.z + drop.length;
-      const [tailX, tailY] = this.project3D(drop.x, drop.y, tailZ);
+      const tailX = drop.x - drop.vx * 1.5;
+      const tailY = drop.y - drop.vy * 1.5;
+      const tailZ = drop.z - drop.vz * 1.5;
+      const [tailScreenX, tailScreenY] = this.project3D(tailX, tailY, tailZ);
 
-      // Opacity fades based on depth (closer = more visible)
-      const depthFade = Math.max(0, 1 - Math.abs(drop.z) / this.rainFieldDepth);
-      this.ctx.globalAlpha = drop.opacity * depthFade * 0.7;
+      // Fade based on altitude (z) so it doesn't just pop in
+      const altitudeFade = Math.max(0, 1 - Math.max(0, drop.z - this.rainFieldDepth * 0.5) / (this.rainFieldDepth * 0.5));
+      this.ctx.globalAlpha = drop.opacity * altitudeFade * Math.min(1, scale * 1.5);
 
       this.ctx.beginPath();
       this.ctx.moveTo(screenX, screenY);
-      this.ctx.lineTo(tailX, tailY);
+      this.ctx.lineTo(tailScreenX, tailScreenY);
       this.ctx.stroke();
     }
 
@@ -256,18 +278,25 @@ export class RainEffect {
     for (const wave of this.waves) {
       if (!wave.active) continue;
 
+      const [screenX, screenY, scale] = this.project3D(wave.x, wave.y, 0);
+
+      if (screenX < -100 || screenX > this.viewportWidth + 100 || screenY < -100 || screenY > this.viewportHeight + 100 || scale === 0) continue;
+
+      const screenRadiusX = wave.radius * scale;
+      const screenRadiusY = wave.radius * scale * Math.max(0.15, Math.cos((this.mapPitch * Math.PI) / 180));
+
       // Outer ring
       this.ctx.strokeStyle = `rgba(150, 210, 255, ${wave.opacity * 0.5})`;
-      this.ctx.lineWidth = 1.8;
+      this.ctx.lineWidth = 1.8 * scale;
       this.ctx.beginPath();
-      this.ctx.arc(wave.x, wave.y, wave.radius, 0, Math.PI * 2);
+      this.ctx.ellipse(screenX, screenY, screenRadiusX, screenRadiusY, 0, 0, Math.PI * 2);
       this.ctx.stroke();
 
       // Inner ring
       this.ctx.strokeStyle = `rgba(180, 225, 255, ${wave.opacity * 0.3})`;
-      this.ctx.lineWidth = 0.9;
+      this.ctx.lineWidth = 0.9 * scale;
       this.ctx.beginPath();
-      this.ctx.arc(wave.x, wave.y, wave.radius * 0.65, 0, Math.PI * 2);
+      this.ctx.ellipse(screenX, screenY, screenRadiusX * 0.65, screenRadiusY * 0.65, 0, 0, Math.PI * 2);
       this.ctx.stroke();
     }
 
@@ -322,8 +351,8 @@ export class RainEffect {
     this.cameraZ = 800 - Math.min(5, mapZoom - 10) * 100;
     this.cameraZ = Math.max(400, this.cameraZ);
 
-    // Rotate wind direction with map bearing
-    this.windAngle = (mapBearing * Math.PI) / 180;
+    this.mapBearing = mapBearing;
+    this.mapPitch = mapPitch;
   }
 
   destroy() {

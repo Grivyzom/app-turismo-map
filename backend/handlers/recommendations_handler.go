@@ -79,9 +79,11 @@ func RecommendationsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 4. Buscar lugares y eventos que coincidan con estas categorías y ordenar por relevancia
+	// Y sumar notificaciones/novedades (Smart Notifications)
 	sqlQuery := `
 		SELECT id, title, description, lat, lng, category, organizer, address, time, image_url,
-		       COALESCE((SELECT name FROM zones z WHERE z.id = ANY(u.containing_zone_ids) LIMIT 1), '') as sector_name
+		       COALESCE((SELECT name FROM zones z WHERE z.id = ANY(u.containing_zone_ids) LIMIT 1), '') as sector_name,
+		       u.is_smart_notification, u.recommendation_type
 		FROM (
 			SELECT 
 				'branch-' || b.id::text as id, 
@@ -97,7 +99,9 @@ func RecommendationsHandler(w http.ResponseWriter, r *http.Request) {
 				COALESCE(b.image_url, '') as image_url,
 				b.containing_zone_ids,
 				COALESCE(b.target_audience, 'all') as target_audience,
-				false as is_live
+				false as is_live,
+				false as is_smart_notification,
+				'none' as recommendation_type
 			FROM company_branches b
 			JOIN companies c ON b.company_id = c.id
 			WHERE b.category = ANY($1)
@@ -118,11 +122,19 @@ func RecommendationsHandler(w http.ResponseWriter, r *http.Request) {
 				'' as image_url,
 				e.containing_zone_ids,
 				COALESCE(e.target_audience, 'all') as target_audience,
-				COALESCE(e.is_live, false) as is_live
+				COALESCE(e.is_live, false) as is_live,
+				CASE WHEN e.category IN ('new_item', 'invitation_club', 'invitation_sports', 'new_spot') THEN true ELSE false END as is_smart_notification,
+				CASE 
+					WHEN e.category = 'new_item' THEN 'new_item'
+					WHEN e.category = 'invitation_club' THEN 'invitation_club'
+					WHEN e.category = 'invitation_sports' THEN 'invitation_sports'
+					WHEN e.category = 'new_spot' THEN 'new_spot'
+					ELSE 'none'
+				END as recommendation_type
 			FROM events e
 			LEFT JOIN company_branches b ON e.branch_emitter_id = b.id
 			LEFT JOIN companies c ON b.company_id = c.id
-			WHERE e.category = ANY($1) AND e.end_time > NOW()
+			WHERE (e.category = ANY($1) OR e.category IN ('new_item', 'invitation_club', 'invitation_sports', 'new_spot')) AND e.end_time > NOW()
 		) u
 		ORDER BY (
 			-- Scoring algorithm based on currentViewMode and target_audience
@@ -134,7 +146,9 @@ func RecommendationsHandler(w http.ResponseWriter, r *http.Request) {
 				ELSE 0.5
 			END +
 			-- Live event bonus
-			CASE WHEN u.is_live = true THEN 0.15 ELSE 0.0 END
+			CASE WHEN u.is_live = true THEN 0.15 ELSE 0.0 END +
+			-- Smart notification bonus (highest priority)
+			CASE WHEN u.is_smart_notification = true THEN 2.0 ELSE 0.0 END
 		) DESC, RANDOM()
 		LIMIT 10
 	`
@@ -150,7 +164,7 @@ func RecommendationsHandler(w http.ResponseWriter, r *http.Request) {
 	results := []Place{}
 	for rows.Next() {
 		var p Place
-		if err := rows.Scan(&p.ID, &p.Title, &p.Description, &p.Latitude, &p.Longitude, &p.Category, &p.Organizer, &p.Address, &p.Time, &p.ImageUrl, &p.SectorName); err != nil {
+		if err := rows.Scan(&p.ID, &p.Title, &p.Description, &p.Latitude, &p.Longitude, &p.Category, &p.Organizer, &p.Address, &p.Time, &p.ImageUrl, &p.SectorName, &p.IsSmartNotification, &p.RecommendationType); err != nil {
 			log.Printf("Error escaneando recomendación: %v\n", err)
 			continue
 		}

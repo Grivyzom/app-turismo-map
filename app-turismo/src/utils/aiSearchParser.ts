@@ -7,6 +7,7 @@ export type ParsedSearch = {
   query: string;
   originalText: string;
   isFinal?: boolean;
+  eventId?: string;
 };
 
 /**

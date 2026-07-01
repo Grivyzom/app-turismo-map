@@ -96,6 +96,13 @@ func main() {
 	mux.HandleFunc("DELETE /api/v1/follows/{id}", middleware.AuthMiddleware(handlers.UnfollowCompanyHandler))
 	mux.HandleFunc("GET /api/v1/follows", middleware.AuthMiddleware(handlers.ListFollowedCompaniesHandler))
 
+	// ── Rutas de Novedades y Notificaciones ──────────────────────────────
+	mux.HandleFunc("POST /api/v1/business/updates", middleware.AuthMiddleware(handlers.CreateBranchUpdateHandler))
+	mux.HandleFunc("GET /api/v1/branches/{id}/updates", handlers.GetBranchUpdatesHandler) // Público
+	mux.HandleFunc("GET /api/v1/notifications", middleware.AuthMiddleware(handlers.GetNotificationsHandler))
+	mux.HandleFunc("PUT /api/v1/notifications/{id}/read", middleware.AuthMiddleware(handlers.MarkNotificationReadHandler))
+
+
 	// ── Rutas del Catálogo y Promociones ──────────────────────────────────
 	if repo != nil {
 		catalogHandler := catalog.NewHandler(repo.GetDB())

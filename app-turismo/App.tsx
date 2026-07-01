@@ -13,6 +13,7 @@ import {
   Dimensions,
   Platform,
   Animated,
+  PanResponder,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
@@ -24,6 +25,8 @@ import { MapContainer } from './src/components/Map/MapContainer';
 import { MapLayer, TurismoEvent } from './src/components/Map/types';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
+import OnboardingScreen from './src/screens/OnboardingScreen';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   DEFAULT_MAP_LAYER,
   loadPersistedMapLayer,
@@ -97,7 +100,7 @@ export default function App() {
     ...Ionicons.font,
   });
 
-  const [screen, setScreen] = useState<'login' | 'register' | 'home'>('login');
+  const [screen, setScreen] = useState<'loading' | 'onboarding' | 'login' | 'register' | 'home'>('loading');
   const [events, setEvents] = useState<TurismoEvent[]>(INITIAL_EVENTS);
   const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>('todos');
   const [selectedEvent, setSelectedEvent] = useState<TurismoEvent | null>(null);
@@ -113,9 +116,35 @@ export default function App() {
   const toastY = useRef(new Animated.Value(-150)).current;
   const cardHeight = useRef(new Animated.Value(0)).current;
 
-  // Submenú
-  const [isTopBarHovered, setIsTopBarHovered] = useState(false);
-  const submenuHeight = useRef(new Animated.Value(0)).current;
+  // PanResponder para la tarjeta de detalles (Bottom Sheet)
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderMove: (evt, gestureState) => {
+        if (gestureState.dy > 0) {
+          // Solo permitir arrastrar hacia abajo
+          cardHeight.setValue(1 - gestureState.dy / 400);
+        }
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        if (gestureState.dy > 100 || gestureState.vy > 1.5) {
+          // Deslizó lo suficiente hacia abajo o rápido
+          setSelectedEvent(null);
+        } else {
+          // Restaurar la posición si no fue suficiente el arrastre
+          Animated.spring(cardHeight, {
+            toValue: 1,
+            tension: 40,
+            friction: 9,
+            useNativeDriver: false,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
+  // Menú de Capas flotante
+  const [isLayerMenuOpen, setIsLayerMenuOpen] = useState(false);
 
   // Animación del Toast flotante (para WebSockets en tiempo real)
   const showNotification = (message: string) => {
@@ -220,15 +249,6 @@ export default function App() {
     }
   }, [selectedEvent, cardHeight]);
 
-  // Manejar animación del submenú
-  useEffect(() => {
-    Animated.spring(submenuHeight, {
-      toValue: isTopBarHovered ? 1 : 0,
-      tension: 50,
-      friction: 8,
-      useNativeDriver: false, // height/opacity no soportan native driver en RN web para transformaciones complejas, pero opacity sí.
-    }).start();
-  }, [isTopBarHovered]);
 
   // Filtrar eventos por categoría y búsqueda
   const filteredEvents = events.filter((event) => {
@@ -246,8 +266,37 @@ export default function App() {
     return matchesCategory && matchesSearch;
   });
 
-  if (!fontsLoaded) {
+  useEffect(() => {
+    const checkOnboarding = async () => {
+      try {
+        const hasSeenOnboarding = await AsyncStorage.getItem('@has_seen_onboarding');
+        if (hasSeenOnboarding === 'true') {
+          setScreen('login');
+        } else {
+          setScreen('onboarding');
+        }
+      } catch (error) {
+        setScreen('login');
+      }
+    };
+    checkOnboarding();
+  }, []);
+
+  const handleFinishOnboarding = async () => {
+    try {
+      await AsyncStorage.setItem('@has_seen_onboarding', 'true');
+      setScreen('login');
+    } catch (error) {
+      console.log('Error guardando estado de onboarding', error);
+    }
+  };
+
+  if (!fontsLoaded || screen === 'loading') {
     return null;
+  }
+
+  if (screen === 'onboarding') {
+    return <OnboardingScreen onFinish={handleFinishOnboarding} />;
   }
 
   if (screen === 'login') {
@@ -285,37 +334,16 @@ export default function App() {
         </Animated.View>
       )}
 
-      {/* BARRA SUPERIOR NUEVA Y SUBMENÚ */}
-      <View
-        style={styles.topBarWrapper}
-        //@ts-ignore
-        onMouseEnter={() => setIsTopBarHovered(true)}
-        onMouseLeave={() => setIsTopBarHovered(false)}
-      >
+      {/* BARRA SUPERIOR NUEVA Y CATEGORÍAS */}
+      <View style={styles.topBarWrapper}>
         <TopAppBar
           currentTab="map"
           onSearchClick={() => console.log('Search clicked')}
           onAccountClick={() => console.log('Account clicked')}
         />
 
-        {/* SUBMENÚ DESPLEGABLE */}
-        <Animated.View
-          style={[
-            styles.submenuContainer,
-            {
-              opacity: submenuHeight,
-              transform: [
-                {
-                  translateY: submenuHeight.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [-20, 0],
-                  }),
-                },
-              ],
-            },
-            !isTopBarHovered && { pointerEvents: 'none' }, // Desactiva clics cuando está oculto
-          ]}
-        >
+        {/* CATEGORÍAS SIEMPRE VISIBLES */}
+        <View style={styles.categoriesContainer}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -367,32 +395,46 @@ export default function App() {
               </TouchableOpacity>
             ))}
           </ScrollView>
+        </View>
+      </View>
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.layersScroll}
-            contentContainerStyle={styles.layersContent}
-          >
-            <Text style={styles.layersLabel}>CAPAS:</Text>
+      {/* FAB DE CAPAS DE MAPA (Derecha) */}
+      <View style={styles.fabLayersContainer}>
+        <TouchableOpacity
+          style={styles.fabLayersButton}
+          onPress={() => setIsLayerMenuOpen(!isLayerMenuOpen)}
+        >
+          <MaterialIcons name="layers" size={24} color={isLayerMenuOpen ? "#38BDF8" : "#FFFFFF"} />
+        </TouchableOpacity>
+
+        {isLayerMenuOpen && (
+          <View style={styles.layersModal}>
+            <Text style={styles.layersModalHeader}>CAPAS DE MAPA</Text>
             {MAP_LAYER_OPTIONS.map((layer) => (
               <TouchableOpacity
                 key={layer.key}
-                style={[styles.layerChip, mapLayer === layer.key && styles.activeLayerChip]}
-                onPress={() => setMapLayer(layer.key)}
+                style={[styles.layerModalRow, mapLayer === layer.key && styles.activeLayerModalRow]}
+                onPress={() => {
+                  setMapLayer(layer.key);
+                  setIsLayerMenuOpen(false);
+                }}
               >
+                <Text style={styles.layerModalIcon}>{layer.icon}</Text>
                 <Text
                   style={[
-                    styles.layerChipText,
-                    mapLayer === layer.key && styles.activeLayerChipText,
+                    styles.layerModalText,
+                    mapLayer === layer.key && styles.activeLayerModalText,
                   ]}
                 >
-                  {layer.icon} {layer.label}
+                  {layer.label}
                 </Text>
+                {mapLayer === layer.key && (
+                  <MaterialIcons name="check" size={16} color="#38BDF8" style={{ marginLeft: 'auto' }} />
+                )}
               </TouchableOpacity>
             ))}
-          </ScrollView>
-        </Animated.View>
+          </View>
+        )}
       </View>
 
       {/* PANEL DE CONTROL DE SIMULACIÓN Y WEBSOCKET (Esquina Derecha / Inferior) */}
@@ -420,11 +462,13 @@ export default function App() {
         </View>
       </View>
 
-      {/* TARJETA DETALLADA FLOTANTE (Efecto Emerger) */}
+      {/* TARJETA DETALLADA FLOTANTE (Bottom Sheet Deslizable) */}
       {selectedEvent &&
-        selectedEvent.category?.toLowerCase() !== 'tienda' &&
-        selectedEvent.category?.toLowerCase() !== 'fauna' && (
+        !['tienda', 'fauna', 'hospital', 'clinica', 'universidad', 'bombero', 'carabinero', 'camara'].includes(
+          selectedEvent.category?.toLowerCase() || ''
+        ) && (
           <Animated.View
+            {...panResponder.panHandlers}
             style={[
               styles.detailsCard,
               {
@@ -432,14 +476,21 @@ export default function App() {
                   {
                     translateY: cardHeight.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [300, 0],
+                      outputRange: [400, 0],
                     }),
                   },
                 ],
-                opacity: cardHeight,
+                opacity: cardHeight.interpolate({
+                  inputRange: [0, 0.5, 1],
+                  outputRange: [0, 1, 1],
+                }),
               },
             ]}
           >
+            <View style={styles.bottomSheetHandleContainer}>
+              <View style={styles.bottomSheetHandle} />
+            </View>
+
             <View style={styles.cardHeader}>
               <View
                 style={[
@@ -452,16 +503,15 @@ export default function App() {
                   },
                 ]}
               >
+                {['choque', 'incendio', 'accidente', 'calle_cortada'].includes(selectedEvent.category) && (
+                  <MaterialIcons name="warning" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
+                )}
                 <Text style={styles.cardBadgeText}>
-                  {['choque', 'incendio', 'accidente', 'calle_cortada'].includes(
-                    selectedEvent.category,
-                  )
-                    ? `🚨 ${selectedEvent.category.toUpperCase().replace('_', ' ')}`
-                    : selectedEvent.category.toUpperCase()}
+                  {selectedEvent.category.toUpperCase().replace('_', ' ')}
                 </Text>
               </View>
               <TouchableOpacity onPress={() => setSelectedEvent(null)} style={styles.closeButton}>
-                <Text style={styles.closeButtonText}>✕</Text>
+                <MaterialIcons name="close" size={20} color="#9CA3AF" />
               </TouchableOpacity>
             </View>
 
@@ -479,11 +529,17 @@ export default function App() {
             <View style={styles.cardMetaRow}>
               <View style={styles.cardMetaItem}>
                 <Text style={styles.metaLabel}>HORA</Text>
-                <Text style={styles.metaValue}>🕒 {selectedEvent.time}</Text>
+                <View style={styles.metaValueContainer}>
+                  <MaterialIcons name="access-time" size={16} color="#E0F2FE" />
+                  <Text style={styles.metaValue}>{selectedEvent.time}</Text>
+                </View>
               </View>
               <View style={styles.cardMetaItem}>
                 <Text style={styles.metaLabel}>ASISTENTES</Text>
-                <Text style={styles.metaValue}>👥 {selectedEvent.attendeesCount} en vivo</Text>
+                <View style={styles.metaValueContainer}>
+                  <MaterialIcons name="people" size={16} color="#E0F2FE" />
+                  <Text style={styles.metaValue}>{selectedEvent.attendeesCount} en vivo</Text>
+                </View>
               </View>
             </View>
 
@@ -544,22 +600,8 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  submenuContainer: {
+  categoriesContainer: {
     marginTop: 8,
-    paddingVertical: 8,
-    backgroundColor: 'rgba(17, 24, 39, 0.75)',
-    borderRadius: 20,
-    marginHorizontal: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    ...Platform.select({
-      web: {
-        backdropFilter: 'blur(12px)',
-        maxWidth: 600,
-        alignSelf: 'center',
-        width: '100%',
-      },
-    }),
   },
   header: {
     alignItems: 'center',
@@ -634,52 +676,87 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  layersScroll: {
-    width: '100%',
-    marginTop: 2,
-  },
-  layersContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-    gap: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    ...Platform.select({
-      web: {
-        justifyContent: 'center',
-        maxWidth: 800,
-        alignSelf: 'center',
-      },
-    }),
-  },
-  layersLabel: {
+  layersModalHeader: {
     color: '#BAE6FD',
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.5,
-    marginRight: 4,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingTop: 8,
     textTransform: 'uppercase',
   },
-  layerChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 18,
-    backgroundColor: 'rgba(8, 47, 73, 0.7)',
+  fabLayersContainer: {
+    position: 'absolute',
+    top: Platform.OS === 'web' ? 140 : 160, // Ajustado para estar debajo de la barra y buscador
+    right: 16,
+    zIndex: 110,
+    alignItems: 'flex-end',
+  },
+  fabLayersButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(17, 24, 39, 0.85)',
     borderWidth: 1,
-    borderColor: 'rgba(125, 211, 252, 0.25)',
-    marginRight: 6,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.4,
+        shadowRadius: 5,
+      },
+      web: {
+        backdropFilter: 'blur(12px)',
+        boxShadow: '0px 4px 6px rgba(0, 0, 0, 0.4)',
+        cursor: 'pointer',
+      },
+    }),
+    elevation: 8,
   },
-  activeLayerChip: {
-    backgroundColor: '#0EA5E9',
-    borderColor: '#38BDF8',
+  layersModal: {
+    marginTop: 12,
+    backgroundColor: 'rgba(17, 24, 39, 0.95)',
+    borderRadius: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    minWidth: 180,
+    ...Platform.select({
+      web: {
+        backdropFilter: 'blur(16px)',
+        boxShadow: '0px 8px 24px rgba(0, 0, 0, 0.6)',
+      },
+    }),
+    elevation: 10,
   },
-  layerChipText: {
+  layerModalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    marginBottom: 4,
+  },
+  activeLayerModalRow: {
+    backgroundColor: 'rgba(14, 165, 233, 0.15)',
+  },
+  layerModalIcon: {
+    fontSize: 18,
+    marginRight: 10,
+  },
+  layerModalText: {
     color: '#E0F2FE',
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '600',
   },
-  activeLayerChipText: {
-    color: '#082F49',
+  activeLayerModalText: {
+    color: '#38BDF8',
+    fontWeight: 'bold',
   },
   categoryChip: {
     paddingHorizontal: 14,
@@ -807,30 +884,36 @@ const styles = StyleSheet.create({
   },
   detailsCard: {
     position: 'absolute',
-    bottom: 24,
-    left: 16,
-    right: 16,
-    backgroundColor: 'rgba(17, 24, 39, 0.90)',
-    borderRadius: 28,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(17, 24, 39, 0.95)',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    padding: 24,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    borderTopWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 16 },
+        shadowOffset: { width: 0, height: -4 },
         shadowOpacity: 0.3,
-        shadowRadius: 20,
+        shadowRadius: 10,
       },
       web: {
-        boxShadow: '0px 16px 30px rgba(0, 0, 0, 0.3)',
+        boxShadow: '0px -10px 30px rgba(0, 0, 0, 0.3)',
       },
     }),
     elevation: 10,
     zIndex: 200,
     ...Platform.select({
       web: {
-        maxWidth: 500,
+        bottom: 24,
+        borderRadius: 28, // Restore rounded corners for a minimodal look
+        borderTopLeftRadius: 28, // Override the mobile bottom sheet style
+        borderTopRightRadius: 28,
+        maxWidth: 450, // Slightly smaller than 500 for a tighter minimodal look
         alignSelf: 'center',
         left: 'auto',
         right: 'auto',
@@ -838,6 +921,17 @@ const styles = StyleSheet.create({
         backdropFilter: 'blur(16px)',
       },
     }),
+  },
+  bottomSheetHandleContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+    marginTop: -8,
+  },
+  bottomSheetHandle: {
+    width: 40,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
   },
   cardHeader: {
     flexDirection: 'row',
@@ -904,7 +998,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#9CA3AF',
     letterSpacing: 0.5,
-    marginBottom: 4,
+    marginBottom: 6,
+  },
+  metaValueContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   metaValue: {
     fontSize: 13,

@@ -425,6 +425,35 @@ export function useHomeScreenState(token: string | null) {
     return () => clearTimeout(timer);
   }, [searchQuery, mapBounds, fetchRealPlaces, activeNestedZone]);
 
+  // ── Smart Recommendations Effect ──────────────────────────────────────────
+  const fetchSmartRecommendations = useCallback(async () => {
+    if (!token) return;
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_URL}/api/v1/recommendations`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.results && data.results.length > 0) {
+          setEvents((prev) => {
+            const existingIds = new Set(prev.map((p) => p.id));
+            const newPlaces = data.results.filter((rp: any) => !existingIds.has(rp.id));
+            return [...prev, ...newPlaces];
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('Error fetching smart recommendations:', err);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    fetchSmartRecommendations();
+  }, [fetchSmartRecommendations]);
+
   // ── Reverse Geocoding Effect ──────────────────────────────────────────────
   useEffect(() => {
     if (!tacticalLocation) {

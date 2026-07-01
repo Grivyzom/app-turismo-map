@@ -58,7 +58,9 @@ const useTactileScale = () => {
 /* eslint-enable react-hooks/immutability */
 
 // ─── Constants matching the standalone design ──────────────────────────
-const MODAL_MAX_WIDTH = 340;
+const windowWidth = Dimensions.get('window').width;
+const IS_DESKTOP = Platform.OS === 'web' && windowWidth >= 768;
+const MODAL_MAX_WIDTH = IS_DESKTOP ? 340 : windowWidth;
 const GALLERY_HEIGHT = 196;
 
 export const MiniModal = ({ event, isLightMode, isSelected }: MiniModalProps) => {
@@ -73,7 +75,7 @@ export const MiniModal = ({ event, isLightMode, isSelected }: MiniModalProps) =>
 
   const [isExpanded, setIsExpanded] = useState<boolean>(shouldAutoExpand ? true : false);
   const [galeriaIndex, setGaleriaIndex] = useState(0);
-  const [modalWidth, setModalWidth] = useState(MODAL_MAX_WIDTH);
+  const [modalWidth, setModalWidth] = useState<number>(MODAL_MAX_WIDTH);
   const [galeriaImages, setGaleriaImages] = useState<string[]>([]);
 
   useEffect(() => {
@@ -261,11 +263,6 @@ export const MiniModal = ({ event, isLightMode, isSelected }: MiniModalProps) =>
       onLayout={onModalLayout}
       style={[styles.modalContainer, { transformOrigin: 'bottom', maxHeight: maxModalHeight } as any]}
     >
-      {/* ── Handle / drag indicator ─────────────────────────────── */}
-      <View style={styles.handleContainer}>
-        <View style={styles.handle} />
-      </View>
-
       {/* ── Gallery carousel ────────────────────────────────────── */}
       <View style={styles.galleryContainer}>
         <ScrollView
@@ -295,8 +292,16 @@ export const MiniModal = ({ event, isLightMode, isSelected }: MiniModalProps) =>
 
         {/* Top bar: categoria + dots */}
         <View style={styles.topBar}>
-          <View style={styles.categoryBadge}>
-            <Text style={styles.categoryBadgeText}>{categoria}</Text>
+          <View style={styles.badgesRow}>
+            <View style={styles.categoryBadge}>
+              <Text style={styles.categoryBadgeText}>{categoria}</Text>
+            </View>
+            {event.hasActiveUpdate && (
+              <View style={styles.updateBadge}>
+                <MaterialIcons name="campaign" size={12} color="#FFFFFF" />
+                <Text style={styles.updateBadgeText}>Novedades</Text>
+              </View>
+            )}
           </View>
           {galeria.length > 1 && (
             <View style={styles.dotsContainer}>
@@ -529,9 +534,6 @@ export const MiniModal = ({ event, isLightMode, isSelected }: MiniModalProps) =>
           </AnimatedPressable>
         </View>
       </ScrollView>
-
-      {/* Pointer triangle */}
-      <View style={[styles.pointer, { borderTopColor: '#0d1117' }]} />
     </Animated.View>
   );
 };
@@ -543,9 +545,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#0d1117',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    marginBottom: 8,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    marginBottom: 0,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 16 },
     shadowOpacity: 0.9,
@@ -555,19 +557,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(200,150,100,0.08)',
     alignItems: 'center',
-  },
-  handleContainer: {
-    width: '100%',
-    alignItems: 'center',
-    paddingTop: 11,
-    paddingBottom: 7,
-    zIndex: 10,
-  },
-  handle: {
-    width: 36,
-    height: 4,
-    backgroundColor: 'rgba(200,150,100,0.2)',
-    borderRadius: 2,
   },
 
   // ── Gallery ──────────────────────────────────────────────
@@ -606,6 +595,11 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     zIndex: 10,
   },
+  badgesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   categoryBadge: {
     backgroundColor: 'rgba(10,14,20,0.82)',
     paddingVertical: 5,
@@ -619,6 +613,21 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.7,
+    textTransform: 'uppercase',
+  },
+  updateBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FF3B30',
+    paddingVertical: 5,
+    paddingHorizontal: 9,
+    borderRadius: 8,
+    gap: 4,
+  },
+  updateBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold',
     textTransform: 'uppercase',
   },
   dotsContainer: {
@@ -855,21 +864,6 @@ const styles = StyleSheet.create({
     color: '#0a0e14',
     fontSize: 13,
     fontWeight: '700',
-  },
-
-  // ── Pointer ──────────────────────────────────────────────
-  pointer: {
-    width: 0,
-    height: 0,
-    backgroundColor: 'transparent',
-    borderStyle: 'solid',
-    borderLeftWidth: 8,
-    borderRightWidth: 8,
-    borderTopWidth: 8,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    position: 'absolute',
-    bottom: -8,
   },
 
   // ── Tooltip (camara) ─────────────────────────────────────

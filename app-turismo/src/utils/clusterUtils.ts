@@ -178,8 +178,9 @@ export function useSuperclusterEvents(
   // Instanciar y cargar datos en el QuadTree solo si cambian los eventos filtrados por LOD
   const superclusterInstance = useMemo(() => {
     const sc = new Supercluster<TurismoEvent, any>({
-      radius: 100,
+      radius: 80, // Reducido para sensibilidad en zoom bajo
       maxZoom: 18,
+      minPoints: 2, // Agrupar incluso 2 eventos cercanos
     });
 
     const points: Supercluster.PointFeature<TurismoEvent>[] = visibleEventsForTier
@@ -260,6 +261,54 @@ export function useSuperclusterEvents(
       const decluttered = declutterEvents(visibleClusteredCandidates, zoom);
 
       return [...decluttered, ...unclusteredEvents];
+    }
+
+    // Mega-cluster: cuando zoom < 11, agrupar TODO en un único cluster central
+    if (zoom < 11) {
+      const allClusterableEvents = visibleEventsForTier
+        .filter((e) => {
+          const cat = e.category?.toLowerCase() || '';
+          return (
+            cat !== 'embarcacion' &&
+            cat !== 'parque' &&
+            cat !== 'reserva' &&
+            cat !== 'reservas' &&
+            cat !== 'naturaleza' &&
+            cat !== 'camara'
+          );
+        })
+        .filter(
+          (event) =>
+            event.longitude >= bbox[0] &&
+            event.longitude <= bbox[2] &&
+            event.latitude >= bbox[1] &&
+            event.latitude <= bbox[3],
+        );
+
+      if (allClusterableEvents.length > 1) {
+        // Calcular centroide
+        let sumLat = 0,
+          sumLng = 0;
+        for (const e of allClusterableEvents) {
+          sumLat += e.latitude;
+          sumLng += e.longitude;
+        }
+        const centerLat = sumLat / allClusterableEvents.length;
+        const centerLng = sumLng / allClusterableEvents.length;
+
+        return [
+          {
+            id: `mega-cluster-${superclusterInstance.id}`,
+            latitude: centerLat,
+            longitude: centerLng,
+            isCluster: true,
+            events: allClusterableEvents,
+          } as Cluster,
+          ...unclusteredEvents,
+        ];
+      }
+
+      return [...allClusterableEvents, ...unclusteredEvents];
     }
 
     const scClusters = superclusterInstance.sc.getClusters(bbox, zoom);

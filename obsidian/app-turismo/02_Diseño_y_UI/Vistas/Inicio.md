@@ -56,6 +56,22 @@ Desbloquea el set completo de herramientas y añade componentes interactivos del
   - **Colecciones Personales (`SaveToCollectionModal`)**: Permite almacenar marcadores dentro de carpetas organizadas por el usuario.
   - **Creadores de Datos Geográficos (`CreatePointModal` / `CreateSectorModal` / `CoordsEditorHUD`)**: Habilitados para usuarios autenticados que desean reportar incidentes o agregar nuevos puntos turísticos.
 
+##### 🗂️ Panel de Recomendados (`PlacesShelfPanel` / `PlacesShelfTrigger`)
+Estante flotante de descubrimiento de lugares ubicado en la parte inferior del mapa (`BottomPlaceCarousel.tsx`). Se compone de dos piezas:
+
+* **`PlacesShelfTrigger`**: Botón flotante (icono `auto-awesome` ✨ + badge con el conteo de lugares) que abre/cierra el panel. **No** contiene texto; es solo el disparador.
+* **`PlacesShelfPanel`**: Panel translúcido (dark + `blur(20px)`) que aparece al abrir. Su estructura:
+  - **Header**: badge ✨ + título **"Recomendados"** + botón de cerrar (X) en la esquina superior derecha. *(Esta barra "Recomendados ··· X" pertenece al panel, no al trigger.)*
+  - **Pestañas unificadas (5)**: iconos grandes (20px) con indicador verde para el activo (fondo + barra inferior):
+    1. **Cercanos** — ordena por distancia.
+    2. **Mejor valorado** — ordena por calificación.
+    3. **Categorías** — despliega chips de filtro por categoría.
+    4. **Favoritos** — lee la colección `"all"` de `collectionsStorage`.
+    5. **Historial** — últimos lugares visitados (`visitedPlacesStorage`), con botón *Limpiar*.
+  - **Tarjetas (carrusel horizontal)**: layout vertical con imagen de vista previa grande arriba, pill de distancia sobre la imagen, badge de categoría, nombre destacado (2 líneas) y calificación por estrellas (★★★★★ + valor + reseñas).
+  - **Navegación del carrusel**: flechas circulares blancas grandes (40px) a izquierda/derecha, con snap por tarjeta.
+  - **Estados vacíos** diferenciados para Favoritos, Historial y "Sin resultados".
+
 ---
 
 #### 3. Ubicación Física de los Componentes en el Codebase
@@ -81,3 +97,6 @@ Desbloquea el set completo de herramientas y añade componentes interactivos del
   - [[TelemetryHUD.tsx](file:///grivyzom/webs/app-turismo-map/app-turismo/src/components/MapUI/TelemetryHUD.tsx)] (Dashboard que monitorea la telemetría del mapa)
   - [[RouterHUD.tsx](file:///grivyzom/webs/app-turismo-map/app-turismo/src/components/MapUI/RouterHUD.tsx)] (Panel de instrucciones paso a paso para enrutamiento)
   - [[SectorConfigPanel.tsx](file:///grivyzom/webs/app-turismo-map/app-turismo/src/components/MapUI/SectorConfigPanel.tsx)] (Visualizador e inspector de zonas de la Selva Valdiviana)
+
+* **Panel de Recomendados**:
+  - [[BottomPlaceCarousel.tsx](file:///grivyzom/webs/app-turismo-map/app-turismo/src/components/ui/BottomPlaceCarousel.tsx)] (`PlacesShelfTrigger` + `PlacesShelfPanel`: estante de descubrimiento con pestañas y tarjetas)

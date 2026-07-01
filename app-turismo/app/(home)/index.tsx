@@ -189,6 +189,18 @@ const tooltipStyles = StyleSheet.create({
 
 // ───────────────────────────────────────────────────────────────────────────
 
+function deterministicRating(id: string | number): { rating: number; reviews: number } {
+  const str = String(id);
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) + h) ^ str.charCodeAt(i);
+    h >>>= 0;
+  }
+  const rating = Math.round((3.5 + (h % 150) / 100) * 10) / 10;
+  const reviews = 20 + (h % 480);
+  return { rating, reviews };
+}
+
 interface MapLayerMenuProps {
   currentLayer: any;
   onSelectLayer: (layer: any) => void;
@@ -417,6 +429,7 @@ export default function HomeScreen() {
           dist = distNum.toFixed(1) + ' km';
         }
 
+        const dr = deterministicRating(e.id);
         return {
           id: e.id,
           name: e.title,
@@ -425,6 +438,8 @@ export default function HomeScreen() {
           distance: dist,
           address: e.address,
           time: e.time,
+          rating: dr.rating,
+          reviews: dr.reviews,
           description: e.description,
           _rawDist: distNum, // For filtering
         };
@@ -454,7 +469,11 @@ export default function HomeScreen() {
     ? ['choque', 'incendio', 'accidente', 'calle_cortada'].includes(selectedEvent.category)
     : false;
 
-  const isInformative = selectedEvent?.category?.toLowerCase() === 'fauna';
+  const hasFloatingMinimodal = selectedEvent
+    ? ['tienda', 'fauna', 'hospital', 'clinica', 'universidad', 'bombero', 'carabinero', 'camara'].includes(
+        selectedEvent.category?.toLowerCase() || ''
+      )
+    : false;
 
   // ── OSRM In-app Navigation ──────────────────────────────────────────────
   const [navRoute, setNavRoute] = useState<OsrmRoute | null>(null);
@@ -989,6 +1008,7 @@ export default function HomeScreen() {
           data={lugaresCarrusel}
           bottomOffset={Math.max(insets.bottom, 20)}
           onPlacePress={(lugar) => {
+            setShelfOpen(false);
             setSelectedEvent(filteredEvents.find((e) => e.id === lugar.id) || null);
           }}
         />
@@ -1797,7 +1817,7 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {showMainUI && selectedEvent && !isInformative && (
+      {showMainUI && selectedEvent && !hasFloatingMinimodal && (
         <View style={styles.sidePanelOverlay} pointerEvents="box-none">
           {/* Tap-to-dismiss backdrop */}
           <Pressable style={styles.sidePanelBackdrop} onPress={closeEventPanel} />
@@ -1889,9 +1909,7 @@ export default function HomeScreen() {
                       <Text style={styles.cardBadgeTextPremium}>
                         {isEmergencyEvent
                           ? selectedEvent.category.toUpperCase().replace('_', ' ')
-                          : isInformative
-                            ? 'INFORMACIÓN'
-                            : selectedEvent.category.toUpperCase()}
+                          : selectedEvent.category.toUpperCase()}
                       </Text>
                     </View>
                     <TouchableOpacity
@@ -1923,9 +1941,7 @@ export default function HomeScreen() {
                     <Text style={styles.cardBadgeTextPremium}>
                       {isEmergencyEvent
                         ? selectedEvent.category.toUpperCase().replace('_', ' ')
-                        : isInformative
-                          ? 'INFORMACIÓN'
-                          : selectedEvent.category.toUpperCase()}
+                        : selectedEvent.category.toUpperCase()}
                     </Text>
                   </View>
                   <TouchableOpacity
@@ -1963,16 +1979,14 @@ export default function HomeScreen() {
 
                 {/* Rejilla Horizontal de Metadatos (Info Hub) */}
                 <View style={styles.metaInfoGrid}>
-                  {!isInformative && (
-                    <View style={styles.metaGridItem}>
-                      <Ionicons name="time-outline" size={14} color="#A0AEC0" />
-                      <Text style={styles.metaGridText} numberOfLines={1}>
-                        {selectedEvent.time}
-                      </Text>
-                    </View>
-                  )}
+                  <View style={styles.metaGridItem}>
+                    <Ionicons name="time-outline" size={14} color="#A0AEC0" />
+                    <Text style={styles.metaGridText} numberOfLines={1}>
+                      {selectedEvent.time}
+                    </Text>
+                  </View>
 
-                  {!isInformative && <View style={styles.metaGridDivider} />}
+                  <View style={styles.metaGridDivider} />
 
                   <View style={styles.metaGridItem}>
                     <MaterialIcons
@@ -1983,24 +1997,9 @@ export default function HomeScreen() {
                     <Text style={styles.metaGridText} numberOfLines={1}>
                       {isEmergencyEvent
                         ? 'ALERTA'
-                        : isInformative
-                          ? 'PATRIMONIO'
-                          : selectedEvent.category.toUpperCase()}
+                        : selectedEvent.category.toUpperCase()}
                     </Text>
                   </View>
-
-
-                  {isInformative && (
-                    <>
-                      <View style={styles.metaGridDivider} />
-                      <View style={styles.metaGridItem}>
-                        <Ionicons name="calendar-outline" size={14} color="#A0AEC0" />
-                        <Text style={styles.metaGridText} numberOfLines={1}>
-                          {selectedEvent.time}
-                        </Text>
-                      </View>
-                    </>
-                  )}
                 </View>
 
 
@@ -2053,7 +2052,7 @@ export default function HomeScreen() {
                   setShowCheckInModal={setShowCheckInModal}
                 />
 
-                {isDesktop && !isInformative && (
+                {isDesktop && (
                   <View style={styles.desktopToolsContainerPremium}>
                     <Text style={styles.desktopToolsTitlePremium}>COMPLEMENTOS EN VIVO</Text>
                     <TouchableOpacity
@@ -2181,102 +2180,6 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* --- MiniModal for Informative Landmarks --- */}
-      {showMainUI && selectedEvent && isInformative && (
-        <Animated.View
-          style={[
-            styles.miniModalContainer,
-            {
-              width: isDesktop ? 380 : '90%',
-              left: isDesktop ? 20 : '5%',
-              bottom: isDesktop ? 32 : 40,
-              transform: [
-                {
-                  translateY: panelSlide.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [600, 0],
-                  }),
-                },
-              ],
-              opacity: panelSlide,
-            },
-          ]}
-        >
-          {/* Header/Banner Section */}
-          <View style={styles.miniBannerContainer}>
-            {selectedEvent.imageUrl && (
-              <Image source={{ uri: selectedEvent.imageUrl }} style={styles.miniBannerImage} />
-            )}
-            <View style={styles.miniBannerOverlay} />
-            <TouchableOpacity
-              onPress={closeEventPanel}
-              style={styles.miniCloseButton}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="close" size={18} color="#FFFFFF" />
-            </TouchableOpacity>
-
-            <View style={styles.miniBadgeContainer}>
-              <View style={[styles.miniBadge, { backgroundColor: 'rgba(18, 22, 30, 0.8)' }]}>
-                <MaterialIcons name="pets" size={12} color="#A0AEC0" />
-                <Text style={styles.miniBadgeText}>LANDMARK PATRIMONIAL</Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Info Section */}
-          <View style={styles.miniContent}>
-            <Text style={styles.miniTitle}>{selectedEvent.title}</Text>
-            <Text style={styles.miniOrganizer}>📍 {selectedEvent.organizer}</Text>
-
-            <Text style={styles.miniDescription} numberOfLines={4}>
-              {selectedEvent.description}
-            </Text>
-
-            {/* Meta Grid Section */}
-            <View style={styles.miniMetaGrid}>
-              <View style={styles.miniMetaItem}>
-                <Ionicons name="calendar-outline" size={14} color="#A0AEC0" />
-                <Text style={styles.miniMetaText}>{selectedEvent.time}</Text>
-              </View>
-              <View style={styles.miniMetaDivider} />
-              <View style={styles.miniMetaItem}>
-                <Ionicons name="location-outline" size={14} color="#A0AEC0" />
-                <Text style={styles.miniMetaText} numberOfLines={1}>
-                  Feria Fluvial
-                </Text>
-              </View>
-            </View>
-
-            {/* Action Buttons Section */}
-            <View style={styles.miniActionRow}>
-              <TouchableOpacity
-                style={[
-                  styles.miniPrimaryBtn,
-                  { backgroundColor: getCategoryColor(selectedEvent.category) },
-                ]}
-                activeOpacity={0.8}
-                onPress={() =>
-                  handleNavigateTo(selectedEvent.latitude, selectedEvent.longitude)
-                }
-              >
-                {navLoading ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Ionicons name="navigate" size={16} color="#FFFFFF" />
-                )}
-                <Text style={styles.miniPrimaryBtnText}>
-                  {navLoading ? 'Calculando...' : 'Cómo llegar'}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.miniIconBtn} activeOpacity={0.7}>
-                <Ionicons name="share-social-outline" size={20} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Animated.View>
-      )}
 
       {/* --- Sector Info Card (Before Exploring) --- */}
       {showMainUI &&

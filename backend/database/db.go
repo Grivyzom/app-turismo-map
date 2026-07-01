@@ -314,6 +314,62 @@ func InitDB() {
 		);`,
 		`CREATE INDEX IF NOT EXISTS idx_uuf_followed ON user_user_follows (followed_id);`,
 
+		// ── Tablas para Novedades de Negocios y Notificaciones ──────────────────────────
+		`CREATE TABLE IF NOT EXISTS branch_updates (
+			id SERIAL PRIMARY KEY,
+			branch_id INT NOT NULL REFERENCES company_branches(id) ON DELETE CASCADE,
+			title VARCHAR(255) NOT NULL,
+			description TEXT,
+			is_active BOOLEAN DEFAULT true,
+			expires_at TIMESTAMP,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		);`,
+		`CREATE TABLE IF NOT EXISTS user_notifications (
+			id SERIAL PRIMARY KEY,
+			user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			type VARCHAR(50) NOT NULL,
+			reference_id INT,
+			title VARCHAR(255) NOT NULL,
+			message TEXT,
+			is_read BOOLEAN DEFAULT false,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		);`,
+		`CREATE INDEX IF NOT EXISTS branch_updates_branch_idx ON branch_updates (branch_id);`,
+		`CREATE INDEX IF NOT EXISTS branch_updates_active_idx ON branch_updates (is_active);`,
+		`CREATE INDEX IF NOT EXISTS user_notifications_user_idx ON user_notifications (user_id);`,
+
+		// Función y Trigger para notificar a seguidores de la empresa
+		`CREATE OR REPLACE FUNCTION fn_notify_followers_on_update()
+		RETURNS TRIGGER AS $$
+		DECLARE
+			v_company_id INT;
+			v_branch_name VARCHAR(255);
+		BEGIN
+			SELECT company_id, branch_name INTO v_company_id, v_branch_name
+			FROM public.company_branches
+			WHERE id = NEW.branch_id;
+			
+			IF v_company_id IS NOT NULL THEN
+				INSERT INTO public.user_notifications (user_id, type, reference_id, title, message)
+				SELECT uf.user_id, 'business_update', NEW.id, NEW.title, 
+				       CASE 
+				           WHEN v_branch_name IS NOT NULL AND v_branch_name != '' THEN v_branch_name || ': ' || COALESCE(NEW.description, '')
+				           ELSE COALESCE(NEW.description, '')
+				       END
+				FROM public.user_follows uf
+				WHERE uf.company_id = v_company_id;
+			END IF;
+			
+			RETURN NEW;
+		END;
+		$$ LANGUAGE plpgsql;`,
+		
+		`DROP TRIGGER IF EXISTS trg_notify_followers_update ON branch_updates;`,
+		`CREATE TRIGGER trg_notify_followers_update
+		AFTER INSERT ON branch_updates
+		FOR EACH ROW
+		EXECUTE FUNCTION fn_notify_followers_on_update();`,
+
 		// ── Bio en perfil de ciudadano ────────────────────────────────────────
 		`ALTER TABLE citizen_profiles ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT '';`,
 

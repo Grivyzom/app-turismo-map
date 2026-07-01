@@ -49,7 +49,16 @@ export type CategoryFilter =
   | 'estatua'
   | 'arte'
   | 'bosque'
-  | 'mercado';
+  | 'mercado'
+  | 'new_item'
+  | 'invitation_club'
+  | 'invitation_sports'
+  | 'new_spot'
+  | 'choque'
+  | 'incendio'
+  | 'accidente'
+  | 'calle_cortada'
+  | 'edificio';
 
 const COMERCIAL_EVENTS: TurismoEvent[] = [
   {
@@ -192,6 +201,20 @@ export const CATEGORY_ICONS: Record<
   camara: { name: 'videocam', family: 'MaterialIcons' },
   municipalidad: { name: 'location-city', family: 'MaterialIcons' },
   mercado: { name: 'storefront', family: 'MaterialIcons' },
+  bosque: { name: 'forest', family: 'MaterialIcons' },
+  escultura: { name: 'account-balance', family: 'MaterialIcons' },
+  torreon: { name: 'fort', family: 'MaterialIcons' },
+  estatua: { name: 'accessibility-new', family: 'MaterialIcons' },
+  arte: { name: 'palette', family: 'MaterialIcons' },
+  new_item: { name: 'new-releases', family: 'MaterialIcons' },
+  invitation_club: { name: 'local-activity', family: 'MaterialIcons' },
+  invitation_sports: { name: 'sports-basketball', family: 'MaterialIcons' },
+  new_spot: { name: 'park', family: 'MaterialIcons' },
+  choque: { name: 'car-crash', family: 'MaterialIcons' },
+  incendio: { name: 'local-fire-department', family: 'MaterialIcons' },
+  accidente: { name: 'warning', family: 'MaterialIcons' },
+  calle_cortada: { name: 'block', family: 'MaterialIcons' },
+  edificio: { name: 'business', family: 'MaterialIcons' },
 };
 
 export const MAP_LAYER_OPTIONS: {

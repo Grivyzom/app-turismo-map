@@ -457,22 +457,24 @@ function GoogleClusterMarker({ cluster, onClick }: { cluster: Cluster; onClick: 
     >
       <div
         style={{
-          width: 36,
-          height: 36,
+          width: 34,
+          height: 34,
           borderRadius: '50%',
-          border: `3px solid ${dominantColor}`,
-          backgroundColor: '#0B0F19',
+          border: `2px solid rgba(255, 255, 255, 0.85)`,
+          backgroundColor: dominantColor,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           color: '#ffffff',
-          fontWeight: 800,
-          fontSize: '13px',
-          boxShadow: '0 3px 8px rgba(0,0,0,0.5)',
-          transition: 'transform 0.15s ease',
+          fontWeight: 'bold',
+          fontSize: '14px',
+          boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+          fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
+          transition: 'transform 0.2s ease, box-shadow 0.2s ease',
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'scale(1.15)';
+          e.currentTarget.style.transform = 'scale(1.1)';
+          e.currentTarget.style.boxShadow = `0 4px 12px ${dominantColor}80`;
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.transform = 'scale(1)';

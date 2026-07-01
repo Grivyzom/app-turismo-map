@@ -356,3 +356,32 @@ type CreateIndoorPOIRequest struct {
 	Description string  `json:"description,omitempty"`
 	Schedule    string  `json:"schedule,omitempty"`
 }
+
+// ── Models para Novedades de Negocios y Notificaciones ─────────────────────
+
+type BranchUpdate struct {
+	ID          int    `json:"id"`
+	BranchID    int    `json:"branchId"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	IsActive    bool   `json:"isActive"`
+	ExpiresAt   string `json:"expiresAt,omitempty"`
+	CreatedAt   string `json:"createdAt"`
+}
+
+type CreateBranchUpdateRequest struct {
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	ExpiresIn   int    `json:"expiresIn"` // Horas de vigencia
+}
+
+type UserNotification struct {
+	ID          int    `json:"id"`
+	UserID      int    `json:"userId"`
+	Type        string `json:"type"`
+	ReferenceID *int   `json:"referenceId,omitempty"`
+	Title       string `json:"title"`
+	Message     string `json:"message"`
+	IsRead      bool   `json:"isRead"`
+	CreatedAt   string `json:"createdAt"`
+}

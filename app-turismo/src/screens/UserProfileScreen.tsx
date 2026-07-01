@@ -478,6 +478,13 @@ export default function UserProfileScreen() {
               <MaterialIcons name="person-search" size={22} color="#6EE7B7" />
               <Text style={styles.metricLabel}>Buscar</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.metricItem}
+              onPress={() => router.push('/(home)/notifications' as never)}
+            >
+              <MaterialIcons name="notifications-none" size={22} color="#6EE7B7" />
+              <Text style={styles.metricLabel}>Notificaciones</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
