@@ -434,13 +434,15 @@ export default function HomeScreen() {
           id: e.id,
           name: e.title,
           category: e.category,
-          imageUrl: e.imageUrl || 'https://via.placeholder.com/400x300',
+          imageUrl: e.imageUrl,
           distance: dist,
           address: e.address,
           time: e.time,
           rating: dr.rating,
           reviews: dr.reviews,
           description: e.description,
+          spotsCount: e.spots?.length ?? 0,
+          openingHours: e.openingHours,
           _rawDist: distNum, // For filtering
         };
       })

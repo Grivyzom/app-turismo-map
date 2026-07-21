@@ -27,6 +27,10 @@ import Animated, {
   withSpring,
   withTiming,
   withSequence,
+  withRepeat,
+  withDelay,
+  cancelAnimation,
+  Easing,
   interpolate,
   Extrapolation,
 } from 'react-native-reanimated';
@@ -48,7 +52,6 @@ const IS_DESKTOP = SW >= 768;
 
 const CARD_W      = IS_DESKTOP ? 224 : 200;
 const SPACING     = 14;
-const IMG_H       = 140;
 const CARD_H      = 288;
 const CARD_STRIDE = CARD_W + SPACING;
 const REMOVE_CLIPPED = Platform.OS !== 'web';
@@ -63,13 +66,14 @@ const SPRING_CFG    = { damping: 22, stiffness: 220, mass: 0.8, overshootClampin
 const SPRING_BOUNCE = { damping: 10, stiffness: 400 } as const;
 
 // ─── Paleta ──────────────────────────────────────────────────────────────────
-const ACCENT      = '#34D399';
-const ACCENT2     = '#6EE7B7';
-const MUTED       = '#94A3B8';
-const MUTED_DARK  = '#475569';
+const ACCENT      = '#34D399';   // solo CTA primarios y tab activo
+const MUTED       = '#64748B';
+const MUTED_DARK  = '#334155';
 const ON_LIGHT    = '#0F172A';
 const STAR_COLOR  = '#FBBF24';
-const SAVE_COLOR  = '#F87171';
+// Fondo elevado de cards — ligeramente más claro que el panel
+const CARD_BG     = '#131D2E';
+const CARD_BORDER = 'rgba(255,255,255,0.07)';
 
 type Tab = 'nearby' | 'top' | 'category' | 'favorites' | 'history';
 
@@ -94,6 +98,8 @@ export interface PlaceItem {
   address?: string;
   time?: string;
   description?: string;
+  spotsCount?: number;
+  openingHours?: string;
 }
 
 // ─── Utils ───────────────────────────────────────────────────────────────────
@@ -101,6 +107,97 @@ export interface PlaceItem {
 function parseDist(d?: string) {
   if (!d) return Infinity;
   return parseFloat(d.replace(/[^0-9.]/g, '')) || Infinity;
+}
+
+// Color de categoría — solo para texto del badge y estado activo de iconos
+const CAT_COLOR: Record<string, string> = {
+  cultura:     '#F59E0B',
+  museo:       '#A78BFA',
+  teatro:      '#F472B6',
+  naturaleza:  '#34D399',
+  parque:      '#6EE7B7',
+  bosque:      '#4ADE80',
+  gastronomia: '#FB923C',
+  monumento:   '#94A3B8',
+  escultura:   '#CBD5E1',
+  torreon:     '#94A3B8',
+  estatua:     '#BAC8D3',
+  tienda:      '#60A5FA',
+};
+const IMG_H = 132; // altura fija — todos los cards idénticos en proporción
+
+// ─── MarqueeText ─────────────────────────────────────────────────────────────
+
+function MarqueeText({
+  text,
+  textStyle,
+  active,
+  maxLines = 1,
+}: {
+  text: string;
+  textStyle?: any;
+  active: boolean;
+  maxLines?: number;
+}) {
+  const [containerW, setContainerW] = useState(0);
+  const [fullTextW,  setFullTextW]  = useState(0);
+  const translateX = useSharedValue(0);
+
+  const overflow = Math.max(0, fullTextW - containerW + 4);
+  const needsScroll = overflow > 8;
+
+  useEffect(() => {
+    if (active && needsScroll) {
+      translateX.value = withDelay(
+        280,
+        withRepeat(
+          withSequence(
+            withTiming(-overflow, {
+              duration: Math.max(overflow * 22, 1400),
+              easing: Easing.inOut(Easing.quad),
+            }),
+            withTiming(0, { duration: 500, easing: Easing.out(Easing.quad) }),
+          ),
+          -1,
+          false,
+        ),
+      );
+    } else {
+      cancelAnimation(translateX);
+      translateX.value = withTiming(0, { duration: 180 });
+    }
+  }, [active, needsScroll, overflow]);
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
+
+  return (
+    <View
+      style={styles.marqueeContainer}
+      onLayout={(e) => setContainerW(e.nativeEvent.layout.width)}
+    >
+      {/* Nodo oculto para medir ancho real del texto sin truncar */}
+      <Text
+        style={[textStyle, styles.marqueeHidden]}
+        numberOfLines={1}
+        onLayout={(e) => setFullTextW(e.nativeEvent.layout.width)}
+        aria-hidden
+      >
+        {text}
+      </Text>
+      <Animated.Text
+        style={[
+          textStyle,
+          animStyle,
+          Platform.OS === 'web' ? ({ whiteSpace: 'nowrap' } as any) : undefined,
+        ]}
+        numberOfLines={needsScroll && active ? 1 : maxLines}
+      >
+        {text}
+      </Animated.Text>
+    </View>
+  );
 }
 
 // ─── PlaceCard ────────────────────────────────────────────────────────────────
@@ -115,24 +212,22 @@ interface PlaceCardProps {
 
 function PlaceCard({ item, index, onPress, onViewMore, onSaveToggle }: PlaceCardProps) {
   const [userRating, setUserRating] = useState(0);
-  const [saved,      setSaved]      = useState(false);
+  const [liked,      setLiked]      = useState(false);
+  const [bookmarked, setBookmarked] = useState(false);
+  const [focused,    setFocused]    = useState(false);
   const [hintStar,   setHintStar]   = useState(0);
   const hintTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  const cardScale   = useSharedValue(1);
-  const ratingScale = useSharedValue(1);
-  const cardStyle   = useAnimatedStyle(() => ({ transform: [{ scale: cardScale.value }] }));
-  const ratingStyle = useAnimatedStyle(() => ({ transform: [{ scale: ratingScale.value }] }));
+  const cardScale = useSharedValue(1);
+  const cardStyle = useAnimatedStyle(() => ({ transform: [{ scale: cardScale.value }] }));
 
+  const catColor = CAT_COLOR[item.category] ?? ACCENT;
   const iconData = CATEGORY_ICONS[item.category as CategoryFilter];
   const CatIcon  = iconData
     ? (iconData.family === 'Ionicons' ? Ionicons : MaterialIcons)
     : null;
 
-  const clearHint = () => {
-    hintTimers.current.forEach(clearTimeout);
-    hintTimers.current = [];
-  };
+  const clearHint = () => { hintTimers.current.forEach(clearTimeout); hintTimers.current = []; };
 
   const runHint = () => {
     if (userRating > 0) return;
@@ -142,48 +237,27 @@ function PlaceCard({ item, index, onPress, onViewMore, onSaveToggle }: PlaceCard
       const t = setTimeout(() => setHintStar(star), 60 + i * 100);
       hintTimers.current.push(t);
     });
-    const reset = setTimeout(() => setHintStar(0), 60 + 5 * 100 + 350);
-    hintTimers.current.push(reset);
+    hintTimers.current.push(setTimeout(() => setHintStar(0), 60 + 5 * 100 + 350));
   };
 
   useEffect(() => () => clearHint(), []);
 
-  const handlePressIn = () => {
-    cardScale.value = withSpring(0.97, SPRING_BOUNCE);
-    runHint();
-  };
-  const handlePressOut = () => {
-    cardScale.value = withSpring(1, SPRING_CFG);
-  };
-
-  const handleSave = () => {
-    const next = !saved;
-    setSaved(next);
-    onSaveToggle(next);
-  };
+  // Hover web — solo marquee, sin escala
+  const hoverIn  = () => setFocused(true);
+  const hoverOut = () => { setFocused(false); cardScale.value = withSpring(1, SPRING_CFG); };
+  // Press — escala + marquee + hint
+  const pressIn  = () => { setFocused(true); cardScale.value = withSpring(0.97, SPRING_BOUNCE); runHint(); };
+  const pressOut = () => { cardScale.value = withSpring(1, SPRING_CFG); };
 
   const handleRate = (star: number) => {
-    const next = star === userRating ? 0 : star;
-    setUserRating(next);
+    setUserRating(star === userRating ? 0 : star);
     clearHint();
     setHintStar(0);
-    ratingScale.value = withSequence(
-      withSpring(1.12, SPRING_BOUNCE),
-      withSpring(1, { damping: 14, stiffness: 280 }),
-    );
   };
 
-  // Qué mostrar en las estrellas:
-  // 1. Si el usuario ya votó → su rating
-  // 2. Si la animación hint está corriendo → hintStar
-  // 3. Si no → rating comunitario (con media estrella)
   const getStarName = (i: number): 'star' | 'star-half' | 'star-border' => {
-    if (userRating > 0) {
-      return i <= userRating ? 'star' : 'star-border';
-    }
-    if (hintStar > 0) {
-      return i <= hintStar ? 'star' : 'star-border';
-    }
+    if (userRating > 0) return i <= userRating ? 'star' : 'star-border';
+    if (hintStar > 0)   return i <= hintStar   ? 'star' : 'star-border';
     if (item.rating != null) {
       const full = Math.floor(item.rating);
       const half = item.rating - full >= 0.5;
@@ -206,9 +280,11 @@ function PlaceCard({ item, index, onPress, onViewMore, onSaveToggle }: PlaceCard
 
   const displayRatingText = userRating > 0
     ? `${userRating}.0`
-    : item.rating != null
-    ? item.rating.toFixed(1)
-    : null;
+    : item.rating != null ? item.rating.toFixed(1) : null;
+
+  const webHoverProps = Platform.OS === 'web'
+    ? { onMouseEnter: hoverIn, onMouseLeave: hoverOut } as any
+    : {};
 
   return (
     <Animated.View
@@ -217,77 +293,72 @@ function PlaceCard({ item, index, onPress, onViewMore, onSaveToggle }: PlaceCard
     >
       <Pressable
         onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
+        onPressIn={pressIn}
+        onPressOut={pressOut}
         style={styles.card}
         accessibilityRole="button"
         accessibilityLabel={`${item.name}, ${item.category}`}
+        {...webHoverProps}
       >
-        {/* ── Imagen ───────────────────────────────────── */}
+        {/* ── Imagen fija ───────────────────────────────── */}
         <View style={styles.thumb}>
           {item.imageUrl ? (
             <Image source={{ uri: item.imageUrl }} style={styles.thumbImg} resizeMode="cover" />
           ) : (
-            <View style={styles.thumbEmpty}>
-              <MaterialIcons name="image-not-supported" size={32} color="#1E293B" />
+            // Placeholder limpio: fondo sólido + icono atenuado
+            <View style={styles.thumbPlaceholder}>
+              {CatIcon ? (
+                <CatIcon name={iconData!.name as any} size={36} color={catColor} style={{ opacity: 0.35 }} />
+              ) : (
+                <MaterialIcons name="place" size={36} color="#64748B" style={{ opacity: 0.35 }} />
+              )}
             </View>
           )}
 
+          {/* Gradiente imagen → fondo, sin horizontes duros */}
           <LinearGradient
-            colors={['transparent', 'rgba(10,17,32,0.85)']}
+            colors={['transparent', 'transparent', CARD_BG]}
+            locations={[0, 0.55, 1]}
             style={styles.imgGradient}
             pointerEvents="none"
           />
 
-          {/* Badge categoría */}
+          {/* Badge categoría — sin borde */}
           <View style={styles.catBadgeImg}>
-            {CatIcon && <CatIcon name={iconData!.name as any} size={10} color={ACCENT} />}
-            <Text style={styles.catTextImg}>{item.category.toUpperCase()}</Text>
+            {CatIcon && <CatIcon name={iconData!.name as any} size={9} color={catColor} />}
+            <Text style={[styles.catTextImg, { color: catColor }]}>{item.category.toUpperCase()}</Text>
           </View>
 
-          {/* Botón guardar — sin animación de hover/bounce */}
-          <Pressable
-            onPress={handleSave}
-            style={styles.saveBtn}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel={saved ? 'Quitar de guardados' : 'Guardar lugar'}
-          >
-            <MaterialIcons
-              name={saved ? 'favorite' : 'favorite-border'}
-              size={18}
-              color={saved ? SAVE_COLOR : '#CBD5E1'}
-            />
-          </Pressable>
-
-          {/* Distancia */}
-          {item.distance != null && (
-            <View style={styles.distPill}>
-              <MaterialIcons name="near-me" size={10} color={ACCENT} />
-              <Text style={styles.distPillText}>{item.distance}</Text>
-            </View>
-          )}
+          {/* Distancia + spots — esquina inf-der, sin borde */}
+          <View style={styles.imgBadgesRight}>
+            {item.distance != null && (
+              <View style={styles.distPill}>
+                <MaterialIcons name="near-me" size={8} color="#94A3B8" />
+                <Text style={styles.distPillText}>{item.distance}</Text>
+              </View>
+            )}
+            {(item.spotsCount ?? 0) > 0 && (
+              <View style={styles.spotsPill}>
+                <MaterialIcons name="place" size={8} color="#94A3B8" />
+                <Text style={styles.spotsPillText}>{item.spotsCount} spots</Text>
+              </View>
+            )}
+          </View>
         </View>
 
-        {/* ── Info ─────────────────────────────────────── */}
+        {/* ── Info con flexbox para alinear footer ─────── */}
         <View style={styles.cardInfo}>
-          <Text style={styles.cardName} numberOfLines={2}>{item.name}</Text>
+          {/* Título — ocupa espacio disponible y empuja rating hacia abajo */}
+          <View style={styles.cardNameWrap}>
+            <MarqueeText text={item.name} textStyle={styles.cardName} active={focused} maxLines={2} />
+          </View>
 
-          {/* Fila de rating unificada: comunidad + interactiva para usuario */}
-          <Animated.View style={[styles.ratingRow, ratingStyle]}>
+          {/* Rating — siempre anclado sobre el footer */}
+          <View style={styles.ratingRow}>
             <View style={styles.starGroup}>
               {[1, 2, 3, 4, 5].map((i) => (
-                <TouchableOpacity
-                  key={i}
-                  onPress={() => handleRate(i)}
-                  hitSlop={6}
-                  activeOpacity={0.75}
-                >
-                  <MaterialIcons
-                    name={getStarName(i)}
-                    size={17}
-                    color={getStarColor(i)}
-                  />
+                <TouchableOpacity key={i} onPress={() => handleRate(i)} hitSlop={6} activeOpacity={0.75}>
+                  <MaterialIcons name={getStarName(i)} size={15} color={getStarColor(i)} />
                 </TouchableOpacity>
               ))}
             </View>
@@ -298,22 +369,70 @@ function PlaceCard({ item, index, onPress, onViewMore, onSaveToggle }: PlaceCard
               <Text style={styles.reviewsText}>({item.reviews})</Text>
             )}
             {userRating > 0 && (
-              <Text style={styles.userRatedLabel}>tu nota</Text>
+              <Text style={{ fontSize: 9, fontWeight: '700', color: ACCENT, opacity: 0.85 }}>tu nota</Text>
             )}
-          </Animated.View>
+          </View>
 
-          <View style={styles.divider} />
+          {/* Horario o dirección — solo si disponible */}
+          {(item.openingHours || item.address) && (
+            <View style={styles.infoRow}>
+              {item.openingHours ? (
+                <View style={styles.infoPill}>
+                  <MaterialIcons name="access-time" size={9} color={MUTED} />
+                  <Text style={styles.infoPillText} numberOfLines={1}>{item.openingHours}</Text>
+                </View>
+              ) : (
+                <View style={styles.infoPill}>
+                  <MaterialIcons name="location-on" size={9} color={MUTED} />
+                  <Text style={styles.infoPillText} numberOfLines={1}>{item.address}</Text>
+                </View>
+              )}
+            </View>
+          )}
+        </View>
 
-          {/* Botón Ver más */}
+        {/* ── Footer: ghost icons + CTA ─────────────────── */}
+        <View style={styles.cardFooter}>
+          {/* Ghost: Like */}
+          <Pressable
+            onPress={() => setLiked(p => !p)}
+            style={styles.ghostBtn}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={liked ? 'Quitar like' : 'Dar like'}
+          >
+            <MaterialIcons
+              name={liked ? 'thumb-up' : 'thumb-up-off-alt'}
+              size={16}
+              color={liked ? ACCENT : MUTED}
+            />
+          </Pressable>
+
+          {/* Ghost: Guardar */}
+          <Pressable
+            onPress={() => { setBookmarked(p => !p); onSaveToggle(!bookmarked); }}
+            style={styles.ghostBtn}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={bookmarked ? 'Quitar guardado' : 'Guardar lugar'}
+          >
+            <MaterialIcons
+              name={bookmarked ? 'bookmark' : 'bookmark-border'}
+              size={16}
+              color={bookmarked ? ACCENT : MUTED}
+            />
+          </Pressable>
+
+          {/* CTA: Ver más — único elemento estilizado */}
           <TouchableOpacity
             onPress={onViewMore}
             style={styles.viewMoreBtn}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
             accessibilityRole="button"
             accessibilityLabel={`Ver más sobre ${item.name}`}
           >
             <Text style={styles.viewMoreText}>Ver más</Text>
-            <MaterialIcons name="arrow-forward" size={13} color={ACCENT} />
+            <MaterialIcons name="arrow-forward" size={12} color={ACCENT} />
           </TouchableOpacity>
         </View>
       </Pressable>
@@ -1019,20 +1138,21 @@ const styles = StyleSheet.create({
   card: {
     width: CARD_W,
     height: CARD_H,
-    borderRadius: 20,
+    borderRadius: 18,
     overflow: 'hidden',
-    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: CARD_BORDER,
+    flexDirection: 'column',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
+        shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.4,
         shadowRadius: 16,
       },
       android: { elevation: 10 },
-      web: { boxShadow: '0px 8px 32px rgba(0,0,0,0.5)' } as any,
+      web: { boxShadow: '0px 6px 24px rgba(0,0,0,0.5)' } as any,
     }),
   },
 
@@ -1040,114 +1160,135 @@ const styles = StyleSheet.create({
   thumb: {
     width: '100%',
     height: IMG_H,
-    backgroundColor: '#0F172A',
     position: 'relative',
   },
-  thumbImg:   { width: '100%', height: '100%' },
-  thumbEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0F172A' },
+  thumbImg: { width: '100%', height: '100%' },
+  thumbPlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0D1626',
+  },
   imgGradient: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: 60,
+    height: 56,
   },
 
-  // Category badge on image
+  // Badge categoría (sup-izq)
   catBadgeImg: {
     position: 'absolute',
-    top: 10,
-    left: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(10,17,32,0.78)',
-    borderRadius: 8,
-    paddingHorizontal: 7,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(52,211,153,0.3)',
-  },
-  catTextImg: { color: ACCENT, fontSize: 9, fontWeight: '800', letterSpacing: 0.6 },
-
-  // Save button on image
-  saveBtn: {
-    position: 'absolute',
     top: 8,
-    right: 8,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(10,17,32,0.72)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-  },
-
-  // Distance pill
-  distPill: {
-    position: 'absolute',
-    bottom: 10,
-    left: 10,
+    left: 8,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    paddingHorizontal: 7,
+    borderRadius: 5,
+    paddingHorizontal: 6,
     paddingVertical: 3,
-    borderRadius: 20,
-    backgroundColor: 'rgba(10,17,32,0.82)',
-    borderWidth: 1,
-    borderColor: 'rgba(52,211,153,0.3)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  distPillText: { color: '#E2E8F0', fontSize: 10, fontWeight: '700' },
+  catTextImg: { fontSize: 8, fontWeight: '800', letterSpacing: 0.5 },
+
+  // Badges inf-der agrupados
+  imgBadgesRight: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  distPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 5,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  distPillText: { color: '#94A3B8', fontSize: 8, fontWeight: '600' },
+  spotsPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 5,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  spotsPillText: { color: '#94A3B8', fontSize: 8, fontWeight: '600' },
 
   // ── Card info ──
   cardInfo: {
     flex: 1,
     paddingHorizontal: 12,
     paddingTop: 10,
-    paddingBottom: 10,
-    gap: 5,
+    paddingBottom: 6,
+    flexDirection: 'column',
   },
+  cardNameWrap: { flex: 1 },
   cardName: {
-    color: '#F8FAFC',
-    fontSize: 14,
+    color: '#E2E8F0',
+    fontSize: 13,
     fontWeight: '700',
-    lineHeight: 19,
+    lineHeight: 18,
   },
 
   // Rating row (unificada comunidad + usuario)
-  ratingRow:      { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  starGroup:      { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  ratingValue:    { color: STAR_COLOR, fontSize: 11, fontWeight: '700' },
-  reviewsText:    { color: '#64748B', fontSize: 10, fontWeight: '500' },
-  userRatedLabel: { color: ACCENT, fontSize: 9, fontWeight: '700', letterSpacing: 0.3, opacity: 0.85 },
+  ratingRow:   { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  starGroup:   { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  ratingValue: { color: STAR_COLOR, fontSize: 11, fontWeight: '700' },
+  reviewsText: { color: '#64748B', fontSize: 10, fontWeight: '500' },
 
-  // Divider
-  divider: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    marginVertical: 2,
+  // Fila de info extra
+  infoRow: { marginTop: 5 },
+  infoPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
   },
+  infoPillText: { color: '#475569', fontSize: 9, fontWeight: '500', flex: 1 },
 
-  // Ver más button
+  // ── Marquee ──
+  marqueeContainer: { overflow: 'hidden' },
+  marqueeHidden: { position: 'absolute', opacity: 0, width: 9999 },
+
+  // ── Card footer ──
+  cardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.06)',
+  },
+  ghostBtn: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   viewMoreBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 5,
     paddingVertical: 7,
-    borderRadius: 12,
-    backgroundColor: 'rgba(52,211,153,0.12)',
+    borderRadius: 10,
+    backgroundColor: 'rgba(52,211,153,0.13)',
     borderWidth: 1,
-    borderColor: 'rgba(52,211,153,0.28)',
+    borderColor: 'rgba(52,211,153,0.25)',
   },
   viewMoreText: {
     color: ACCENT,
     fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 0.2,
   },
 
   // ── Empty ──
