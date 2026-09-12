@@ -563,6 +563,81 @@ func InitDB() {
 			RETURN NULL;
 		END;
 		$$ LANGUAGE plpgsql;`,
+
+		// ── Tabla de Lugares OSM/Overpass (parques, humedales, universidades, mobiliario, buildings, etc.) ──
+		`CREATE TABLE IF NOT EXISTS osm_places (
+			id SERIAL PRIMARY KEY,
+			osm_id VARCHAR(255) UNIQUE NOT NULL,
+			source_layer VARCHAR(50) NOT NULL,
+			category VARCHAR(100) NOT NULL,
+			name VARCHAR(255),
+			address TEXT,
+			target_audience VARCHAR(50) DEFAULT 'all',
+			lat DOUBLE PRECISION NOT NULL,
+			lng DOUBLE PRECISION NOT NULL,
+			geom GEOGRAPHY(Geometry, 4326) NOT NULL,
+			osm_tags JSONB NOT NULL DEFAULT '{}'::jsonb,
+			parent_building_id INT REFERENCES osm_places(id) ON DELETE SET NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		);`,
+		`CREATE INDEX IF NOT EXISTS osm_places_geom_idx ON osm_places USING GIST (geom);`,
+		`CREATE INDEX IF NOT EXISTS osm_places_category_idx ON osm_places (category);`,
+		`CREATE INDEX IF NOT EXISTS osm_places_parent_building_idx ON osm_places (parent_building_id);`,
+
+		// ── Asignación automática de parent_building_id (un punto queda "adentro" del building/universidad más pequeño que lo contiene) ──
+		`CREATE OR REPLACE FUNCTION fn_assign_parent_building()
+		RETURNS TRIGGER AS $$
+		BEGIN
+			IF NEW.category IN ('edificio', 'universidad') THEN
+				NEW.parent_building_id := NULL;
+				RETURN NEW;
+			END IF;
+
+			SELECT b.id INTO NEW.parent_building_id
+			FROM public.osm_places b
+			WHERE b.category IN ('edificio', 'universidad')
+			  AND b.id <> NEW.id
+			  AND ST_GeometryType(b.geom::geometry) IN ('ST_Polygon', 'ST_MultiPolygon')
+			  AND ST_Contains(b.geom::geometry, NEW.geom::geometry)
+			ORDER BY ST_Area(b.geom::geometry) ASC
+			LIMIT 1;
+
+			RETURN NEW;
+		END;
+		$$ LANGUAGE plpgsql;`,
+
+		`DROP TRIGGER IF EXISTS trg_assign_parent_building ON osm_places;`,
+		`CREATE TRIGGER trg_assign_parent_building
+		BEFORE INSERT OR UPDATE OF geom, category ON osm_places
+		FOR EACH ROW
+		EXECUTE FUNCTION fn_assign_parent_building();`,
+
+		// ── Recalcular contención cuando un building/universidad se agrega o cambia de forma DESPUÉS de sus puntos ──
+		`CREATE OR REPLACE FUNCTION fn_recalculate_osm_building_containment()
+		RETURNS TRIGGER AS $$
+		BEGIN
+			UPDATE public.osm_places child
+			SET parent_building_id = (
+				SELECT b.id
+				FROM public.osm_places b
+				WHERE b.category IN ('edificio', 'universidad')
+				  AND ST_GeometryType(b.geom::geometry) IN ('ST_Polygon', 'ST_MultiPolygon')
+				  AND ST_Contains(b.geom::geometry, child.geom::geometry)
+				ORDER BY ST_Area(b.geom::geometry) ASC
+				LIMIT 1
+			)
+			WHERE child.category NOT IN ('edificio', 'universidad');
+			RETURN NULL;
+		END;
+		$$ LANGUAGE plpgsql;`,
+
+		`DROP TRIGGER IF EXISTS trg_recalc_osm_building_containment ON osm_places;`,
+		`CREATE TRIGGER trg_recalc_osm_building_containment
+		AFTER INSERT OR UPDATE OF geom, category ON osm_places
+		FOR EACH ROW
+		WHEN (NEW.category IN ('edificio', 'universidad'))
+		EXECUTE FUNCTION fn_recalculate_osm_building_containment();`,
 	}
 
 	for _, query := range queries {
