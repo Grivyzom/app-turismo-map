@@ -58,7 +58,11 @@ export type CategoryFilter =
   | 'incendio'
   | 'accidente'
   | 'calle_cortada'
-  | 'edificio';
+  | 'edificio'
+  | 'banca'
+  | 'basurero'
+  | 'bebedero'
+  | 'bano';
 
 const COMERCIAL_EVENTS: TurismoEvent[] = [
   {
@@ -215,6 +219,10 @@ export const CATEGORY_ICONS: Record<
   accidente: { name: 'warning', family: 'MaterialIcons' },
   calle_cortada: { name: 'block', family: 'MaterialIcons' },
   edificio: { name: 'business', family: 'MaterialIcons' },
+  banca: { name: 'chair', family: 'MaterialIcons' },
+  basurero: { name: 'delete', family: 'MaterialIcons' },
+  bebedero: { name: 'water-drop', family: 'MaterialIcons' },
+  bano: { name: 'wc', family: 'MaterialIcons' },
 };
 
 export const MAP_LAYER_OPTIONS: {

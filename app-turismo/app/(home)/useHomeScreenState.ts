@@ -33,7 +33,20 @@ import { INITIAL_EVENTS, WS_SIMULATION_POOL, CategoryFilter } from '../../src/da
 // Categorías visibles por modo de mapa. 'mapa' = infraestructura/seguridad de la ciudad,
 // 'turismo' = atractivos y naturaleza, 'comercial' = comercio y gastronomía.
 const MODE_CATEGORIES: Record<MapDisplayMode, CategoryFilter[]> = {
-  mapa: ['hospital', 'universidad', 'bombero', 'carabinero', 'camara', 'emergencia', 'publico', 'municipalidad'],
+  mapa: [
+    'hospital',
+    'universidad',
+    'bombero',
+    'carabinero',
+    'camara',
+    'emergencia',
+    'publico',
+    'municipalidad',
+    'banca',
+    'basurero',
+    'bebedero',
+    'bano',
+  ],
   turismo: [
     'cultura',
     'naturaleza',
@@ -56,6 +69,28 @@ const MODE_CATEGORIES: Record<MapDisplayMode, CategoryFilter[]> = {
   ],
   comercial: ['tienda', 'gastronomia'],
 };
+
+function isCategoryVisible(
+  category: string,
+  selectedCategory: CategoryFilter,
+  mapDisplayMode: MapDisplayMode,
+): boolean {
+  const isEmergencyCategory = ['choque', 'incendio', 'accidente', 'calle_cortada'].includes(
+    category,
+  );
+  if (selectedCategory === 'todos') {
+    return (
+      isEmergencyCategory || MODE_CATEGORIES[mapDisplayMode].includes(category as CategoryFilter)
+    );
+  }
+  return (selectedCategory === 'emergencia' && isEmergencyCategory) || category === selectedCategory;
+}
+
+const ALL_OSM_CATEGORIES: CategoryFilter[] = [
+  'parque', 'agua', 'humedal', 'universidad', 'hospital', 'clinica',
+  'bombero', 'carabinero', 'camara', 'escultura', 'torreon', 'estatua',
+  'arte', 'edificio', 'banca', 'basurero', 'bebedero', 'bano',
+];
 
 type MapPinchoState = {
   latitude: number;
@@ -87,6 +122,7 @@ export function useHomeScreenState(token: string | null) {
   // ── Nested Zones State ─────────────────────────────────────────────────
   const [activeNestedZone, setActiveNestedZone] = useState<any>(null);
   const [selectedSector, setSelectedSector] = useState<Zone | null>(null);
+  const [activeBuildingId, setActiveBuildingId] = useState<number | null>(null);
 
   // ── Magic Wand (Zone Creation) State ───────────────────────────────────
   const [isMagicWandActive, setIsMagicWandActive] = useState<boolean>(false);
@@ -906,15 +942,7 @@ export function useHomeScreenState(token: string | null) {
   const filteredEvents = useMemo(
     () =>
       events.filter((event) => {
-        const isEmergencyEvent = ['choque', 'incendio', 'accidente', 'calle_cortada'].includes(
-          event.category,
-        );
-        const matchesCategory =
-          selectedCategory === 'todos'
-            ? isEmergencyEvent ||
-              MODE_CATEGORIES[mapDisplayMode].includes(event.category as CategoryFilter)
-            : (selectedCategory === 'emergencia' && isEmergencyEvent) ||
-              event.category === selectedCategory;
+        const matchesCategory = isCategoryVisible(event.category, selectedCategory, mapDisplayMode);
         const query = searchQuery.toLowerCase();
         const matchesSearch =
           (event.title?.toLowerCase() || '').includes(query) ||
@@ -923,6 +951,12 @@ export function useHomeScreenState(token: string | null) {
         return matchesCategory && matchesSearch;
       }),
     [events, selectedCategory, searchQuery, mapDisplayMode],
+  );
+
+  const visibleOsmCategories = useMemo(
+    () =>
+      ALL_OSM_CATEGORIES.filter((cat) => isCategoryVisible(cat, selectedCategory, mapDisplayMode)),
+    [selectedCategory, mapDisplayMode],
   );
 
   const isTacticalModeActiveRef = useRef(isTacticalModeActive);
@@ -1307,6 +1341,8 @@ export function useHomeScreenState(token: string | null) {
     setActiveNestedZone,
     selectedSector,
     setSelectedSector,
+    activeBuildingId,
+    setActiveBuildingId,
     isMagicWandActive,
     setIsMagicWandActive,
     extractedGeometry,
@@ -1360,6 +1396,7 @@ export function useHomeScreenState(token: string | null) {
     panelWidth,
     openRightSheet,
     filteredEvents,
+    visibleOsmCategories,
     handleSelectEvent,
     closeEventPanel,
 
