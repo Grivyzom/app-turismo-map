@@ -81,6 +81,14 @@ export const getCategoryColor = (category: string, musicStyle?: string) => {
       return '#8B7355'; // Bronze statue
     case 'arte':
       return '#D97706'; // Amber art
+    case 'banca':
+      return '#94A3B8'; // Gris pizarra — mobiliario neutro
+    case 'basurero':
+      return '#78716C'; // Gris piedra
+    case 'bebedero':
+      return '#38BDF8'; // Celeste agua
+    case 'bano':
+      return '#64748B'; // Slate
     default:
       return '#3B82F6';
   }
@@ -168,6 +176,14 @@ export const getCategoryIcon = (category: string, musicStyle?: string): Category
       return 'public';
     case 'arte':
       return 'palette';
+    case 'banca':
+      return 'chair';
+    case 'basurero':
+      return 'delete';
+    case 'bebedero':
+      return 'water-drop';
+    case 'bano':
+      return 'wc';
     default:
       return 'place';
   }

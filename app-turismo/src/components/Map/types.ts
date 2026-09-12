@@ -82,7 +82,11 @@ export interface TurismoEvent {
     | 'invitation_club'
     | 'invitation_sports'
     | 'new_spot'
-    | 'mercado';
+    | 'mercado'
+    | 'banca'
+    | 'basurero'
+    | 'bebedero'
+    | 'bano';
   organizer: string;
   time: string;
   attendeesCount?: number;
