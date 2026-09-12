@@ -170,6 +170,20 @@ Cambios:
 - `DeckGL3DContainer.web.tsx` deja de importar `valdivia_buildings.json`; recibe los buildings desde `/api/v1/places/search` (filtrando `source_layer === 'buildings'`) y reconstruye `{height, levels, type}` desde `osm_tags`. Los buildings siguen siendo polígonos extruidos (deck.gl), no pines — no pasan por `osm-places-source`/`mobiliario-layer`.
 - `useHomeScreenState.ts` no cambia en su lógica de fetch — pero **si** al fix del bug de acumulación (pines que nunca se limpian al cambiar bounds, ver conversación previa) no se hace en este trabajo, hay que evitar que los resultados `osm_places` entren al mismo array acumulativo `events`; deben ir a un estado aparte alimentando `osm-places-source` directamente, para no heredar ese bug.
 
+### Conectar la layer nativa al sistema de filtros existente (bug encontrado)
+
+`mobiliario-layer` hoy se agrega sin ninguna conexión al sistema de filtros de la app: ni `mapDisplayMode` (Mapa/Turismo/Comercial) ni `selectedCategories` (panel "Herramientas") llegan como prop a `MapLibreContainer.web.tsx` — solo `activeNestedZone` llega (`app/(home)/index.tsx:992-1027`). Por eso hoy se ve siempre, sin importar el modo o lo que el usuario apague en Herramientas. Esto es un bug preexistente, no algo introducido por este spec, pero `osm-places-layer` (su reemplazo generalizado) tiene que nacer corrigiéndolo — si no, todo lo que agreguemos hereda el mismo problema.
+
+Regla pedida por el usuario: mobiliario urbano (`banca`, `basurero`, `bebedero`, `bano`, y cualquier categoría granular futura de infraestructura tipo "máquina de ejercicio") solo se ve en modo **Mapa**, nunca en Turismo ni Comercial.
+
+Cambios:
+
+- `MODE_CATEGORIES.mapa` (`useHomeScreenState.ts:44-53`) suma `'banca'`, `'basurero'`, `'bebedero'`, `'bano'`. No se agregan a `turismo` ni `comercial` — quedan invisibles ahí por diseño, igual que hoy no aparecen en `MODE_CATEGORIES` en absoluto (ausencia total = nunca coinciden con `matchesCategory` en modo "todos").
+- Nuevo valor derivado `visibleOsmCategories` en `useHomeScreenState.ts`, misma lógica que ya usa `matchesCategory` en `filteredEvents` (línea 1028-1034) pero aplicada al universo de categorías en vez de a un array de eventos — se puede factorizar esa condición a una función compartida `isCategoryVisible(category, selectedCategories, mapDisplayMode)` y usarla en ambos lugares para no duplicar la regla.
+- `mapDisplayMode` y `visibleOsmCategories` se agregan como props nuevas de `<MapContainer>` (`app/(home)/index.tsx:992`) → `MapLibreContainer.web.tsx`, mismo mecanismo que ya existe para `activeNestedZone`.
+- En `MapLibreContainer.web.tsx`, un `useEffect` sobre `visibleOsmCategories` llama `map.setFilter('osm-places-layer', ['in', ['get', 'category'], ['literal', visibleOsmCategories]])` — filtro client-side instantáneo (WebGL), sin re-fetch al servidor al cambiar el toggle de Herramientas o el tab Mapa/Turismo/Comercial.
+- Este filtro se combina (AND lógico, ambos aplican independientemente) con el de `parent_building_id` de la sección anterior: un pin se ve solo si (a) no está anidado en un building no-seleccionado, Y (b) su categoría está en `visibleOsmCategories`.
+
 ### Disclosure progresiva: click en edificio revela sus pines anidados
 
 Estado nuevo, mismo patrón que `activeNestedZone` ya usado para zonas de negocio: `activeBuildingId: number | null` en `useHomeScreenState.ts`. Cuando tiene valor, el fetch de `osm-places-source` agrega `&buildingId=<id>` — trayendo *solo* lo anidado en ese building (el resto del mapa sigue mostrando todo lo no-anidado normalmente, sin necesidad de ocultar nada más). Al deseleccionar (click afuera, o click en otro building) vuelve a `null` y el source recarga sin `buildingId`.
@@ -197,6 +211,7 @@ Si un building no tiene nada anidado (la gran mayoría de los 4146 son residenci
 - Backend: test que el `UPDATE` de `parent_building_id` asigna correctamente un punto dentro de un building con fixture controlado (polígono conocido + punto adentro/afuera), y que con dos buildings solapados gana el de menor área.
 - Backend: test de `PlacesSearchHandler` con `buildingId` presente vs ausente — confirma que sin el param los anidados no aparecen, y con el param aparecen solo los de ese building.
 - Frontend: click manual sobre un building con contenido conocido (ej. una universidad con bancas adentro) en ambos containers (`DeckGL3DContainer` y `MapLibreContainer.web.tsx`) y confirmar que `osm-places-source` se actualiza y vuelve a su estado normal al deseleccionar.
+- Frontend: en modo Turismo y Comercial, confirmar que banca/basurero/bebedero/bano NO aparecen aunque Herramientas tenga "Mostrar Todos"; en modo Mapa sí aparecen; al tocar "Ocultar Pines" en Herramientas desaparecen en cualquier modo.
 
 ## Riesgos / decisiones abiertas para el plan de implementación
 
