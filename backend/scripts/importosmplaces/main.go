@@ -91,11 +91,15 @@ func pointFromGeometry(geom geoGeometry) (lat, lng float64, geoJSON string, ok b
 	return lat, lng, geoJSON, true
 }
 
-func importSource(src sourceFile) (imported, skipped int) {
+// importSource devuelve (importados, omitidos, loadErr). loadErr != nil significa
+// que la CAPA ENTERA se omitió (archivo faltante o JSON inválido), caso muy distinto
+// de "se leyó bien pero ninguna feature calificó" — main() lo reporta aparte para que
+// una capa que no se cargó no se confunda con una capa legítimamente vacía.
+func importSource(src sourceFile) (imported, skipped int, loadErr error) {
 	fc, err := loadFeatureCollection(src.path)
 	if err != nil {
 		log.Printf("[osm-import] no se pudo leer %s: %v (se omite esta capa)", src.path, err)
-		return 0, 0
+		return 0, 0, err
 	}
 
 	for i, f := range fc.Features {
@@ -139,7 +143,43 @@ func importSource(src sourceFile) (imported, skipped int) {
 		}
 		imported++
 	}
-	return imported, skipped
+	return imported, skipped, nil
+}
+
+// recalculateContainment corrige parent_building_id de una sola pasada al final del
+// import: los puntos que se insertaron ANTES de que existiera el building que los
+// contiene no pudieron resolverse en el trigger BEFORE INSERT. Reemplaza al viejo
+// trigger AFTER por fila (fn_recalculate_osm_building_containment), que reescribía
+// miles de hijos por cada building tocado. Solo geometrías ST_Point pueden anidarse:
+// un parque/humedal (polígono) siempre queda con parent_building_id NULL.
+func recalculateContainment() {
+	_, err := database.DB.Exec(`
+		UPDATE osm_places child
+		SET parent_building_id = (
+			SELECT b.id
+			FROM osm_places b
+			WHERE b.category IN ('edificio', 'universidad')
+			  AND ST_GeometryType(b.geom::geometry) IN ('ST_Polygon', 'ST_MultiPolygon')
+			  AND ST_GeometryType(child.geom::geometry) = 'ST_Point'
+			  AND ST_Contains(b.geom::geometry, child.geom::geometry)
+			ORDER BY ST_Area(b.geom::geometry) ASC
+			LIMIT 1
+		)
+		WHERE child.category NOT IN ('edificio', 'universidad')
+	`)
+	if err != nil {
+		log.Printf("[osm-import] error recalculando parent_building_id: %v", err)
+		return
+	}
+
+	var nested int
+	if err := database.DB.QueryRow(
+		`SELECT COUNT(*) FROM osm_places WHERE parent_building_id IS NOT NULL`,
+	).Scan(&nested); err != nil {
+		log.Printf("[osm-import] recalculo de parent_building_id OK (no se pudo contar: %v)", err)
+		return
+	}
+	log.Printf("[osm-import] recalculo de contencion OK: %d filas con parent_building_id no nulo", nested)
 }
 
 func main() {
@@ -149,11 +189,21 @@ func main() {
 	database.InitDB()
 
 	totalImported, totalSkipped := 0, 0
+	var failedLayers []string
 	for _, src := range sources {
-		imported, skipped := importSource(src)
+		imported, skipped, loadErr := importSource(src)
+		if loadErr != nil {
+			failedLayers = append(failedLayers, src.sourceLayer)
+		}
 		log.Printf("[osm-import] %-14s -> %4d importados, %4d omitidos", src.sourceLayer, imported, skipped)
 		totalImported += imported
 		totalSkipped += skipped
 	}
+
+	recalculateContainment()
+
 	log.Printf("[osm-import] TOTAL: %d importados, %d omitidos", totalImported, totalSkipped)
+	if len(failedLayers) > 0 {
+		log.Printf("[osm-import] ATENCION: %d capas no se pudieron cargar: %v", len(failedLayers), failedLayers)
+	}
 }

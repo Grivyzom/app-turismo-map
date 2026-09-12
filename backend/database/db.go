@@ -585,7 +585,12 @@ func InitDB() {
 		`CREATE INDEX IF NOT EXISTS osm_places_category_idx ON osm_places (category);`,
 		`CREATE INDEX IF NOT EXISTS osm_places_parent_building_idx ON osm_places (parent_building_id);`,
 
-		// ── Asignación automática de parent_building_id (un punto queda "adentro" del building/universidad más pequeño que lo contiene) ──
+		// ── Asignación automática de parent_building_id (un PUNTO queda "adentro" del building/universidad más pequeño que lo contiene) ──
+		// Solo geometrías de tipo ST_Point pueden quedar anidadas: un parque o humedal
+		// (polígono) cuyo centroide cae dentro del campus de una universidad sigue siendo
+		// contenido de mapa de primer nivel y debe quedar con parent_building_id = NULL.
+		// El backfill posterior a un import masivo lo hace un UPDATE batch one-shot al
+		// final de scripts/importosmplaces/main.go (no un trigger AFTER por fila).
 		`CREATE OR REPLACE FUNCTION fn_assign_parent_building()
 		RETURNS TRIGGER AS $$
 		BEGIN
@@ -599,6 +604,7 @@ func InitDB() {
 			WHERE b.category IN ('edificio', 'universidad')
 			  AND b.id <> NEW.id
 			  AND ST_GeometryType(b.geom::geometry) IN ('ST_Polygon', 'ST_MultiPolygon')
+			  AND ST_GeometryType(NEW.geom::geometry) = 'ST_Point'
 			  AND ST_Contains(b.geom::geometry, NEW.geom::geometry)
 			ORDER BY ST_Area(b.geom::geometry) ASC
 			LIMIT 1;
@@ -613,31 +619,12 @@ func InitDB() {
 		FOR EACH ROW
 		EXECUTE FUNCTION fn_assign_parent_building();`,
 
-		// ── Recalcular contención cuando un building/universidad se agrega o cambia de forma DESPUÉS de sus puntos ──
-		`CREATE OR REPLACE FUNCTION fn_recalculate_osm_building_containment()
-		RETURNS TRIGGER AS $$
-		BEGIN
-			UPDATE public.osm_places child
-			SET parent_building_id = (
-				SELECT b.id
-				FROM public.osm_places b
-				WHERE b.category IN ('edificio', 'universidad')
-				  AND ST_GeometryType(b.geom::geometry) IN ('ST_Polygon', 'ST_MultiPolygon')
-				  AND ST_Contains(b.geom::geometry, child.geom::geometry)
-				ORDER BY ST_Area(b.geom::geometry) ASC
-				LIMIT 1
-			)
-			WHERE child.category NOT IN ('edificio', 'universidad');
-			RETURN NULL;
-		END;
-		$$ LANGUAGE plpgsql;`,
-
+		// El trigger AFTER trg_recalc_osm_building_containment / fn_recalculate_osm_building_containment
+		// se eliminó a propósito: reescribía miles de filas hijas por CADA building tocado
+		// (~2000 buildings × full scan por re-import ≈ 3.1M row-versions). El backfill
+		// equivalente es ahora un UPDATE batch one-shot al final del script de import.
 		`DROP TRIGGER IF EXISTS trg_recalc_osm_building_containment ON osm_places;`,
-		`CREATE TRIGGER trg_recalc_osm_building_containment
-		AFTER INSERT OR UPDATE OF geom, category ON osm_places
-		FOR EACH ROW
-		WHEN (NEW.category IN ('edificio', 'universidad'))
-		EXECUTE FUNCTION fn_recalculate_osm_building_containment();`,
+		`DROP FUNCTION IF EXISTS fn_recalculate_osm_building_containment();`,
 	}
 
 	for _, query := range queries {
