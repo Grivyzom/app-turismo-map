@@ -22,6 +22,10 @@
 
 ## Task 1: `osm_places` table, indexes, and building-containment trigger
 
+**Corrections made during the final whole-branch review (2026-09-12):**
+1. `fn_assign_parent_building` now also requires `AND ST_GeometryType(NEW.geom::geometry) = 'ST_Point'`. Without it, POLYGON features (parques, humedales) whose footprint sits inside a building/campus polygon were being nested and therefore hidden from the default fetch — verified live: "Jardín Botánico UACh" and "Jardín Kate Taylor" (both `category='parque'`) had `parent_building_id=7` (the UACh campus). Only point geometries can ever be nested; a polygon row always keeps `parent_building_id = NULL`.
+2. `fn_recalculate_osm_building_containment` + `trg_recalc_osm_building_containment` (the AFTER-per-row trigger below) were **removed**. Firing a full child-table rewrite once per touched building row meant a re-import (which upserts ~2000 building rows) wrote ~3.1M row-versions. `db.go` now only keeps the `DROP TRIGGER IF EXISTS` / `DROP FUNCTION IF EXISTS` statements so the trigger is torn down on existing databases, and the equivalent backfill runs once as a batch `UPDATE` at the end of Task 3's import script (matching the spec's original "one-off batch UPDATE" intent, and the `fn_recalculate_all_zones` precedent which fires on the far smaller `zones` table). The Step 3 snippet and Step 5 expected trigger list below are therefore historical — `SELECT tgname FROM pg_trigger WHERE tgrelid='osm_places'::regclass` should now return **only** `trg_assign_parent_building`.
+
 **Files:**
 - Modify: `backend/database/db.go:634-635` (insert new entries into the `queries` slice, right before its closing `}` at line 635, i.e. immediately after the `fn_recalculate_all_zones` block that currently ends the slice)
 
@@ -279,7 +283,7 @@ func TestExtractOsmID(t *testing.T) {
 	}{
 		{"prefers @id", "parques", 0, map[string]interface{}{"@id": "way/123"}, nil, "way-123"},
 		{"falls back to top-level id", "parques", 0, map[string]interface{}{}, "node/456", "node-456"},
-		{"falls back to properties.id prefixed by layer", "buildings", 0, map[string]interface{}{"id": float64(107909780)}, nil, "buildings-1.0779078e+08"},
+		{"falls back to properties.id prefixed by layer", "buildings", 0, map[string]interface{}{"id": float64(107909780)}, nil, "buildings-1.0790978e+08"},
 		{"falls back to index", "parques", 3, map[string]interface{}{}, nil, "parques-3"},
 	}
 	for _, tt := range tests {
@@ -477,10 +481,12 @@ EOF
 
 ---
 
-## Task 3: `import_osm_places.go` — one-off import script
+## Task 3: `importosmplaces/main.go` — one-off import script
+
+**Correction made during the final whole-branch review (2026-09-12):** the script originally landed at `backend/scripts/import_osm_places.go`, which broke `go build ./...` / `go vet ./...` / `go test ./...` for the WHOLE module (`main redeclared in this block` — the pre-existing `backend/scripts/seed_business_accounts.go` is also `package main` in that same directory). It now lives at **`backend/scripts/importosmplaces/main.go`**, its own package directory, mirroring how `backend/scripts/osmimport/` is already structured. The import path of the sibling `osmimport` package is unchanged (`backend/scripts/osmimport`, an absolute module path), and the relative GeoJSON source paths (`../app-turismo/...`) still resolve the same way because the script is still run with `backend/` as the working directory. Two behavior changes were also made in the same pass: a one-shot batch `UPDATE` of `parent_building_id` at the end of `main()` (replacing the removed AFTER trigger, see Task 1's correction note) and a `failedLayers` summary line so a wholly-unreadable source file can't be mistaken for an empty layer.
 
 **Files:**
-- Create: `backend/scripts/import_osm_places.go`
+- Create: `backend/scripts/importosmplaces/main.go`
 
 **Interfaces:**
 - Consumes: `osmimport.CategoryForLayer`, `osmimport.BuildOsmTags`, `osmimport.PolygonCentroid`, `osmimport.ExtractOsmID` (Task 2); `database.InitDB()` / `database.DB` (`backend/database/db.go`, already includes the `osm_places` schema from Task 1 by the time this runs).
@@ -490,7 +496,7 @@ This task has no automated test (it's I/O-heavy: reads 9 JSON files, writes to P
 
 - [ ] **Step 1: Write the script**
 
-Create `backend/scripts/import_osm_places.go`:
+Create `backend/scripts/importosmplaces/main.go`:
 
 ```go
 package main
@@ -656,12 +662,12 @@ func main() {
 
 - [ ] **Step 2: Verify it compiles**
 
-Run: `cd backend && go build -o /tmp/import_osm_places ./scripts/import_osm_places.go`
-Expected: no errors. If `go build` complains about `scripts` not being a valid package layout (single-file `package main` alongside a subpackage `osmimport` under the same `scripts/` directory), move `import_osm_places.go` up to `backend/scripts/import_osm_places.go` (already the path above) — this is fine because `osmimport` lives in its own subdirectory (`backend/scripts/osmimport/`), separate Go package, so there's no conflict with the sibling files already in `backend/scripts/` (`seed_business_accounts.go`, also `package main`). If `go build ./...` complains about two `package main` files colliding in the same directory when building the whole module, build this file explicitly by path as shown above instead of via `./...`.
+Run: `cd backend && go build ./...`
+Expected: no errors for the whole module. Because the script lives in its own directory (`scripts/importosmplaces/`), it does NOT collide with the other `package main` file in `scripts/` (`seed_business_accounts.go`) — never put a second `package main` file directly under `backend/scripts/`, that breaks `go build`/`go vet`/`go test` for the entire module.
 
 - [ ] **Step 3: Run against the dev database**
 
-Run: `cd backend && go run ./scripts/import_osm_places.go`
+Run: `cd backend && go run ./scripts/importosmplaces`
 Expected: one log line per source layer with an `importados` count > 0 for every layer except any missing/empty file, and a final `TOTAL` line. Expect roughly: buildings ~4146, universidades ~13, parques ~388, agua ~69, humedales ~673, hospitales ~19, seguridad ~87, estructuras ~7, mobiliario ~235 (170 bench + 61 waste_basket + 4 drinking_water skipped... note: mobiliario has 170 bench + 61 waste_basket + 4 drinking_water + 1 toilets = 236 rows in the source file per the earlier count — all 4 amenities map to a category, so `skipped` for mobiliario should be 0 unless the file has amenities beyond those 4).
 
 - [ ] **Step 4: Verify row counts and the building-containment trigger**
@@ -676,7 +682,7 @@ Expected: the first query shows all 21 categories from Task 2's mapping table wi
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/scripts/import_osm_places.go
+git add backend/scripts/importosmplaces/
 git commit -m "$(cat <<'EOF'
 feat: agregar script de import one-off para osm_places
 
@@ -693,12 +699,15 @@ EOF
 
 ## Task 4: `places_handler.go` — 4th UNION branch, `buildingId`, and `geometry`
 
+**Corrections made during the final whole-branch review (2026-09-12):** three changes on top of the steps below — (a) the trailing `LIMIT 500` is now `LIMIT 8000`: with the 4th branch live, 5567 `osm_places` rows qualify in a normal Valdivia viewport (measured 2026-09-12 after the corrected re-import) and the old cap silently dropped ~90% of them with no `ORDER BY`, so which rows survived was nondeterministic between calls. It is a safety ceiling only — real scoping comes from the bbox `WHERE` clause plus the viewport-aware fetching a later plan adds; (b) `buildingIdParam` is validated with `strconv.Atoi` right after it is read and answers `400 buildingId inválido` instead of letting a non-numeric value become a Postgres cast error surfaced as a 500; (c) a `SourceLayer *string` / `json:"sourceLayer,omitempty"` field was added to `Place`, selected as `op.source_layer` in the `osm_places` branch and `NULL::text as source_layer` in the other three, so Plans 2/3 can discriminate buildings rows without parsing the `organizer` display string.
+
 **Files:**
 - Modify: `backend/handlers/places_handler.go`
 - Test: `backend/handlers/places_handler_test.go` (new file)
 
 **Interfaces:**
 - Produces: `GET /api/v1/places/search` now also returns `osm_places` rows; accepts `?buildingId=<id>` to reveal only that building's nested rows (default: nested rows hidden); JSON now includes `"geometry"` (GeoJSON text of the row's `geom`, or omitted for point geometries — always present, Plan 2 decides whether to use it). Plan 2 (DeckGL3DContainer, MapLibreContainer) and Plan 3 (MapContainer.tsx) consume this response shape.
+- **Contract clarification (added after final review):** `?buildingId=<id>` is **additive**, not exclusive — it returns ONLY that building's nested children (rows with `parent_building_id = id`), never the building itself and never anything else on the map. Buildings are already visible via the default (no-`buildingId`) fetch, since a building/university row's own `parent_building_id` is always `NULL` (Task 1's trigger excludes them from being anyone's child). Plan 2/3 must issue the `buildingId` fetch ALONGSIDE the default fetch (merging both result sets), never as a replacement for it — this is already how Plan 2 Task 1's fetch effect is written (`urls` array with both the base URL and, conditionally, the `&buildingId=` URL), but call it out explicitly here since a final-review pass flagged the response shape as easy to misread as self-sufficient.
 
 - [ ] **Step 1: Write the failing regression test**
 
@@ -887,9 +896,9 @@ Replace the entire `sqlQuery := \`...\`` block (lines 93-168) with:
 	`
 ```
 
-- [ ] **Step 5: Add the `buildingId` filter after the existing `zoneId`/`NOT EXISTS zones` block**
+- [ ] **Step 5: Insert a new `buildingId` if/else block between the existing `zoneId` block and `LIMIT 500`**
 
-Right after the existing block (was lines 198-204, now shifted down by the new UNION branch — find it by content, not line number):
+Find this existing block (unchanged by this step — do NOT duplicate it, do NOT delete it, leave it exactly as-is):
 
 ```go
 	if zoneIdParam != "" {
@@ -899,7 +908,11 @@ Right after the existing block (was lines 198-204, now shifted down by the new U
 	} else {
 		sqlQuery += " AND NOT EXISTS (SELECT 1 FROM zones z WHERE z.id = ANY(u.containing_zone_ids) AND z.category IN ('edificio', 'reserva') AND z.is_active = true)"
 	}
+```
 
+It is immediately followed today by exactly one line: `sqlQuery += " LIMIT 500"`. Insert this NEW block between the two — after the `zoneId` block's closing `}`, before the `LIMIT 500` line (which stays, unchanged, and must still appear exactly once, now after this new block instead of right after the `zoneId` block):
+
+```go
 	if buildingIdParam != "" {
 		sqlQuery += fmt.Sprintf(" AND u.parent_building_id = $%d", paramCount)
 		args = append(args, buildingIdParam)
@@ -907,11 +920,9 @@ Right after the existing block (was lines 198-204, now shifted down by the new U
 	} else {
 		sqlQuery += " AND u.parent_building_id IS NULL"
 	}
-
-	sqlQuery += " LIMIT 500"
 ```
 
-(This replaces the old `sqlQuery += " LIMIT 500"` line that used to come immediately after the `zoneId`/`NOT EXISTS` block — don't leave two `LIMIT 500` lines.)
+After this step, reading the function top-to-bottom should show: `viewMode` filter, `queryParam` filter, bounds filter, `followedOnly` filter, the (untouched) `zoneId`/`NOT EXISTS` block, this new `buildingId` block, then `sqlQuery += " LIMIT 500"` exactly once.
 
 - [ ] **Step 6: Update the `Scan` call**
 
@@ -1082,28 +1093,23 @@ EOF
 
 ## Task 6: `useHomeScreenState.ts` — mode/filter plumbing + `activeBuildingId`
 
+**Corrections made during the final whole-branch review (2026-09-12):** two additions in the same file — (a) `fetchRealPlaces` now filters `rp.organizer !== 'OpenStreetMap'` out of the rows it merges into `events`. `events` feeds the heavy interactive pin pipeline (`renderPinMarker.ts` on web, `EventMarker`/`ArtisticMarker` on mobile) and the spec requires OSM rows to render only through the separate lightweight layer that Plans 2/3 add; without the filter, Task 8's removal of the static OSM arrays just re-routed the same data into that heavy pipeline, unbounded (the `setEvents` merge only ever appends, so it grew on every pan). The identical-looking merge in `fetchSmartRecommendations` needs no filter — `/api/v1/recommendations` never reads `osm_places`. (b) `'clinica'` was added to `MODE_CATEGORIES.mapa`: it is in `ALL_OSM_CATEGORIES` but was in no mode list, so `isCategoryVisible('clinica', 'todos', …)` was `false` in every mode and the 16 imported clinic rows were unreachable (there is no `clinica` chip in `ToolsFilterPanel`'s `CORE_CATEGORIES` either). `'edificio'` stays out of every mode list on purpose and now carries an inline comment saying so.
+
+**Correction made during execution (2026-09-12):** the plan originally targeted `app-turismo/src/hooks/useHomeScreenState.ts` with a multi-select `selectedCategories: CategoryFilter[]` API and a `CATEGORY_ALIASES` map. Both only exist in the repo owner's local **uncommitted** working copy (a rename + refactor in progress, itself dependent on further uncommitted changes in `types.ts`, `osrmService.ts`, `mapPreferences.ts`, and `AuthContext.tsx` that don't compile on their own yet). The actual git-committed file — which is what this worktree and this task must build against — is still at `app-turismo/app/(home)/useHomeScreenState.ts`, with a **scalar** `selectedCategory: CategoryFilter` (single-select), no `CATEGORY_ALIASES`. Ruling: build Task 6/7 against the committed scalar API; the repo owner's in-progress multi-select refactor is left untouched for them to finish and reconcile separately. Confirmed this doesn't break anything downstream: `ToolsFilterPanel.tsx` already supports EITHER a scalar (`selectedCategory`/`onSelectCategory`) or multi-select (`selectedCategories`/`onSelectCategories`) shape — the committed `index.tsx` already wires the scalar props, so nothing here changes the live UI's behavior.
+
 **Files:**
-- Modify: `app-turismo/src/hooks/useHomeScreenState.ts`
+- Modify: `app-turismo/app/(home)/useHomeScreenState.ts`
 
 **Interfaces:**
 - Consumes: `TurismoEvent['category']` (Task 5, already includes the 4 new categories).
-- Produces: `MODE_CATEGORIES.mapa` includes the 4 mobiliario categories; new exported-from-hook value `visibleOsmCategories: string[]`; new pure function `isCategoryVisible(category: string, selectedCategories: CategoryFilter[], mapDisplayMode: MapDisplayMode): boolean` (also used internally by `filteredEvents`, replacing its inlined `matchesCategory` boolean expression 1:1 — same behavior, factored out so `visibleOsmCategories` can reuse the identical rule); `activeBuildingId: number | null` state + `setActiveBuildingId`. Plans 2 and 3 both destructure `visibleOsmCategories`, `activeBuildingId`, `setActiveBuildingId` from this hook's return value and pass them down to their respective map containers.
+- Produces: `MODE_CATEGORIES.mapa` includes the 4 mobiliario categories; new exported-from-hook value `visibleOsmCategories: string[]`; new pure function `isCategoryVisible(category: string, selectedCategory: CategoryFilter, mapDisplayMode: MapDisplayMode): boolean` (also used internally by `filteredEvents`, replacing its inlined `matchesCategory` boolean expression 1:1 — same behavior, factored out so `visibleOsmCategories` can reuse the identical rule); `activeBuildingId: number | null` state + `setActiveBuildingId`. Plans 2 and 3 both destructure `visibleOsmCategories`, `activeBuildingId`, `setActiveBuildingId` from this hook's return value and pass them down to their respective map containers.
 
 - [ ] **Step 1: Add the mobiliario categories to `MODE_CATEGORIES.mapa`**
 
-In `app-turismo/src/hooks/useHomeScreenState.ts`, change (lines 44-53):
+In `app-turismo/app/(home)/useHomeScreenState.ts`, change (line 36):
 
 ```ts
-  mapa: [
-    'hospital',
-    'universidad',
-    'bombero',
-    'carabinero',
-    'camara',
-    'emergencia',
-    'publico',
-    'municipalidad',
-  ],
+  mapa: ['hospital', 'universidad', 'bombero', 'carabinero', 'camara', 'emergencia', 'publico', 'municipalidad'],
 ```
 
 to:
@@ -1129,40 +1135,43 @@ to:
 
 - [ ] **Step 2: Extract `isCategoryVisible` and reuse it in `filteredEvents`**
 
-Add this function right after the `CATEGORY_ALIASES` constant (currently ends at line 95, right before `type MapPinchoState = {`):
+Add this function right after the `MODE_CATEGORIES` constant (right before `type MapPinchoState = {`):
 
 ```ts
 function isCategoryVisible(
   category: string,
-  selectedCategories: CategoryFilter[],
+  selectedCategory: CategoryFilter,
   mapDisplayMode: MapDisplayMode,
 ): boolean {
   const isEmergencyCategory = ['choque', 'incendio', 'accidente', 'calle_cortada'].includes(
     category,
   );
-  if (selectedCategories.includes('ninguno')) {
-    return false;
-  }
-  if (selectedCategories.includes('todos') || selectedCategories.length === 0) {
+  if (selectedCategory === 'todos') {
     return (
       isEmergencyCategory || MODE_CATEGORIES[mapDisplayMode].includes(category as CategoryFilter)
     );
   }
-  return (
-    (selectedCategories.includes('emergencia') && isEmergencyCategory) ||
-    selectedCategories.includes(category as CategoryFilter) ||
-    selectedCategories.some((cat) => CATEGORY_ALIASES[cat]?.includes(category))
-  );
+  return (selectedCategory === 'emergencia' && isEmergencyCategory) || category === selectedCategory;
 }
 ```
 
-Then replace the `filteredEvents` body (lines 1019-1043) to use it instead of the inlined logic:
+This is a pure extraction — the body is byte-for-byte the same boolean logic that's currently inlined in `filteredEvents` (see Step 3), just parameterized so it can also be called once per category for `visibleOsmCategories` instead of once per event.
+
+Then replace the `filteredEvents` body — find the existing block:
 
 ```ts
   const filteredEvents = useMemo(
     () =>
       events.filter((event) => {
-        const matchesCategory = isCategoryVisible(event.category, selectedCategories, mapDisplayMode);
+        const isEmergencyEvent = ['choque', 'incendio', 'accidente', 'calle_cortada'].includes(
+          event.category,
+        );
+        const matchesCategory =
+          selectedCategory === 'todos'
+            ? isEmergencyEvent ||
+              MODE_CATEGORIES[mapDisplayMode].includes(event.category as CategoryFilter)
+            : (selectedCategory === 'emergencia' && isEmergencyEvent) ||
+              event.category === selectedCategory;
         const query = searchQuery.toLowerCase();
         const matchesSearch =
           (event.title?.toLowerCase() || '').includes(query) ||
@@ -1170,7 +1179,25 @@ Then replace the `filteredEvents` body (lines 1019-1043) to use it instead of th
           (event.organizer?.toLowerCase() || '').includes(query);
         return matchesCategory && matchesSearch;
       }),
-    [events, selectedCategories, searchQuery, mapDisplayMode],
+    [events, selectedCategory, searchQuery, mapDisplayMode],
+  );
+```
+
+and replace it with:
+
+```ts
+  const filteredEvents = useMemo(
+    () =>
+      events.filter((event) => {
+        const matchesCategory = isCategoryVisible(event.category, selectedCategory, mapDisplayMode);
+        const query = searchQuery.toLowerCase();
+        const matchesSearch =
+          (event.title?.toLowerCase() || '').includes(query) ||
+          (event.description?.toLowerCase() || '').includes(query) ||
+          (event.organizer?.toLowerCase() || '').includes(query);
+        return matchesCategory && matchesSearch;
+      }),
+    [events, selectedCategory, searchQuery, mapDisplayMode],
   );
 ```
 
@@ -1191,14 +1218,14 @@ Then, inside `useHomeScreenState` (near where `filteredEvents` is defined, right
 ```ts
   const visibleOsmCategories = useMemo(
     () =>
-      ALL_OSM_CATEGORIES.filter((cat) => isCategoryVisible(cat, selectedCategories, mapDisplayMode)),
-    [selectedCategories, mapDisplayMode],
+      ALL_OSM_CATEGORIES.filter((cat) => isCategoryVisible(cat, selectedCategory, mapDisplayMode)),
+    [selectedCategory, mapDisplayMode],
   );
 ```
 
 - [ ] **Step 4: Add `activeBuildingId` state**
 
-Near the other map-interaction state (right after the `mapBounds` state declared around line 432-437), add:
+Near the other map-interaction state (near `activeNestedZone`, declared around line 88), add:
 
 ```ts
   const [activeBuildingId, setActiveBuildingId] = useState<number | null>(null);
@@ -1206,7 +1233,7 @@ Near the other map-interaction state (right after the `mapBounds` state declared
 
 - [ ] **Step 5: Export the 3 new values from the hook's return statement**
 
-Find the hook's `return { ... }` statement (it already returns `filteredEvents` at line 1570 and `mapDisplayMode`/`setMapDisplayMode` around lines 1579-1580) and add, near those:
+Find the hook's `return { ... }` statement (it already returns `filteredEvents`, `mapDisplayMode`, `setMapDisplayMode`, `activeNestedZone`) and add, near those:
 
 ```ts
     visibleOsmCategories,
@@ -1232,7 +1259,7 @@ Run the dev server, open the app, and in the browser console confirm: with the d
 - [ ] **Step 8: Commit**
 
 ```bash
-git add app-turismo/src/hooks/useHomeScreenState.ts
+git add "app-turismo/app/(home)/useHomeScreenState.ts"
 git commit -m "$(cat <<'EOF'
 feat: agregar visibleOsmCategories y activeBuildingId al hook de estado
 
@@ -1250,9 +1277,11 @@ EOF
 
 ## Task 7: Thread the new state through `MapContainerProps` and `index.tsx`
 
+**Correction made during execution (2026-09-12):** same root cause as Task 6 — `useHomeScreenState.ts` is still at `app-turismo/app/(home)/useHomeScreenState.ts` in git history, and `index.tsx`'s committed `<MapContainer>` call is shorter than originally assumed (ends at `navRouteGeojson`, no `userLocation`/`isAuthenticated`/`cameraAnimationsEnabled` props yet — those are also part of the repo owner's uncommitted WIP). Exact line numbers below were re-verified against the committed file.
+
 **Files:**
-- Modify: `app-turismo/src/components/Map/types.ts:203-262` (`MapContainerProps` interface)
-- Modify: `app-turismo/app/(home)/index.tsx:992-1027` (the `<MapContainer>` invocation)
+- Modify: `app-turismo/src/components/Map/types.ts` (`MapContainerProps` interface, currently ends around line 262 with `cameraAnimationsEnabled?: boolean;` right before its closing `}`)
+- Modify: `app-turismo/app/(home)/index.tsx` (the `<MapContainer>` invocation, currently lines 957-991, and the `useHomeScreenState(token)` destructuring, which closes at line 398 with `} = useHomeScreenState(token);`)
 
 **Interfaces:**
 - Consumes: `visibleOsmCategories`, `activeBuildingId`, `setActiveBuildingId` (Task 6).
@@ -1260,7 +1289,7 @@ EOF
 
 - [ ] **Step 1: Extend `MapContainerProps`**
 
-In `app-turismo/src/components/Map/types.ts`, add to the `MapContainerProps` interface (right before its closing `}` at line 262, after the `cameraAnimationsEnabled?: boolean;` line):
+In `app-turismo/src/components/Map/types.ts`, add to the `MapContainerProps` interface (right before its closing `}`, after the `cameraAnimationsEnabled?: boolean;` line):
 
 ```ts
   // Filtrado de pines OSM (Herramientas + modo Mapa/Turismo/Comercial)
@@ -1274,12 +1303,29 @@ In `app-turismo/src/components/Map/types.ts`, add to the `MapContainerProps` int
 
 (Using the inline `import('../MapUI/types').MapDisplayMode` type avoids adding a new top-level import to `types.ts` for a single field — check first whether `types.ts` already imports anything from `../MapUI/types`; if it does, use that existing import instead of the inline form for consistency.)
 
-- [ ] **Step 2: Pass the new props from `index.tsx`**
+- [ ] **Step 2: Add the 3 new names to the `useHomeScreenState(token)` destructuring**
 
-In `app-turismo/app/(home)/index.tsx`, the `<MapContainer>` call (starts at line 992) already destructures `visibleOsmCategories`, `activeBuildingId`, `setActiveBuildingId` from `useHomeScreenState` (verify this — they come from the same destructuring assignment that already pulls out `filteredEvents`, `mapDisplayMode`, `selectedCategories`, etc., visible around lines 251-390). Add 3 new prop lines to the `<MapContainer>` JSX, right after the existing `cameraAnimationsEnabled={cameraAnimationsEnabled}` line:
+In `app-turismo/app/(home)/index.tsx`, find the destructuring assignment that ends with `} = useHomeScreenState(token);` (line 398) and add `visibleOsmCategories, activeBuildingId, setActiveBuildingId,` to that list (anywhere among the other destructured names — e.g. right next to the existing `mapDisplayMode,` line).
+
+- [ ] **Step 3: Pass the new props from the `<MapContainer>` JSX**
+
+In the same file, the `<MapContainer>` call currently ends with:
 
 ```tsx
-          cameraAnimationsEnabled={cameraAnimationsEnabled}
+          savedRoutes={showSavedRoutes ? savedRoutes : []}
+          onRateRoute={rateRoute}
+          activeNestedZone={activeNestedZone}
+          navRouteGeojson={navRoute?.geojson ?? null}
+        />
+```
+
+Add the 3 new props right after `navRouteGeojson`, before the closing `/>`:
+
+```tsx
+          savedRoutes={showSavedRoutes ? savedRoutes : []}
+          onRateRoute={rateRoute}
+          activeNestedZone={activeNestedZone}
+          navRouteGeojson={navRoute?.geojson ?? null}
           visibleOsmCategories={visibleOsmCategories}
           mapDisplayMode={mapDisplayMode}
           activeBuildingId={activeBuildingId}
@@ -1287,16 +1333,16 @@ In `app-turismo/app/(home)/index.tsx`, the `<MapContainer>` call (starts at line
         />
 ```
 
-- [ ] **Step 3: Type-check**
+- [ ] **Step 4: Type-check**
 
 Run: `cd app-turismo && npx tsc --noEmit`
-Expected: no new errors. If `visibleOsmCategories`/`activeBuildingId`/`setActiveBuildingId` aren't already in scope inside `index.tsx` (i.e. `useHomeScreenState()`'s destructuring doesn't list them yet, since Task 6 added them to the hook's return value but `index.tsx`'s own destructuring is a separate line), add them there too — find the line that currently destructures `filteredEvents`, `mapDisplayMode`, `selectedCategories`, etc. from `useHomeScreenState(token)` and add `visibleOsmCategories, activeBuildingId, setActiveBuildingId,` to that same destructuring list.
+Expected: no new errors compared to the baseline established in Task 5/6.
 
-- [ ] **Step 4: Manual verification**
+- [ ] **Step 5: Manual verification**
 
 Run the dev server, open React DevTools (or the browser's component inspector), select the `MapContainer` instance, and confirm its props panel shows `visibleOsmCategories` (an array), `mapDisplayMode` (`"mapa"` by default), `activeBuildingId` (`null`), and `onBuildingSelect` (a function) — even though nothing consumes them yet.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add app-turismo/src/components/Map/types.ts "app-turismo/app/(home)/index.tsx"
