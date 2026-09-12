@@ -393,6 +393,9 @@ export default function HomeScreen() {
     viewMode,
     handleToggleViewMode,
     mapDisplayMode,
+    visibleOsmCategories,
+    activeBuildingId,
+    setActiveBuildingId,
     setMapDisplayMode,
     activeToast,
   } = useHomeScreenState(token);
@@ -988,6 +991,10 @@ export default function HomeScreen() {
           onRateRoute={rateRoute}
           activeNestedZone={activeNestedZone}
           navRouteGeojson={navRoute?.geojson ?? null}
+          visibleOsmCategories={visibleOsmCategories}
+          mapDisplayMode={mapDisplayMode}
+          activeBuildingId={activeBuildingId}
+          onBuildingSelect={setActiveBuildingId}
         />
       </View>
 
