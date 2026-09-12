@@ -25,6 +25,8 @@ type Place struct {
 	HasActiveUpdate     bool    `json:"hasActiveUpdate,omitempty"`
 	RecommendationType  string  `json:"recommendationType,omitempty"`
 	IsSmartNotification bool    `json:"isSmartNotification,omitempty"`
+	Geometry            *string `json:"geometry,omitempty"`
+	OsmTags             *string `json:"osmTags,omitempty"`
 }
 
 type PlacesResponse struct {
@@ -35,6 +37,7 @@ func PlacesSearchHandler(w http.ResponseWriter, r *http.Request) {
 	queryParam := r.URL.Query().Get("q")
 	followedParam := r.URL.Query().Get("followed")
 	zoneIdParam := r.URL.Query().Get("zoneId")
+	buildingIdParam := r.URL.Query().Get("buildingId")
 
 	minLat := r.URL.Query().Get("minLat")
 	maxLat := r.URL.Query().Get("maxLat")
@@ -93,7 +96,9 @@ func PlacesSearchHandler(w http.ResponseWriter, r *http.Request) {
 	sqlQuery := `
 		SELECT id, title, description, lat, lng, category, organizer, address, time, image_url,
 		       COALESCE((SELECT name FROM zones z WHERE z.id = ANY(u.containing_zone_ids) LIMIT 1), '') as sector_name,
-		       has_active_update
+		       has_active_update,
+		       ST_AsGeoJSON(u.geom) as geometry,
+		       u.osm_tags::text as osm_tags
 		FROM (
 			SELECT
 				'branch-' || b.id::text as id,
@@ -110,7 +115,9 @@ func PlacesSearchHandler(w http.ResponseWriter, r *http.Request) {
 				b.company_id,
 				b.containing_zone_ids,
 				COALESCE(b.target_audience, 'all') as target_audience,
-				EXISTS (SELECT 1 FROM branch_updates bu WHERE bu.branch_id = b.id AND bu.is_active = true AND (bu.expires_at IS NULL OR bu.expires_at > CURRENT_TIMESTAMP)) as has_active_update
+				EXISTS (SELECT 1 FROM branch_updates bu WHERE bu.branch_id = b.id AND bu.is_active = true AND (bu.expires_at IS NULL OR bu.expires_at > CURRENT_TIMESTAMP)) as has_active_update,
+				NULL::int as parent_building_id,
+				NULL::jsonb as osm_tags
 			FROM company_branches b
 			LEFT JOIN companies c ON b.company_id = c.id
 
@@ -131,7 +138,9 @@ func PlacesSearchHandler(w http.ResponseWriter, r *http.Request) {
 				b.company_id,
 				e.containing_zone_ids,
 				COALESCE(e.target_audience, 'all') as target_audience,
-				false as has_active_update
+				false as has_active_update,
+				NULL::int as parent_building_id,
+				NULL::jsonb as osm_tags
 			FROM events e
 			LEFT JOIN company_branches b ON e.branch_emitter_id = b.id
 			LEFT JOIN companies c ON b.company_id = c.id
@@ -161,8 +170,32 @@ func PlacesSearchHandler(w http.ResponseWriter, r *http.Request) {
 				NULL::int as company_id,
 				COALESCE(ep.containing_zone_ids, '{}'::int[]) as containing_zone_ids,
 				ep.target_audience,
-				false as has_active_update
+				false as has_active_update,
+				NULL::int as parent_building_id,
+				NULL::jsonb as osm_tags
 			FROM external_places ep
+
+			UNION ALL
+
+			SELECT
+				'osm-' || op.id::text as id,
+				op.name as title,
+				'' as description,
+				op.lat,
+				op.lng,
+				op.category,
+				'OpenStreetMap' as organizer,
+				COALESCE(op.address, '') as address,
+				'24/7' as time,
+				op.geom,
+				'' as image_url,
+				NULL::int as company_id,
+				'{}'::int[] as containing_zone_ids,
+				op.target_audience,
+				false as has_active_update,
+				op.parent_building_id,
+				op.osm_tags
+			FROM osm_places op
 		) u
 		WHERE 1=1
 	`
@@ -203,6 +236,14 @@ func PlacesSearchHandler(w http.ResponseWriter, r *http.Request) {
 		sqlQuery += " AND NOT EXISTS (SELECT 1 FROM zones z WHERE z.id = ANY(u.containing_zone_ids) AND z.category IN ('edificio', 'reserva') AND z.is_active = true)"
 	}
 
+	if buildingIdParam != "" {
+		sqlQuery += fmt.Sprintf(" AND u.parent_building_id = $%d", paramCount)
+		args = append(args, buildingIdParam)
+		paramCount++
+	} else {
+		sqlQuery += " AND u.parent_building_id IS NULL"
+	}
+
 	sqlQuery += " LIMIT 500"
 
 	rows, err = database.DB.Query(sqlQuery, args...)
@@ -217,9 +258,17 @@ func PlacesSearchHandler(w http.ResponseWriter, r *http.Request) {
 	places := []Place{}
 	for rows.Next() {
 		var p Place
-		if err := rows.Scan(&p.ID, &p.Title, &p.Description, &p.Latitude, &p.Longitude, &p.Category, &p.Organizer, &p.Address, &p.Time, &p.ImageUrl, &p.SectorName, &p.HasActiveUpdate); err != nil {
+		var geometryRaw sql.NullString
+		var osmTagsRaw sql.NullString
+		if err := rows.Scan(&p.ID, &p.Title, &p.Description, &p.Latitude, &p.Longitude, &p.Category, &p.Organizer, &p.Address, &p.Time, &p.ImageUrl, &p.SectorName, &p.HasActiveUpdate, &geometryRaw, &osmTagsRaw); err != nil {
 			log.Printf("Error escaneando fila: %v\n", err)
 			continue
+		}
+		if geometryRaw.Valid {
+			p.Geometry = &geometryRaw.String
+		}
+		if osmTagsRaw.Valid {
+			p.OsmTags = &osmTagsRaw.String
 		}
 		places = append(places, p)
 	}
