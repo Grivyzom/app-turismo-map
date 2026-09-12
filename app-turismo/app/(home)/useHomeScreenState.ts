@@ -35,6 +35,7 @@ import { INITIAL_EVENTS, WS_SIMULATION_POOL, CategoryFilter } from '../../src/da
 const MODE_CATEGORIES: Record<MapDisplayMode, CategoryFilter[]> = {
   mapa: [
     'hospital',
+    'clinica',
     'universidad',
     'bombero',
     'carabinero',
@@ -89,7 +90,12 @@ function isCategoryVisible(
 const ALL_OSM_CATEGORIES: CategoryFilter[] = [
   'parque', 'agua', 'humedal', 'universidad', 'hospital', 'clinica',
   'bombero', 'carabinero', 'camara', 'escultura', 'torreon', 'estatua',
-  'arte', 'edificio', 'banca', 'basurero', 'bebedero', 'bano',
+  'arte',
+  // 'edificio' queda a proposito FUERA de todos los MODE_CATEGORIES: los buildings
+  // se pintan como capa de poligonos/extrusion 3D en un plan posterior, no como pin
+  // puntual, asi que nunca deben aparecer en visibleOsmCategories. No es un bug.
+  'edificio',
+  'banca', 'basurero', 'bebedero', 'bano',
 ];
 
 type MapPinchoState = {
@@ -443,7 +449,13 @@ export function useHomeScreenState(token: string | null) {
         if (data.results) {
           setEvents((prev) => {
             const existingIds = new Set(prev.map((p) => p.id));
-            const newPlaces = data.results.filter((rp: any) => !existingIds.has(rp.id));
+            // Las filas OSM (organizer === 'OpenStreetMap') NUNCA entran a `events`:
+            // ese array alimenta el pipeline pesado de pines interactivos
+            // (renderPinMarker en web, EventMarker/ArtisticMarker en mobile).
+            // Los pines OSM se pintan en una capa liviana aparte (Plan 2/3).
+            const newPlaces = data.results.filter(
+              (rp: any) => !existingIds.has(rp.id) && rp.organizer !== 'OpenStreetMap',
+            );
             return [...prev, ...newPlaces];
           });
         }
