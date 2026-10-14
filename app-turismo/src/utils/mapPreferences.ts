@@ -77,3 +77,34 @@ export const savePersistedCameraAnimations = async (enabled: boolean): Promise<v
     // Silently ignore storage errors
   }
 };
+
+// ─── Cámaras de seguridad (capa opcional, apagada por defecto) ───────────────
+// Son infraestructura de nicho: la mayoría de los usuarios no las necesita y en
+// el centro saturan el mapa, así que se activan explícitamente desde Herramientas.
+const SECURITY_CAMERAS_STORAGE_KEY = 'app-turismo.security-cameras';
+export const DEFAULT_SHOW_SECURITY_CAMERAS = false;
+
+export const loadPersistedShowSecurityCameras = async (): Promise<boolean> => {
+  try {
+    const storedValue =
+      Platform.OS === 'web' && typeof window !== 'undefined'
+        ? window.localStorage.getItem(SECURITY_CAMERAS_STORAGE_KEY)
+        : await AsyncStorage.getItem(SECURITY_CAMERAS_STORAGE_KEY);
+    return storedValue !== null ? storedValue === 'true' : DEFAULT_SHOW_SECURITY_CAMERAS;
+  } catch {
+    return DEFAULT_SHOW_SECURITY_CAMERAS;
+  }
+};
+
+export const savePersistedShowSecurityCameras = async (enabled: boolean): Promise<void> => {
+  try {
+    const value = enabled ? 'true' : 'false';
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.localStorage.setItem(SECURITY_CAMERAS_STORAGE_KEY, value);
+      return;
+    }
+    await AsyncStorage.setItem(SECURITY_CAMERAS_STORAGE_KEY, value);
+  } catch {
+    // Silently ignore storage errors
+  }
+};

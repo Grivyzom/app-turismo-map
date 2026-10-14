@@ -14,7 +14,11 @@ import {
 import { getSatelliteStyle, CARTO_API_KEY } from '../../config/mapStyles.web';
 import { SatelliteTileCache } from '../../utils/satelliteTileCache';
 import { TrafficTileCache, TRAFFIC_PROTOCOL } from '../../utils/trafficTileCache';
-import { useSuperclusterEvents } from '../../utils/clusterUtils';
+import {
+  useSuperclusterEvents,
+  CAMERA_PIN_MIN_ZOOM,
+  CAMERA_GROUP_MAX_ZOOM,
+} from '../../utils/clusterUtils';
 import { MICRODOT_PAINT, microdotFeatures } from '../../utils/semanticZoom';
 import { pickTopPriority, pinHitBox, WALK_LINE_DASHARRAY } from '../../utils/contextualRanking';
 import { radialMenuRegistry } from '../../utils/radialMenuRegistry';
@@ -187,7 +191,6 @@ export function MapLibreContainer({
         pin: HTMLDivElement | null;
         body: HTMLDivElement | null;
         stem: HTMLDivElement | null;
-        stemCamara: HTMLDivElement | null;
         lensContainer: HTMLDivElement | null;
         icon: HTMLDivElement | null;
         flatContainer: HTMLDivElement | null;
@@ -227,6 +230,7 @@ export function MapLibreContainer({
   const onMapMoveRef = useRef(onMapMove);
   const isDraggingRef = useRef(false);
   const updateAestheticsRef = useRef<() => void>(() => {});
+  const cameraHeatmapKeyRef = useRef<string | null>(null);
   const tileCacheRef = useRef<SatelliteTileCache | null>(null);
   const trafficCacheRef = useRef<TrafficTileCache | null>(null);
   const syncUserLocationRef = useRef<() => void>(() => {});
@@ -1604,6 +1608,15 @@ export function MapLibreContainer({
 
     const cameraEvents = events.filter((e) => e.category && e.category.toLowerCase() === 'camara');
 
+    // sync() corre en cada tick de zoom; re-subir el GeoJSON sólo si cambió el
+    // set de cámaras (p. ej. al activar/desactivar la capa) o si un cambio de
+    // estilo se llevó la fuente.
+    const heatmapKey = cameraEvents.map((e) => e.id).join(',');
+    if (map.getSource('camera-heatmap-source') && cameraHeatmapKeyRef.current === heatmapKey) {
+      return;
+    }
+    cameraHeatmapKeyRef.current = heatmapKey;
+
     const featureCollection = {
       type: 'FeatureCollection',
       features: cameraEvents.map((e) => ({
@@ -1639,10 +1652,21 @@ export function MapLibreContainer({
           id: 'camera-heatmap-layer',
           type: 'heatmap',
           source: 'camera-heatmap-source',
-          maxzoom: 18,
+          // Vista de conjunto ("zonas vigiladas") hasta que aparecen los pines;
+          // a escala ciudad no aporta y sólo ensucia el mapa.
+          minzoom: 12,
+          maxzoom: CAMERA_PIN_MIN_ZOOM + 0.5,
           paint: {
             'heatmap-weight': 1,
-            'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 11, 1, 18, 3],
+            'heatmap-intensity': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              12,
+              1,
+              CAMERA_PIN_MIN_ZOOM,
+              2.5,
+            ],
             'heatmap-color': [
               'interpolate',
               ['linear'],
@@ -1660,8 +1684,30 @@ export function MapLibreContainer({
               1,
               'rgba(124, 58, 237, 0.85)', // Purple/Blue neon for surveillance
             ],
-            'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 11, 20, 18, 60],
-            'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 11, 0.7, 16, 0.7, 18, 0],
+            'heatmap-radius': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              12,
+              18,
+              CAMERA_PIN_MIN_ZOOM,
+              50,
+            ],
+            // Se desvanece justo cuando entran los pines: antes seguía visible
+            // hasta z18 y se dibujaba por debajo de los pines ya renderizados.
+            'heatmap-opacity': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              12,
+              0,
+              13,
+              0.6,
+              CAMERA_PIN_MIN_ZOOM - 0.7,
+              0.6,
+              CAMERA_PIN_MIN_ZOOM,
+              0,
+            ],
           },
         },
         beforeId,
@@ -2016,6 +2062,18 @@ export function MapLibreContainer({
 
         pinEl.addEventListener('click', (e) => {
           e.stopPropagation();
+
+          // Grupo de cámaras: no es un destino, sólo un atajo para separarlas.
+          if (event.cameraGroup) {
+            pinEl.dataset.hovered = 'false';
+            map.fitBounds(event.cameraGroup.bounds, {
+              padding: 80,
+              maxZoom: CAMERA_GROUP_MAX_ZOOM,
+              duration: cameraAnimationsEnabledRef.current === false ? 0 : 650,
+            });
+            return;
+          }
+
           if (isRoutingActiveRef.current && onMapClickForRoutingRef.current) {
             onMapClickForRoutingRef.current({
               latitude: event.latitude,

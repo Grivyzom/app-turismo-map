@@ -207,6 +207,90 @@ function thinUtilityEvents(
   return result;
 }
 
+/** Zoom desde el que las cámaras de seguridad se dibujan como pin individual o grupo. */
+export const CAMERA_PIN_MIN_ZOOM = 16.5;
+/** Zoom desde el que las cámaras dejan de agruparse (y al que acerca tocar un grupo). */
+export const CAMERA_GROUP_MAX_ZOOM = 19;
+
+/**
+ * Agrupa cámaras de seguridad que caerían casi encima unas de otras en pantalla.
+ *
+ * En el centro hay calles con varias cámaras cada pocos metros (postes
+ * inteligentes, domos en esquinas); dibujarlas todas produce una mancha de
+ * lentes solapadas. Clustering greedy en píxeles: cada grupo se ancla a su
+ * primera cámara (orden por id ⇒ estable entre renders) y se posiciona en el
+ * centroide. La cámara seleccionada nunca se agrupa para no perder su modal.
+ */
+function groupCameraEvents(
+  cameras: TurismoEvent[],
+  zoom: number,
+  selectedId?: string | null,
+): TurismoEvent[] {
+  // A zoom máximo se muestran sueltas: si no, dos cámaras en el mismo poste
+  // quedarían agrupadas para siempre y el "toca para acercar" no haría nada.
+  if (cameras.length <= 1 || zoom >= CAMERA_GROUP_MAX_ZOOM) return cameras;
+
+  const GROUP_RADIUS_PX = 34;
+  const result: TurismoEvent[] = [];
+  const groups: { seed: TurismoEvent; members: TurismoEvent[] }[] = [];
+
+  const sorted = [...cameras].sort((a, b) => a.id.localeCompare(b.id));
+  for (const cam of sorted) {
+    if (cam.id === selectedId) {
+      result.push(cam);
+      continue;
+    }
+    const group = groups.find(
+      (g) =>
+        getPixelDistance(cam.latitude, cam.longitude, g.seed.latitude, g.seed.longitude, zoom) <
+        GROUP_RADIUS_PX,
+    );
+    if (group) group.members.push(cam);
+    else groups.push({ seed: cam, members: [cam] });
+  }
+
+  for (const { seed, members } of groups) {
+    if (members.length === 1) {
+      result.push(seed);
+      continue;
+    }
+    let sumLat = 0;
+    let sumLng = 0;
+    let minLat = Infinity;
+    let minLng = Infinity;
+    let maxLat = -Infinity;
+    let maxLng = -Infinity;
+    for (const m of members) {
+      sumLat += m.latitude;
+      sumLng += m.longitude;
+      minLat = Math.min(minLat, m.latitude);
+      minLng = Math.min(minLng, m.longitude);
+      maxLat = Math.max(maxLat, m.latitude);
+      maxLng = Math.max(maxLng, m.longitude);
+    }
+    result.push({
+      ...seed,
+      // El conteo va en el id: si cambia la composición se crea un marker nuevo
+      // y su handler de click no queda con bounds viejos.
+      id: `camara-grupo-${seed.id}-${members.length}`,
+      title: `${members.length} cámaras de seguridad`,
+      description: 'Toca para acercar y verlas por separado',
+      latitude: sumLat / members.length,
+      longitude: sumLng / members.length,
+      vineta: undefined,
+      cameraGroup: {
+        count: members.length,
+        bounds: [
+          [minLng, minLat],
+          [maxLng, maxLat],
+        ],
+      },
+    });
+  }
+
+  return result;
+}
+
 /**
  * Hook para optimizar el agrupamiento de eventos usando Supercluster (QuadTree).
  * Implementa un sistema de Nivel de Detalle (LOD) basado en el zoom.
@@ -249,7 +333,9 @@ export function useSuperclusterEvents(
       }
 
       if (cat === 'camara') {
-        return zoom >= 17;
+        // La seleccionada se conserva aunque se aleje el zoom: si no, su
+        // marker desaparece y el mini-modal queda anclado a un nodo removido.
+        return zoom >= CAMERA_PIN_MIN_ZOOM || (selectedId != null && e.id === selectedId);
       }
 
       if (lodTier === 1) {
@@ -316,7 +402,13 @@ export function useSuperclusterEvents(
     const padLng = (bbox[2] - bbox[0]) * 0.35;
     const padLat = (bbox[3] - bbox[1]) * 0.35;
 
-    // 1. Elementos estándar no agrupables (barcos, parques, cámaras, etc.)
+    const inPaddedBbox = (e: TurismoEvent) =>
+      e.longitude >= bbox[0] - padLng &&
+      e.longitude <= bbox[2] + padLng &&
+      e.latitude >= bbox[1] - padLat &&
+      e.latitude <= bbox[3] + padLat;
+
+    // 1. Elementos estándar no agrupables (barcos, parques, etc.)
     const regularUnclustered = visibleEventsForTier.filter((e) => {
       const cat = e.category?.toLowerCase() || '';
       const isReg =
@@ -324,16 +416,19 @@ export function useSuperclusterEvents(
         cat === 'parque' ||
         cat === 'reserva' ||
         cat === 'reservas' ||
-        cat === 'naturaleza' ||
-        cat === 'camara';
-      if (!isReg) return false;
-      return (
-        e.longitude >= bbox[0] - padLng &&
-        e.longitude <= bbox[2] + padLng &&
-        e.latitude >= bbox[1] - padLat &&
-        e.latitude <= bbox[3] + padLat
-      );
+        cat === 'naturaleza';
+      return isReg && inPaddedBbox(e);
     });
+
+    // 1b. Cámaras: fuera del supercluster general (no deben mezclarse con POIs
+    // en un micro-dot), pero agrupadas entre sí cuando se pisan en pantalla.
+    const cameraItems = groupCameraEvents(
+      visibleEventsForTier.filter(
+        (e) => (e.category?.toLowerCase() || '') === 'camara' && inPaddedBbox(e),
+      ),
+      zoom,
+      selectedId,
+    );
 
     // 2. Elementos de utilidad (bancas, basureros, ejercicio)
     const utilityRawEvents = visibleEventsForTier.filter((e) => {
@@ -359,7 +454,7 @@ export function useSuperclusterEvents(
     // Decimación espacial adaptativa: garantiza separación estética y elimina el lag de cientos de DOM markers
     const thinnedUtilityEvents = thinUtilityEvents(utilityRawEvents, zoom, selectedId);
 
-    const unclusteredEvents = [...regularUnclustered, ...thinnedUtilityEvents];
+    const unclusteredEvents = [...regularUnclustered, ...cameraItems, ...thinnedUtilityEvents];
 
     // Si el zoom es muy alto, desactivamos el clustering para el resto
     if (zoom >= 17) {

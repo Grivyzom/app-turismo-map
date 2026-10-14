@@ -31,6 +31,9 @@ import {
   loadPersistedCameraAnimations,
   savePersistedCameraAnimations,
   DEFAULT_CAMERA_ANIMATIONS,
+  loadPersistedShowSecurityCameras,
+  savePersistedShowSecurityCameras,
+  DEFAULT_SHOW_SECURITY_CAMERAS,
 } from '../utils/mapPreferences';
 import { loadUserProfile, saveUserProfile } from '../utils/userProfileStorage';
 import { useUserLocationContext } from '../context/UserLocationContext';
@@ -380,6 +383,31 @@ export function useHomeScreenState(token: string | null) {
       savePersistedCameraAnimations(next);
       return next;
     });
+  }, []);
+
+  // Capa opcional de cámaras de seguridad (opt-in, persistida)
+  const [showSecurityCameras, setShowSecurityCameras] = useState<boolean>(
+    DEFAULT_SHOW_SECURITY_CAMERAS,
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+    loadPersistedShowSecurityCameras().then((enabled) => {
+      if (isMounted) setShowSecurityCameras(enabled);
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const toggleSecurityCameras = useCallback(() => {
+    setShowSecurityCameras((prev) => {
+      const next = !prev;
+      savePersistedShowSecurityCameras(next);
+      return next;
+    });
+    // Al apagar la capa no debe quedar una cámara seleccionada huérfana
+    setSelectedEvent((prev) => (prev?.category === 'camara' ? null : prev));
   }, []);
 
   useEffect(() => {
@@ -1258,6 +1286,12 @@ export function useHomeScreenState(token: string | null) {
         return false;
       }
 
+      // Cámaras: capa opt-in. Se corta aquí (y no en MODE_CATEGORIES) para que
+      // ningún filtro ni alias (ej. 'emergencia' → 'camara') las cuele de vuelta.
+      if (event.category === 'camara' && !showSecurityCameras) {
+        return false;
+      }
+
       // Los pines de utilidad (bancas, basureros, bebederos, ejercicio) NUNCA se muestran en modo 'mapa' ni 'comercial'.
       // En modo 'turismo', solo son elegibles aquellos que pertenecen al polígono regular de un parque o reserva.
       if (isUtilityCategory(event.category)) {
@@ -1283,7 +1317,15 @@ export function useHomeScreenState(token: string | null) {
         (event.organizer?.toLowerCase() || '').includes(query);
       return matchesCategory && matchesSearch;
     });
-  }, [events, isRoutingActive, routeCategory, selectedCategories, searchQuery, mapDisplayMode]);
+  }, [
+    events,
+    isRoutingActive,
+    routeCategory,
+    selectedCategories,
+    searchQuery,
+    mapDisplayMode,
+    showSecurityCameras,
+  ]);
 
   const isTacticalModeActiveRef = useRef(isTacticalModeActive);
   useEffect(() => {
@@ -2045,5 +2087,9 @@ export function useHomeScreenState(token: string | null) {
     cameraAnimationsEnabled,
     setCameraAnimationsEnabled,
     toggleCameraAnimations,
+
+    // Capa opcional de cámaras de seguridad
+    showSecurityCameras,
+    toggleSecurityCameras,
   };
 }
