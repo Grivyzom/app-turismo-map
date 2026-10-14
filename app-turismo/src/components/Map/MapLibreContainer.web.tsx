@@ -16,6 +16,7 @@ import { SatelliteTileCache } from '../../utils/satelliteTileCache';
 import { TrafficTileCache, TRAFFIC_PROTOCOL } from '../../utils/trafficTileCache';
 import { useSuperclusterEvents } from '../../utils/clusterUtils';
 import { MICRODOT_PAINT, microdotFeatures } from '../../utils/semanticZoom';
+import { pickTopPriority, pinHitBox } from '../../utils/contextualRanking';
 import { radialMenuRegistry } from '../../utils/radialMenuRegistry';
 import { getLatestRadarPath } from '../../utils/weatherUtils';
 import { useRainEffect } from '../../utils/useRainEffect';
@@ -766,6 +767,30 @@ export function MapLibreContainer({
           buildingBeforeId,
         );
       }
+
+      // Micro-dots tocables: caja de 52x52px (hit target expandido) y gana el de mayor priority_rank.
+      map.on('click', (e) => {
+        if ((e.originalEvent as any)._turismoHandled) return;
+        if (!map.getLayer('cluster-circles')) return;
+        const hit = pickTopPriority(
+          map.queryRenderedFeatures(pinHitBox(e.point.x, e.point.y), { layers: ['cluster-circles'] }),
+        );
+        const hitId = hit?.properties?.id;
+        if (!hitId || isClickInsideModalOrInput(e)) return;
+        if (isRoutingActiveRef.current && onMapClickForRoutingRef.current) return;
+        const event = eventsRef.current.find((ev) => ev.id === hitId);
+        if (event && onSelectEventRef.current) {
+          (e.originalEvent as any)._turismoHandled = true;
+          onSelectEventRef.current(event);
+        }
+      });
+      map.on('mousemove', (e) => {
+        if (!map.getLayer('cluster-circles')) return;
+        const over = map.queryRenderedFeatures(pinHitBox(e.point.x, e.point.y), {
+          layers: ['cluster-circles'],
+        }).length;
+        map.getCanvas().style.cursor = over ? 'pointer' : '';
+      });
 
       if (sync3DBuildingsRef.current) {
         sync3DBuildingsRef.current();
