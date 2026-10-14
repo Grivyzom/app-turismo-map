@@ -1,6 +1,6 @@
 import { StyleSheet, Platform } from 'react-native';
 
-import { NAVBAR_TOP, NAVBAR_HEIGHT, NAVBAR_CLEARANCE } from '../../src/utils/layout';
+import { NAVBAR_TOP, NAVBAR_HEIGHT, NAVBAR_CLEARANCE } from '../utils/layout';
 
 export { NAVBAR_TOP, NAVBAR_HEIGHT, NAVBAR_CLEARANCE };
 
@@ -17,13 +17,17 @@ export const styles = StyleSheet.create({
   },
   topBarWrapper: {
     position: 'absolute',
-    // Efecto "notch": pegada al borde superior, ancho completo, sin margen.
-    // NAVBAR_TOP queda como padding interno (ver TopAppBar) para despejar el notch/status bar.
+    // Isla flotante suspendida sobre el canvas (Floating HUD)
     top: 0,
     left: 0,
     right: 0,
-    height: NAVBAR_TOP + NAVBAR_HEIGHT,
     zIndex: 5000, // Keep above sidePanelOverlay (4000)
+    pointerEvents: 'box-none',
+    ...Platform.select({
+      web: {
+        pointerEvents: 'none',
+      } as any,
+    }),
   },
   mapContainer: {
     ...StyleSheet.absoluteFill,
@@ -113,51 +117,52 @@ export const styles = StyleSheet.create({
   categoryChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 8,
-    marginBottom: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    marginRight: 6,
+    marginBottom: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.045)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderColor: 'rgba(255, 255, 255, 0.075)',
   },
   activeCategoryChip: {
-    backgroundColor: '#FF6B6B',
-    borderColor: '#FF6B6B',
+    backgroundColor: 'rgba(52, 211, 153, 0.18)',
+    borderColor: '#34D399',
   },
   categoryText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '500',
+    color: '#CBD5E0',
+    fontSize: 11.5,
+    fontWeight: '600',
   },
   activeCategoryText: {
     color: '#FFFFFF',
-    fontWeight: '600',
+    fontWeight: '700',
   },
   toolChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 11,
+    backgroundColor: 'rgba(255, 255, 255, 0.045)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    marginBottom: 8,
-    gap: 10,
+    borderColor: 'rgba(255, 255, 255, 0.075)',
+    marginBottom: 6,
+    gap: 8,
   },
   activeToolChip: {
     backgroundColor: 'rgba(52, 211, 153, 0.12)',
-    borderColor: 'rgba(52, 211, 153, 0.4)',
+    borderColor: 'rgba(52, 211, 153, 0.45)',
   },
   toolChipText: {
     color: '#E2E8F0',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
   },
   activeToolChipText: {
     color: '#34D399',
+    fontWeight: '700',
   },
   layersWrapper: {
     flexDirection: 'row',
@@ -166,36 +171,38 @@ export const styles = StyleSheet.create({
     marginBottom: 8,
   },
   layersLabel: {
-    color: '#A0AEC0',
-    fontSize: 11,
-    fontWeight: '600',
+    color: '#94A3B8',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
     marginRight: 8,
     marginLeft: 4,
   },
   layerChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 8,
-    marginBottom: 8,
-    paddingHorizontal: 12,
+    marginRight: 6,
+    marginBottom: 6,
+    paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 9,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.06)',
   },
   activeLayerChip: {
-    backgroundColor: 'rgba(52, 211, 153, 0.3)',
+    backgroundColor: 'rgba(52, 211, 153, 0.18)',
     borderColor: '#34D399',
   },
   layerChipText: {
-    color: '#CBD5E0',
+    color: '#94A3B8',
     fontSize: 11,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   activeLayerChipText: {
     color: '#34D399',
-    fontWeight: '600',
+    fontWeight: '700',
   },
   premiumHandleContainer: {
     width: '100%',
@@ -490,7 +497,7 @@ export const styles = StyleSheet.create({
     height: 80,
     ...Platform.select({
       web: {
-        background: 'linear-gradient(to bottom, transparent, rgba(18, 22, 30, 0.98))',
+        backgroundImage: 'linear-gradient(to bottom, transparent, rgba(18, 22, 30, 0.98))',
       },
       default: {
         backgroundColor: 'transparent',
@@ -967,8 +974,8 @@ export const styles = StyleSheet.create({
     bottom: 20,
     right: 12,
     zIndex: 5000, // Keep above sidePanelOverlay (4000)
-    backgroundColor: 'rgba(30, 30, 30, 0.6)', // Glassmorphism premium
-    borderRadius: 24, // Mismo radio de borde que los paneles principales
+    backgroundColor: 'rgba(12, 19, 18, 0.75)', // Glassmorphism Selva Glass
+    borderRadius: 22, // Radio estándar de isla SelvaTokens
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
     flexDirection: 'column',
@@ -984,9 +991,9 @@ export const styles = StyleSheet.create({
       },
       android: { elevation: 6 },
       web: {
-        backdropFilter: 'blur(12px)', // Efecto cristal más pronunciado
+        backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
-        boxShadow: '0px 8px 32px rgba(0, 0, 0, 0.2)',
+        boxShadow: '0px 8px 32px rgba(0, 0, 0, 0.25)',
       },
     }),
   },
@@ -999,7 +1006,7 @@ export const styles = StyleSheet.create({
     marginVertical: 2,
   },
   controlButtonActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)', // Coincide con active NavLink
+    backgroundColor: 'rgba(16, 185, 129, 0.16)', // Unificado con SelvaTokens.colors.surface.activeItem
   },
   controlDivider: {
     width: 20,
@@ -1015,8 +1022,8 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
   zoomSliderGlass: {
-    backgroundColor: 'rgba(30, 30, 30, 0.85)',
-    borderRadius: 24,
+    backgroundColor: 'rgba(12, 19, 18, 0.85)',
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
     paddingVertical: 12,
@@ -1036,7 +1043,7 @@ export const styles = StyleSheet.create({
       web: {
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
-        boxShadow: '0px 8px 32px rgba(0, 0, 0, 0.5)',
+        boxShadow: '0px 8px 32px rgba(0, 0, 0, 0.3)',
       },
     }),
   },
@@ -1107,35 +1114,38 @@ export const styles = StyleSheet.create({
   filterOverlay: {
     position: 'absolute',
     bottom: 20,
-    right: 72, // Separación de los controles unificados (12 + 44 + 16 de gap)
-    width: 300,
+    right: 72,
+    width: 320,
     zIndex: 110,
-    backgroundColor: 'rgba(30, 30, 30, 0.6)', // Glassmorphism premium unificado
-    borderRadius: 24, // Mismo radio de borde
-    paddingVertical: 16,
+    backgroundColor: 'rgba(9, 15, 14, 0.95)',
+    borderRadius: 20,
+    paddingVertical: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderTopColor: 'rgba(255, 255, 255, 0.18)',
+    borderBottomColor: 'rgba(255, 255, 255, 0.04)',
+    borderLeftColor: 'rgba(255, 255, 255, 0.08)',
+    borderRightColor: 'rgba(255, 255, 255, 0.08)',
     overflow: 'hidden',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
+        shadowOffset: { width: 0, height: 12 },
         shadowOpacity: 0.5,
         shadowRadius: 20,
       },
-      android: { elevation: 12 },
+      android: { elevation: 18 },
       web: {
-        backdropFilter: 'blur(12px)', // Efecto cristal más pronunciado
-        WebkitBackdropFilter: 'blur(12px)',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+        backdropFilter: 'blur(24px)',
+        WebkitBackdropFilter: 'blur(24px)',
+        boxShadow: '0 24px 48px -8px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.05)',
       },
     }),
   },
   filterSectionTitle: {
-    color: '#A0AEC0',
-    fontSize: 12,
+    color: '#94A3B8',
+    fontSize: 10,
     fontWeight: '700',
-    marginBottom: 8,
+    marginBottom: 6,
     marginTop: 4,
     paddingHorizontal: 16,
     textTransform: 'uppercase',
@@ -1955,5 +1965,18 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#fff',
+  },
+  premiumActionButton: {
+    backgroundColor: '#10B981',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  premiumActionButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#ffffff',
   },
 });

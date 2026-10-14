@@ -9,6 +9,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  DeviceEventEmitter,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
@@ -287,6 +288,9 @@ export default function Onboarding() {
           console.warn('Backend sync failed, saving only locally');
         }
       }
+
+      // Notificar reactivamente al mapa principal sin requerir recarga
+      DeviceEventEmitter.emit('MAP_PREFERENCES_UPDATED', preferencesPayload);
     } catch (error) {
       console.error('Error saving preferences:', error);
     } finally {

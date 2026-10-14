@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, ComponentProps } from 'react';
+import React, { useEffect, useState, useRef, useCallback, ComponentProps } from 'react';
 import { View, Text, StyleSheet, Animated, TouchableOpacity, Platform } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -6,6 +6,7 @@ import { getLocalizedWeather, ZoneWeather, getWeatherIcon } from '../../utils/we
 import { calculateDistance } from '../../utils/locationUtils';
 import { useUserLocationContext } from '../../context/UserLocationContext';
 import { NAVBAR_CLEARANCE } from '../../utils/layout';
+import { SelvaTokens } from '../../theme/tokens';
 
 interface WeatherForecastWidgetProps {
   isDark?: boolean;
@@ -18,22 +19,20 @@ export function WeatherForecastWidget({ isDark }: WeatherForecastWidgetProps) {
   const [weatherData, setWeatherData] = useState<ZoneWeather[]>([]);
   const [expanded, setExpanded] = useState(false);
   const [opacity] = useState(new Animated.Value(0));
+  const [, setIsRefreshing] = useState(false);
 
-  // local override for theme: null means follow isDark prop, otherwise override manually
-  const [userThemeOverride, setUserThemeOverride] = useState<'light' | 'dark' | null>(null);
-
-  // Derive final dark mode setting without calling setState inside an effect
-  const localIsDark = userThemeOverride !== null ? userThemeOverride === 'dark' : !!isDark;
+  // Derive dark mode directly from prop (synced with app shell / mapLayer), default dark
+  const localIsDark = isDark !== undefined ? !!isDark : true;
 
   const lastFetchedLocation = useRef<{ lat: number; lon: number } | null>(null);
 
-  useEffect(() => {
-    async function load() {
+  const loadWeather = useCallback(
+    async (force = false) => {
       const lat = userLocation?.latitude;
       const lon = userLocation?.longitude;
 
-      // Avoid refetching if movement is less than 2km (2000 meters)
-      if (lat !== undefined && lon !== undefined && lastFetchedLocation.current !== null) {
+      // Avoid refetching if movement is less than 2km (2000 meters) unless forced
+      if (!force && lat !== undefined && lon !== undefined && lastFetchedLocation.current !== null) {
         const dist = calculateDistance(
           lastFetchedLocation.current.lat,
           lastFetchedLocation.current.lon,
@@ -41,48 +40,59 @@ export function WeatherForecastWidget({ isDark }: WeatherForecastWidgetProps) {
           lon,
         );
         if (dist < 2000 && weatherData.length > 0) {
-          return; // Skip fetch
+          return;
         }
       }
 
-      const data = await getLocalizedWeather(lat, lon);
-
-      if (lat !== undefined && lon !== undefined) {
-        lastFetchedLocation.current = { lat, lon };
+      setIsRefreshing(true);
+      try {
+        const data = await getLocalizedWeather(lat, lon);
+        if (lat !== undefined && lon !== undefined) {
+          lastFetchedLocation.current = { lat, lon };
+        }
+        setWeatherData(data);
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: false,
+        }).start();
+      } catch {
+        // Keep existing data on error
+      } finally {
+        setIsRefreshing(false);
       }
+    },
+    [userLocation?.latitude, userLocation?.longitude, opacity, weatherData.length],
+  );
 
-      setWeatherData(data);
-      Animated.timing(opacity, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: false,
-      }).start();
-    }
-    load();
-    const interval = setInterval(load, 600000); // 10 min
+  useEffect(() => {
+    loadWeather();
+    const interval = setInterval(() => loadWeather(true), 600000); // 10 min
     return () => clearInterval(interval);
-  }, [userLocation?.latitude, userLocation?.longitude, opacity, weatherData.length]);
+  }, [loadWeather]);
 
   if (weatherData.length === 0) return null;
 
   // We show Valdivia by default in the pill
   const valdivia = weatherData.find((d) => d.name === 'Valdivia') || weatherData[0];
 
-  // Dynamic Theme Styling (Premium Glassmorphism)
+  // Dynamic Theme Styling (Selva Glass Design System)
   const theme = {
-    bg: localIsDark ? 'rgba(30, 30, 30, 0.6)' : 'rgba(255, 255, 255, 0.85)',
-    border: localIsDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.12)',
-    text: localIsDark ? '#FFFFFF' : '#1F2937',
-    textSec: localIsDark ? '#9CA3AF' : '#4B5563',
-    textMuted: localIsDark ? '#6B7280' : '#6B7280',
-    pillBg: localIsDark ? 'rgba(30, 30, 30, 0.6)' : 'rgba(255, 255, 255, 0.85)',
-    pillBorder: localIsDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.12)',
-    pillText: localIsDark ? '#FFFFFF' : '#1F2937',
+    bg: localIsDark ? (SelvaTokens.colors?.surface?.glassDark ?? 'rgba(12, 19, 18, 0.75)') : 'rgba(255, 255, 255, 0.85)',
+    border: localIsDark ? (SelvaTokens.colors?.border?.subtle ?? 'rgba(255, 255, 255, 0.10)') : 'rgba(0, 0, 0, 0.12)',
+    text: localIsDark ? (SelvaTokens.colors?.text?.primary ?? '#F8FAFC') : '#1F2937',
+    textSec: localIsDark ? (SelvaTokens.colors?.text?.secondary ?? '#94A3B8') : '#4B5563',
+    textMuted: localIsDark ? (SelvaTokens.colors?.text?.muted ?? '#64748B') : '#6B7280',
+    pillBg: localIsDark ? (SelvaTokens.colors?.surface?.glassDark ?? 'rgba(12, 19, 18, 0.75)') : 'rgba(255, 255, 255, 0.85)',
+    pillBorder: localIsDark ? (SelvaTokens.colors?.border?.subtle ?? 'rgba(255, 255, 255, 0.10)') : 'rgba(0, 0, 0, 0.12)',
+    pillText: localIsDark ? (SelvaTokens.colors?.text?.primary ?? '#F8FAFC') : '#1F2937',
     progressBg: localIsDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
     cardBg: localIsDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.03)',
     cardBorder: localIsDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.04)',
     shadowColor: localIsDark ? '#000000' : 'rgba(0, 0, 0, 0.15)',
   };
+
+  const riverMistColor = SelvaTokens.colors?.brand?.riverMist ?? SelvaTokens.brand?.riverMist ?? '#38BDF8';
 
   return (
     <Animated.View style={[styles.container, { opacity }]}>
@@ -102,7 +112,7 @@ export function WeatherForecastWidget({ isDark }: WeatherForecastWidgetProps) {
           <Ionicons
             name={getWeatherIcon(valdivia.weatherCode, valdivia.isNight) as IconName}
             size={18}
-            color={localIsDark ? '#FFFFFF' : '#0284C7'}
+            color={localIsDark ? riverMistColor : '#0284C7'}
           />
           <Text style={[styles.tempText, { color: theme.pillText }]}>{valdivia.currentTemp}°</Text>
           <View style={styles.divider} />
@@ -142,14 +152,16 @@ export function WeatherForecastWidget({ isDark }: WeatherForecastWidgetProps) {
                     </Text>
                   </View>
                   <TouchableOpacity
-                    onPress={() => setUserThemeOverride(localIsDark ? 'light' : 'dark')}
+                    onPress={() => loadWeather(true)}
                     style={styles.themeToggleBtn}
                     activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel="Actualizar pronóstico"
                   >
                     <Ionicons
-                      name={localIsDark ? 'sunny' : 'moon'}
-                      size={16}
-                      color={localIsDark ? '#FBBF24' : '#475569'}
+                      name="refresh"
+                      size={15}
+                      color={localIsDark ? riverMistColor : '#0284C7'}
                     />
                   </TouchableOpacity>
                 </View>
@@ -343,7 +355,7 @@ const styles = StyleSheet.create({
   divider: {
     width: 1,
     height: 14,
-    backgroundColor: 'rgba(128,128,128,0.3)',
+    backgroundColor: SelvaTokens.colors?.divider ?? 'rgba(255, 255, 255, 0.10)',
   },
   zoneText: {
     fontSize: 12,
@@ -352,7 +364,7 @@ const styles = StyleSheet.create({
   },
   expandedContent: {
     marginTop: 8,
-    borderRadius: 20,
+    borderRadius: SelvaTokens.radii?.island ?? 22,
     padding: 14,
     borderWidth: 1,
     width: 260,
@@ -367,7 +379,7 @@ const styles = StyleSheet.create({
       web: {
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
-        boxShadow: '0px 8px 32px rgba(0, 0, 0, 0.2)',
+        boxShadow: '0px 8px 32px rgba(0, 0, 0, 0.25)',
       },
     }),
   },

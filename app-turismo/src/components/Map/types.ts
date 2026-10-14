@@ -82,7 +82,16 @@ export interface TurismoEvent {
     | 'invitation_club'
     | 'invitation_sports'
     | 'new_spot'
-    | 'mercado';
+    | 'mercado'
+    | 'maquina_ejercicio'
+    | 'ejercicio'
+    | 'banca'
+    | 'silla'
+    | 'bebedero'
+    | 'bano'
+    | 'basurero'
+    | 'papelera'
+    | 'sendero';
   organizer: string;
   time: string;
   attendeesCount?: number;
@@ -135,7 +144,17 @@ export interface TurismoEvent {
   };
   // Spots (sub-puntos de interés dentro de parques/reservas)
   spots?: Spot[];
+  // Asociación a polígono contenedor de parque o zona de reserva
+  parkId?: string;
+  parkName?: string;
+  // Personalización avanzada de pin y animaciones
+  ambient?: 'sonar' | 'halo' | 'sheen' | 'alert' | 'radar' | 'float' | 'orbit' | 'vital' | 'ember' | 'strobe' | 'none';
+  shape?: 'disc' | 'droplet' | 'shield' | 'diamond' | 'plaque' | 'lens' | 'sprite';
+  finish?: 'glass' | 'pearl' | 'solid';
+  customColor?: string;
+  isFlat?: boolean;
 }
+
 
 /** Sector/Zona delimitada (polígono) creada en el backend, p.ej. Parques/Reservas, Edificios */
 export interface Zone {
@@ -153,7 +172,7 @@ export interface Zone {
   parkType?: string;
 }
 
-export type MapLayer = 'dark' | 'streets' | 'light' | 'satellite' | 'terrain';
+export type MapLayer = 'dark' | 'streets' | 'light' | 'satellite' | 'terrain' | '3d' | 'google3d';
 
 export type UserLocation = {
   latitude: number;
@@ -175,11 +194,13 @@ export type MapCoordinate = {
 
 /** Zoom máximo permitido por capa. Satellite permite overscaling más allá del nativo. */
 export const MAX_ZOOM_PER_LAYER: Record<MapLayer, number> = {
-  dark: 18,
-  streets: 18,
-  light: 18,
-  satellite: 20, // ESRI nativo ~19, overscaling suave hasta 20
+  dark: 20,
+  streets: 20,
+  light: 20,
+  satellite: 19, // ESRI nativo hasta 19 en Sudamérica. Limitar a 19 evita solicitar teselas inexistentes
   terrain: 17,
+  '3d': 22,
+  google3d: 22,
 };
 
 /** Zoom máximo para capas de clima para evitar "Zoom level not supported" */
@@ -203,7 +224,8 @@ export interface MapContainerProps {
   selectedEvent: TurismoEvent | null;
   onSelectEvent: (event: TurismoEvent | null) => void;
   mapLayer: MapLayer;
-  userLocation?: UserLocation;
+  onSelectLayer?: (layer: MapLayer) => void;
+  userLocation?: UserLocation | null;
   centerTrigger?: number;
   tacticalMode?: boolean;
   onTacticalLocationChange?: (location: MapCoordinate | null) => void;
@@ -224,6 +246,7 @@ export interface MapContainerProps {
   showSectors?: boolean;
   sectorsData?: any[];
   visibleSectorIds?: number[];
+  showMobiliario?: boolean;
   onSectorPress?: (zone: any) => void;
   activeNestedZone?: any;
   isMagicWandActive?: boolean;
@@ -244,7 +267,12 @@ export interface MapContainerProps {
   isRoutingActive?: boolean;
   routingType?: RouteType;
   draftRoutePoints?: RoutePoint[];
-  onMapClickForRouting?: (location: MapCoordinate) => void;
+  onMapClickForRouting?: (location: MapCoordinate & {
+    name?: string;
+    businessId?: number;
+    eventId?: string;
+    category?: string;
+  }) => void;
   isRouteFinished?: boolean;
   savedRoutes?: Route[];
   onRateRoute?: (routeId: string, rating: number) => void;
@@ -252,6 +280,13 @@ export interface MapContainerProps {
 
   // OSRM Navigation
   navRouteGeojson?: GeoJSON.LineString | null;
+
+  // Motor de Animaciones de Cámara (Efecto GTA V)
+  isAuthenticated?: boolean;
+  cameraAnimationsEnabled?: boolean;
+
+  // Modo de visualización activo del mapa
+  mapDisplayMode?: 'mapa' | 'turismo' | 'comercial';
 }
 
 export interface Cluster {
@@ -282,17 +317,29 @@ export interface RoutePoint {
   type: RoutePointType;
   name?: string;
   orderIndex: number;
+  businessId?: number;
+  eventId?: string;
+  category?: string;
 }
+
+export type RouteVisibility = 'private' | 'unlisted' | 'public';
 
 export interface Route {
   id: string;
   name: string;
   type: RouteType;
   category: string;
-  businessId: number;
-  businessName: string;
+  businessId?: number;
+  businessName?: string;
+  userId?: number;
+  userName?: string;
   points: RoutePoint[];
   targetAudience: 'local' | 'tourist' | 'all';
+  visibility?: RouteVisibility;
+  shareToken?: string;
+  isSystemRoute?: boolean;
+  transportMode?: 'foot' | 'bike' | 'car';
+  geomGeojson?: string;
   isFeatured?: boolean;
   ratingAvg?: number;
 }

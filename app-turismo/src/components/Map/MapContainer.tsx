@@ -54,6 +54,14 @@ import { AuthorityModal } from './Markers/AuthorityModal';
 import { FurnitureMarker } from './Markers/FurnitureMarker';
 import { SmartNotificationMarker } from './Markers/SmartNotificationMarker';
 import { ClusterPin } from './Markers/ClusterPin';
+import {
+  executeNativeGtaVSpawn,
+  executeNativeGtaVLogout,
+  hasCameraSpawnedInSession,
+  markCameraSpawnedInSession,
+  resetCameraSpawnInSession,
+} from './camera/cameraAnimationEngine';
+import { isNoModalCategory } from './design/pinDesignSystem';
 
 // ─── UserMarkerAnimated ──────────────────────────────────────────────────────
 const UserMarkerAnimated = React.memo(
@@ -668,13 +676,45 @@ function MapContainerInner({
   isRouteFinished,
   savedRoutes = [],
   onRateRoute,
-}: Omit<MapContainerProps, 'userLocation'>) {
-  const { userLocation } = useUserLocationContext();
+  navRouteGeojson,
+  isAuthenticated,
+  cameraAnimationsEnabled = true,
+  userLocation: propUserLocation,
+}: MapContainerProps) {
+  const { userLocation: ctxUserLocation } = useUserLocationContext();
+  const userLocation = propUserLocation !== undefined ? propUserLocation : ctxUserLocation;
   const [showProviderInfo, setShowProviderInfo] = React.useState(false);
   const [localLoboMarinoId, setLocalLoboMarinoId] = React.useState<string | null>(null);
   const [selectedFurnitureId, setSelectedFurnitureId] = React.useState<string | null>(null);
   const [radarPath, setRadarPath] = useState<string | null>(null);
   const skipNextCenter = useRef(false);
+  const prevAuthRef = useRef<boolean | undefined>(undefined);
+  const hasSpawnedRef = useRef<boolean>(false);
+
+  // ── Motor de Animaciones de Cámara GTA V (Mobile) ─────────────────────────
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    if (isAuthenticated) {
+      if (!hasSpawnedRef.current && userLocation) {
+        hasSpawnedRef.current = true;
+        prevAuthRef.current = true;
+        const alreadySpawned = hasCameraSpawnedInSession();
+        executeNativeGtaVSpawn(mapRef.current, userLocation, !alreadySpawned && cameraAnimationsEnabled);
+        markCameraSpawnedInSession();
+      }
+    } else {
+      if (prevAuthRef.current === true) {
+        hasSpawnedRef.current = false;
+        prevAuthRef.current = false;
+        resetCameraSpawnInSession();
+        executeNativeGtaVLogout(mapRef.current, cameraAnimationsEnabled);
+      } else if (prevAuthRef.current === undefined) {
+        prevAuthRef.current = false;
+      }
+    }
+  }, [isAuthenticated, userLocation, cameraAnimationsEnabled]);
+
   const [currentBounds, setCurrentBounds] = useState<
     | {
         minLat: number;
@@ -744,9 +784,22 @@ function MapContainerInner({
         'estatua',
         'arte',
         'bosque',
-      ].includes(event?.category?.toLowerCase() || '');
+      ].includes(event?.category?.toLowerCase() || '') ||
+      isNoModalCategory(event?.category);
       const isAlreadySelected = selectedEvent?.id === event?.id || localLoboMarinoId === event?.id;
       const nextEvent = isAlreadySelected ? null : event;
+
+      if (isRoutingActive && onMapClickForRouting && event) {
+        onMapClickForRouting({
+          latitude: event.latitude,
+          longitude: event.longitude,
+          name: event.title,
+          businessId: (event as any).businessId,
+          eventId: event.id,
+          category: event.category,
+        });
+        return;
+      }
 
       if (nextEvent && isLocalSelection) {
         // Manejamos puramente local para evitar que index.tsx abra su modal/panel
@@ -760,7 +813,7 @@ function MapContainerInner({
 
       skipNextCenter.current = true;
     },
-    [onSelectEvent, selectedEvent, localLoboMarinoId],
+    [onSelectEvent, selectedEvent, localLoboMarinoId, isRoutingActive, onMapClickForRouting],
   );
 
   const clusteredItems = useSuperclusterEvents(events, currentZoom, currentBounds);
@@ -1278,16 +1331,33 @@ function MapContainerInner({
                 );
               }))}
 
-        {/* Capas de Rutas Guardadas (Geo-Router - Público) */}
+        {/* Capas de Rutas Guardadas (Geo-Router - Público y Social) */}
         {savedRoutes.map((route) => {
           const routeColor = getRouteCategoryColor(route.category);
+          let coordinates = route.points.map((p) => ({
+            latitude: p.latitude,
+            longitude: p.longitude,
+          }));
+
+          if (route.geomGeojson) {
+            try {
+              const parsed =
+                typeof route.geomGeojson === 'string'
+                  ? JSON.parse(route.geomGeojson)
+                  : route.geomGeojson;
+              if (parsed?.coordinates && Array.isArray(parsed.coordinates)) {
+                coordinates = parsed.coordinates.map((coord: any) => ({
+                  latitude: coord[1],
+                  longitude: coord[0],
+                }));
+              }
+            } catch (_) {}
+          }
+
           return (
             <React.Fragment key={`saved-route-${route.id}`}>
               <Polyline
-                coordinates={route.points.map((p) => ({
-                  latitude: p.latitude,
-                  longitude: p.longitude,
-                }))}
+                coordinates={coordinates}
                 strokeColor={route.isFeatured ? routeColor : `${routeColor}80`}
                 strokeWidth={route.isFeatured ? 5 : 3}
                 lineJoin="round"
@@ -1351,15 +1421,39 @@ function MapContainerInner({
                 strokeWidth={4}
               />
             ) : (
-              <Polyline
-                coordinates={draftRoutePoints.map((p) => ({
-                  latitude: p.latitude,
-                  longitude: p.longitude,
-                }))}
-                strokeColor="#10B981"
-                strokeWidth={4}
-                lineDashPattern={routingType === 'single_target' ? [5, 5] : undefined}
-              />
+              <>
+                <Polyline
+                  coordinates={
+                    navRouteGeojson && navRouteGeojson.coordinates && navRouteGeojson.coordinates.length > 0
+                      ? navRouteGeojson.coordinates.map((coord: any) => ({
+                          latitude: coord[1],
+                          longitude: coord[0],
+                        }))
+                      : draftRoutePoints.map((p) => ({
+                          latitude: p.latitude,
+                          longitude: p.longitude,
+                        }))
+                  }
+                  strokeColor="#022C22"
+                  strokeWidth={8}
+                />
+                <Polyline
+                  coordinates={
+                    navRouteGeojson && navRouteGeojson.coordinates && navRouteGeojson.coordinates.length > 0
+                      ? navRouteGeojson.coordinates.map((coord: any) => ({
+                          latitude: coord[1],
+                          longitude: coord[0],
+                        }))
+                      : draftRoutePoints.map((p) => ({
+                          latitude: p.latitude,
+                          longitude: p.longitude,
+                        }))
+                  }
+                  strokeColor="#10B981"
+                  strokeWidth={4.5}
+                  lineDashPattern={routingType === 'single_target' ? [5, 5] : undefined}
+                />
+              </>
             )}
             {draftRoutePoints.map((point, index) => {
               let color = '#10B981';

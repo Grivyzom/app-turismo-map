@@ -54,13 +54,90 @@ export function getWeatherIcon(code: number, isNight = false): string {
   return 'cloud-outline';
 }
 
+interface WeatherCacheEntry {
+  timestamp: number;
+  lat: number;
+  lon: number;
+  data: ZoneWeather[];
+}
+
+const WEATHER_CACHE_KEY = 'app-turismo.weather-cache-v1';
+const WEATHER_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutos
+const WEATHER_CACHE_RADIUS_KM = 10; // 10 km de tolerancia espacial para ECMWF
+
+function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function getCachedWeather(lat: number, lon: number): ZoneWeather[] | null {
+  try {
+    if (typeof sessionStorage === 'undefined') return null;
+    const raw = sessionStorage.getItem(WEATHER_CACHE_KEY);
+    if (!raw) return null;
+    const entry: WeatherCacheEntry = JSON.parse(raw);
+    const isFresh = Date.now() - entry.timestamp < WEATHER_CACHE_TTL_MS;
+    const isClose = getDistanceKm(lat, lon, entry.lat, entry.lon) <= WEATHER_CACHE_RADIUS_KM;
+    if (isFresh && isClose) {
+      return entry.data;
+    }
+  } catch {
+    // Ignorar errores de parsing
+  }
+  return null;
+}
+
+function getAnyCachedWeather(): ZoneWeather[] | null {
+  try {
+    if (typeof sessionStorage === 'undefined') return null;
+    const raw = sessionStorage.getItem(WEATHER_CACHE_KEY);
+    if (!raw) return null;
+    const entry: WeatherCacheEntry = JSON.parse(raw);
+    return entry.data;
+  } catch {
+    return null;
+  }
+}
+
+function saveCachedWeather(lat: number, lon: number, data: ZoneWeather[]): void {
+  try {
+    if (typeof sessionStorage === 'undefined') return;
+    const entry: WeatherCacheEntry = {
+      timestamp: Date.now(),
+      lat,
+      lon,
+      data,
+    };
+    sessionStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify(entry));
+  } catch {
+    // Ignorar si sessionStorage está lleno
+  }
+}
+
 /**
- * Fetches weather and air quality for a specific location using Open-Meteo matching Windy precision
+ * Fetches weather and air quality for a specific location using Open-Meteo matching Windy precision.
+ * Incluye caché espacial de 10 km y 15 min TTL en sessionStorage con tolerancia a fallos.
  */
 export async function getLocalizedWeather(lat?: number, lon?: number): Promise<ZoneWeather[]> {
+  const latitude = lat ?? -39.8142;
+  const longitude = lon ?? -73.2459;
+
+  // 1. Comprobar caché local válido
+  const cached = getCachedWeather(latitude, longitude);
+  if (cached && cached.length > 0) {
+    return cached;
+  }
+
   try {
-    const latitude = lat ?? -39.8142;
-    const longitude = lon ?? -73.2459;
 
     const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m&hourly=temperature_2m,precipitation_probability,rain,wind_speed_10m,weather_code&models=ecmwf_ifs&timezone=America%2FSantiago`;
     const airQualityUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${latitude}&longitude=${longitude}&current=us_aqi&timezone=America%2FSantiago`;
@@ -157,7 +234,7 @@ export async function getLocalizedWeather(lat?: number, lon?: number): Promise<Z
       }
     }
 
-    return [
+    const result: ZoneWeather[] = [
       {
         name: placeName,
         currentTemp,
@@ -175,8 +252,17 @@ export async function getLocalizedWeather(lat?: number, lon?: number): Promise<Z
         forecast: next4Hours,
       },
     ];
+
+    saveCachedWeather(latitude, longitude, result);
+    return result;
   } catch (error) {
     console.error('[WEATHER_SERVICE_ERROR]:', error);
+    // Fallback: si hay datos en caché aunque hayan expirado, preservarlos para no romper la UI
+    const fallback = getAnyCachedWeather();
+    if (fallback && fallback.length > 0) {
+      console.warn('[WEATHER_SERVICE]: Usando caché previo como fallback tolerante a fallos.');
+      return fallback;
+    }
     return [];
   }
 }

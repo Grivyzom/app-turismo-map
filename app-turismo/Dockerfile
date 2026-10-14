@@ -20,7 +20,7 @@ RUN npm install -g pnpm
 WORKDIR /app
 
 # Copy dependency files
-COPY app-turismo/package.json app-turismo/pnpm-lock.yaml* app-turismo/pnpm-workspace.yaml* ./
+COPY app-turismo/package.json app-turismo/pnpm-lock.yaml* app-turismo/pnpm-workspace.yaml* app-turismo/.npmrc* ./
 
 # Install dependencies
 # --shamefully-hoist helps with Metro finding nested dependencies in Docker
@@ -35,6 +35,7 @@ ARG EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY
 ARG EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
 ARG EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID
 ARG EXPO_PUBLIC_BACKEND_URL
+ARG EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY
 
 # Set environment variables
 ENV EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=$EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
@@ -42,6 +43,7 @@ ENV EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY=$EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API
 ENV EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=$EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
 ENV EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=$EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID
 ENV EXPO_PUBLIC_BACKEND_URL=$EXPO_PUBLIC_BACKEND_URL
+ENV EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY=$EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY
 ENV CI=1
 ENV NODE_ENV=production
 

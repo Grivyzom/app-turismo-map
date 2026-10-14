@@ -1,12 +1,19 @@
 package middleware
 
 import (
+	"backend/database"
 	"backend/utils"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/golang-jwt/jwt/v5"
 	"net/http"
+	"os"
+	"strings"
+
+	clerkjwt "github.com/clerk/clerk-sdk-go/v2/jwt"
+	clerkuser "github.com/clerk/clerk-sdk-go/v2/user"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 // contextKey es un tipo privado para evitar colisiones en context.Value.
@@ -105,6 +112,7 @@ func OptionalAuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 }
 
 // ExtractAndValidateToken extrae y valida un JWT del header Authorization.
+// Soporta tanto tokens HMAC de la aplicación como tokens de sesión nativos de Clerk.
 func ExtractAndValidateToken(r *http.Request) (jwt.MapClaims, error) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
@@ -116,23 +124,113 @@ func ExtractAndValidateToken(r *http.Request) (jwt.MapClaims, error) {
 	}
 	tokenString := authHeader[7:]
 
+	// 1. Intentar validar primero con HMAC local de la aplicación
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("método de firma inesperado: %v", token.Header["alg"])
+			return nil, fmt.Errorf("método de firma no es HMAC")
 		}
 		return utils.JWTSecret, nil
 	})
 
-	if err != nil || !token.Valid {
-		return nil, fmt.Errorf("token inválido o expirado")
+	if err == nil && token.Valid {
+		if claims, ok := token.Claims.(jwt.MapClaims); ok {
+			return claims, nil
+		}
 	}
 
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return nil, fmt.Errorf("claims inválidos en el token")
+	// 2. Si falla y CLERK_SECRET_KEY está configurado, validar como token de Clerk
+	if os.Getenv("CLERK_SECRET_KEY") != "" {
+		clerkClaims, clerkErr := clerkjwt.Verify(r.Context(), &clerkjwt.VerifyParams{
+			Token: tokenString,
+		})
+		if clerkErr == nil && clerkClaims != nil && clerkClaims.Subject != "" {
+			clerkUserID := clerkClaims.Subject
+			claims := jwt.MapClaims{
+				"sub":      clerkUserID,
+				"scope":    "citizen",
+				"clerk_id": clerkUserID,
+			}
+
+			if database.DB != nil {
+				var dbID int
+				var dbEmail, dbUserType string
+				qErr := database.DB.QueryRow(`
+					SELECT id, email, user_type FROM users WHERE clerk_id = $1 LIMIT 1
+				`, clerkUserID).Scan(&dbID, &dbEmail, &dbUserType)
+				if qErr == nil {
+					claims["id"] = float64(dbID)
+					claims["email"] = dbEmail
+					claims["userType"] = dbUserType
+					return claims, nil
+				}
+
+				// Si el usuario no existe en PostgreSQL, obtener datos desde Clerk API y registrarlo
+				cu, uErr := clerkuser.Get(r.Context(), clerkUserID)
+				if uErr == nil && cu != nil {
+					email := ""
+					for _, em := range cu.EmailAddresses {
+						if cu.PrimaryEmailAddressID != nil && em.ID == *cu.PrimaryEmailAddressID {
+							email = em.EmailAddress
+							break
+						}
+					}
+					if email == "" && len(cu.EmailAddresses) > 0 {
+						email = cu.EmailAddresses[0].EmailAddress
+					}
+
+					name := ""
+					if cu.FirstName != nil {
+						name = *cu.FirstName
+					}
+					if cu.LastName != nil {
+						if name != "" {
+							name += " " + *cu.LastName
+						} else {
+							name = *cu.LastName
+						}
+					}
+					if name == "" && cu.Username != nil {
+						name = *cu.Username
+					}
+					if name == "" {
+						name = strings.Split(email, "@")[0]
+					}
+					picture := ""
+					if cu.ImageURL != nil {
+						picture = *cu.ImageURL
+					}
+
+					qErr = database.DB.QueryRow(`
+						SELECT id, email, user_type FROM users WHERE email = $1 LIMIT 1
+					`, email).Scan(&dbID, &dbEmail, &dbUserType)
+					if qErr == sql.ErrNoRows {
+						insErr := database.DB.QueryRow(`
+							INSERT INTO users (email, name, picture, user_type, status, clerk_id)
+							VALUES ($1, $2, $3, 'citizen', 'active', $4)
+							RETURNING id
+						`, email, name, picture, clerkUserID).Scan(&dbID)
+						if insErr == nil {
+							database.DB.Exec("INSERT INTO citizen_profiles (user_id, profile_type, current_view_mode) VALUES ($1, 'local', 'local') ON CONFLICT DO NOTHING", dbID)
+							claims["id"] = float64(dbID)
+							claims["email"] = email
+							claims["userType"] = "citizen"
+							return claims, nil
+						}
+					} else if qErr == nil {
+						database.DB.Exec("UPDATE users SET clerk_id = $1 WHERE id = $2", clerkUserID, dbID)
+						claims["id"] = float64(dbID)
+						claims["email"] = dbEmail
+						claims["userType"] = dbUserType
+						return claims, nil
+					}
+				}
+			}
+
+			return claims, nil
+		}
 	}
 
-	return claims, nil
+	return nil, fmt.Errorf("token inválido o expirado")
 }
 
 func writeJSON(w http.ResponseWriter, status int, data interface{}) {

@@ -3,13 +3,16 @@ package models
 import "encoding/json"
 
 type User struct {
-	ID       int      `json:"id,omitempty"`
-	Email    string   `json:"email"`
-	Name     string   `json:"name"`
-	Picture  string   `json:"picture,omitempty"`
-	UserType string   `json:"userType,omitempty"` // "citizen", "partner_owner", "partner_worker"
-	Status   string   `json:"status,omitempty"`   // "active", "pending"
-	Company  *Company `json:"company,omitempty"`
+	ID        int      `json:"id,omitempty"`
+	Email     string   `json:"email"`
+	Name      string   `json:"name"`
+	Picture   string   `json:"picture,omitempty"`
+	UserType  string   `json:"userType,omitempty"` // "citizen", "tourist", "partner_owner", "partner_worker"
+	Status    string   `json:"status,omitempty"`   // "active", "pending", "suspended"
+	ClerkID   string   `json:"clerkId,omitempty"`
+	Company   *Company `json:"company,omitempty"`
+	CreatedAt string   `json:"createdAt,omitempty"`
+	UpdatedAt string   `json:"updatedAt,omitempty"`
 }
 
 type Company struct {
@@ -38,6 +41,11 @@ type LoginRequest struct {
 
 type AuthRequest struct {
 	IDToken  string `json:"idToken"`
+	UserType string `json:"userType,omitempty"`
+}
+
+type ClerkAuthRequest struct {
+	Token    string `json:"token"`
 	UserType string `json:"userType,omitempty"`
 }
 
@@ -208,6 +216,16 @@ const (
 	RouteDirect       RouteType = "direct"
 	RouteSingleTarget RouteType = "single_target"
 	RouteMultiTarget  RouteType = "multi_target"
+	RouteCiclovia     RouteType = "ciclovia"
+	RouteSector       RouteType = "sector"
+)
+
+type RouteVisibility string
+
+const (
+	RouteVisibilityPrivate  RouteVisibility = "private"
+	RouteVisibilityUnlisted RouteVisibility = "unlisted"
+	RouteVisibilityPublic   RouteVisibility = "public"
 )
 
 type PointType string
@@ -230,25 +248,55 @@ type RoutePoint struct {
 }
 
 type Route struct {
-	ID             int          `json:"id"`
-	Name           string       `json:"name"`
-	Type           RouteType    `json:"type"`
-	Category       string       `json:"category"`       // "cervecera", "reto", "turistica", etc.
-	BusinessID     int          `json:"businessId"`     // ID del negocio creador
-	BusinessName   string       `json:"businessName"`   // Nombre del negocio (para el frontend)
-	TargetAudience string       `json:"targetAudience"`
-	IsFeatured     bool         `json:"isFeatured"`     // Rutas destacadas (Premium)
-	RatingAvg      float64      `json:"ratingAvg"`      // Calificación media por ciudadanos
-	Points         []RoutePoint `json:"points,omitempty"`
-	CreatedAt      string       `json:"createdAt"`
+	ID              int             `json:"id"`
+	Name            string          `json:"name"`
+	Type            RouteType       `json:"type"`
+	Category        string          `json:"category"`               // "cervecera", "reto", "turistica", etc.
+	BusinessID      *int            `json:"businessId,omitempty"`   // ID del negocio creador
+	BusinessName    string          `json:"businessName,omitempty"` // Nombre del negocio (para el frontend)
+	UserID          *int            `json:"userId,omitempty"`
+	UserName        string          `json:"userName,omitempty"`
+	TargetAudience  string          `json:"targetAudience"`
+	IsFeatured      bool            `json:"isFeatured"`             // Rutas destacadas (Premium)
+	RatingAvg       float64         `json:"ratingAvg"`              // Calificación media por ciudadanos
+	Visibility      RouteVisibility `json:"visibility"`             // 'private', 'unlisted', 'public'
+	ShareToken      string          `json:"shareToken,omitempty"`
+	IsSystemRoute   bool            `json:"isSystemRoute"`
+	OriginalRouteID *int            `json:"originalRouteId,omitempty"`
+	TransportMode   string          `json:"transportMode"`          // 'foot', 'bike'
+	GeomGeoJSON     *string         `json:"geomGeojson,omitempty"`  // GeoJSON LineString
+	Points          []RoutePoint    `json:"points,omitempty"`
+	CreatedAt       string          `json:"createdAt"`
 }
 
 type CreateRouteRequest struct {
-	Name           string       `json:"name"`
-	Type           RouteType    `json:"type"`
-	Category       string       `json:"category"`
-	TargetAudience string       `json:"targetAudience"`
-	Points         []RoutePoint `json:"points"`
+	Name           string          `json:"name"`
+	Type           RouteType       `json:"type"`
+	Category       string          `json:"category"`
+	TargetAudience string          `json:"targetAudience"`
+	Visibility     RouteVisibility `json:"visibility,omitempty"`
+	TransportMode  string          `json:"transportMode,omitempty"`
+	GeomGeoJSON    string          `json:"geomGeojson,omitempty"`
+	Points         []RoutePoint    `json:"points"`
+}
+
+type UserSavedRoute struct {
+	ID          int     `json:"id"`
+	UserID      int     `json:"userId"`
+	RouteID     int     `json:"routeId"`
+	Status      string  `json:"status"` // 'planned', 'completed'
+	CompletedAt *string `json:"completedAt,omitempty"`
+	CreatedAt   string  `json:"createdAt"`
+	Route       *Route  `json:"route,omitempty"`
+}
+
+type BookmarkRouteRequest struct {
+	Status string `json:"status,omitempty"` // 'planned', 'completed'
+}
+
+type ShareRouteRequest struct {
+	SharedWithUserID int    `json:"sharedWithUserId,omitempty"`
+	Permission       string `json:"permission,omitempty"` // 'view', 'edit'
 }
 
 type RateRouteRequest struct {

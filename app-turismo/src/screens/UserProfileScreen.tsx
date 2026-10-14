@@ -661,7 +661,7 @@ export default function UserProfileScreen() {
                                 { text: 'Cancelar', onPress: () => {}, style: 'cancel' },
                                 {
                                   text: 'Crear',
-                                  onPress: (name) => {
+                                  onPress: (name?: string) => {
                                     if (name?.trim()) {
                                       void createCollection(name);
                                     }

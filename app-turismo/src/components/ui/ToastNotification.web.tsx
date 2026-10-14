@@ -53,7 +53,7 @@ export const SileoToaster: React.FC<{offset?: any}> = ({ offset }) => {
     }}>
       {toasts.map(t => (
         <div key={t.id} style={{
-          background: 'rgba(20, 26, 24, 0.95)',
+          backgroundColor: 'rgba(20, 26, 24, 0.95)',
           backdropFilter: 'blur(12px)',
           border: `1px solid rgba(255,255,255,0.1)`,
           borderLeft: `4px solid ${t.type === 'error' ? '#ef4444' : t.type === 'warning' ? '#e39454' : t.type === 'info' ? '#256487' : '#10b981'}`,

@@ -1,61 +1,45 @@
-# App Navbar Design Guide
+# App Navbar Design Guide — Floating HUD (Isla Flotante Despegada)
 
-Este documento describe el estilo fijado para el `AppNavbar` (barra de navegación principal o `TopAppBar`) para garantizar la consistencia visual y permitir la replicación del mismo diseño en otros componentes o futuros desarrollos.
+Este documento describe el estándar de diseño y arquitectura de interfaz para la barra de navegación principal (`TopAppBar` / Floating HUD) sobre el visor cartográfico.
 
-## Concepto General
-El diseño se basa en un estilo de **barra flotante (Floating Navbar)** con efecto **Glassmorphism (Cristal esmerilado)**. Su objetivo es verse moderno, no intrusivo, aprovechar la pantalla completa (ideal para mapas de fondo) y mantener un contraste legible mediante el uso de colores carbón translúcidos e iconos en tonos claros.
+## Concepto General: Isla Flotante Despegada (Floating HUD)
 
----
-
-## 1. Contenedor Principal (Container)
-
-El contenedor actúa como una píldora flotante delgada con los siguientes atributos:
-
-* **Fondo (Background):** `rgba(34, 34, 34, 0.55)`
-  * *Color oscuro carbón con 55% de opacidad (medio transparente) para dejar entrever el fondo.*
-* **Borde y Contorno:**
-  * Borde redondeado completo: `borderRadius: 30`
-  * Línea sutil de contorno: `borderWidth: 1`, `borderColor: 'rgba(255, 255, 255, 0.1)'`
-* **Dimensiones y Espaciado (Altura Delgada):**
-  * Espaciado Interno Vertical (Padding): `paddingVertical: 4`
-  * Espaciado Interno Horizontal: `paddingHorizontal: 12`
-  * Margen Exterior: `marginHorizontal: 16`, `marginTop: 12`
-* **Sombra / Elevación (Profundidad):**
-  * **iOS:** `shadowColor: '#000'`, `shadowOffset: { width: 0, height: 4 }`, `shadowOpacity: 0.3`, `shadowRadius: 10`
-  * **Android:** `elevation: 8`
-  * **Web:** `boxShadow: '0px 4px 10px rgba(0, 0, 0, 0.3)'`, además de requerir `backdropFilter: 'blur(10px)'` para el efecto de cristal.
+En interfaces basadas en mapas interactivos, una barra anclada directamente al techo genera un corte rígido que encierra el visor. Despegarla del marco (con margen superior y lateral) crea una jerarquía espacial tridimensional: el mapa se percibe infinito corriendo por debajo y la barra actúa como una **consola de navegación suspendida** (estilo Apple Maps o Mapbox).
 
 ---
 
-## 2. Elementos de Navegación (NavLinks / Tabs)
+## 1. Principios UX Aplicados al Mapa
 
-Los botones internos se distribuyen de forma equitativa (espaciado tipo `space-around` en el contenedor principal) y adoptan un estilo minimalista.
-
-### Estilo Base
-* **Altura / Espaciado:** `paddingVertical: 4`, `paddingHorizontal: 16`
-* **Layout interno:** `flexDirection: 'row'`, `gap: 8`, centrado (`alignItems: 'center'`, `justifyContent: 'center'`).
-* **Bordes:** `borderRadius: 24` para encajar armónicamente con la píldora principal.
-* **Iconos:** Tamaño base `24`.
-
-### Estado: Inactivo
-* **Fondo:** Transparente.
-* **Color de Texto e Icono:** `#9CA3AF` (Gris claro apagado, para no resaltar frente al fondo carbón oscuro).
-
-### Estado: Activo (Seleccionado)
-* **Fondo:** `rgba(255, 255, 255, 0.15)`
-  * *Blanco con 15% de opacidad, crea un ligero resaltado de píldora interna.*
-* **Color de Texto e Icono:** `#FFFFFF` (Blanco puro para máximo contraste y legibilidad).
+* **Densidad contra Ruido Cartográfico:** Calles, etiquetas y capas satelitales compiten visualmente con los textos. Se utiliza una opacidad de `0.85` (`rgba(9, 15, 14, 0.85)`) y `blur(20px)` para máxima legibilidad sin perder la sensación de cristal reflectante.
+* **Luz Direccional (Specular Rim):** Se sustituyen los bordes planos por un borde superior tenue (`rgba(255, 255, 255, 0.14)`) y un borde inferior imperceptible (`rgba(255, 255, 255, 0.04)`). Simula la refracción cenital sobre cristal.
+* **Geometría Unificada:** Radio de cápsula de `18px` para el contenedor completo y radios proporcionales de `9px`–`10px` para controles internos.
+* **Gestión de Espacio Móvil (375–390px):** El isotipo/badge de la marca (`32x32px`) se muestra aislado en anchos pequeños, colapsando el texto de marca y reuniendo herramientas secundarias en un botón de desbordamiento (`⋮`).
 
 ---
 
-## 3. Disposición de Pestañas (Estructura)
+## 2. Especificación Técnica de la Isla (`navIsland`)
 
-La barra está diseñada explícitamente sin logotipo y contiene solo los accesos directos requeridos. Para mantener un aspecto limpio, algunas opciones solo llevan icono y otras icono + texto.
+* **Contenedor wrapper (`topBarWrapper`):** `position: absolute`, `top: 0`, `left: 0`, `right: 0`, `pointerEvents: 'box-none'` (permite interactuar con el mapa libremente en áreas no cubiertas por la isla).
+* **Dimensiones de la Isla:**
+  * Altura: `52px`
+  * Márgenes: `marginHorizontal: 12px`, `marginTop: Platform.OS === 'ios' ? 52px : (web ? 12px : 16px)`
+  * Radio: `borderRadius: 18px`
+  * Padding: `paddingHorizontal: 10px`
+* **Superficie y Cristal:**
+  * Fondo: `rgba(9, 15, 14, 0.85)`
+  * Desenfoque: `backdropFilter: 'blur(20px)'`
+  * Borde superior: `1px solid rgba(255, 255, 255, 0.14)`
+  * Borde inferior: `1px solid rgba(255, 255, 255, 0.04)`
+  * Bordes laterales: `1px solid rgba(255, 255, 255, 0.07)`
+  * Sombra Web: `box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.45)`
+  * Sombra iOS: `shadowRadius: 12`, `shadowOpacity: 0.35`, `shadowOffset: { width: 0, height: 8 }`
+  * Elevación Android: `elevation: 8`
 
-* **Inicio / Mapa:** Icono (`map`) + Texto ("Inicio")
-* **Foro:** Icono (`forum`) + Texto ("Foro")
-* **Guardados:** Solo Icono (`bookmark`)
-* **Configuración:** Solo Icono (`settings`)
-* **Perfil:** Solo Icono (`person` / `account-circle`)
+---
 
-*(Nota técnica: cuando el botón solo lleva icono, se reduce el `paddingHorizontal` a `12` para mantener la proporción visual cuadrada/circular del botón).*
+## 3. Elementos Internos
+
+* **Botones de Icono (`iconBtn`):** `34x34px`, `borderRadius: 10px`, fondo `rgba(255, 255, 255, 0.05)`, borde `rgba(255, 255, 255, 0.06)`. Estado activo: fondo `rgba(52, 211, 153, 0.18)`, borde `rgba(52, 211, 153, 0.40)`.
+* **Buscador (`searchBox`):** `height: 34px`, `borderRadius: 10px`, colapsable a botón cuadrado o expandible con sugerencias predictivas.
+* **Selector de Modos (`modeGroup`):** Contenedor píldora `borderRadius: 11px`, fondo `rgba(0, 0, 0, 0.35)`, botones internos con indicador deslizante (`borderRadius: 9px`).
+* **Botón de Autenticación (`navAuthButton`):** `height: 34px`, fondo sólido verde Selva `#34D399`, texto contrastado `#06281E` (`fontWeight: 800`).

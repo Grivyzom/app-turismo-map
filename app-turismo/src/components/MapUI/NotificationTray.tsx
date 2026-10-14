@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { SidebarSubmenu } from '../ui/SidebarSubmenu';
-import { AppNotification } from '../../../app/(home)/useHomeScreenState';
+import { AppNotification } from '../../hooks/useHomeScreenState';
 
 interface NotificationTrayProps {
   notifications: AppNotification[];
@@ -73,11 +73,11 @@ function getTypeColor(type: string) {
     case 'success':
       return '#34D399';
     case 'warning':
-      return '#FBBF24';
+      return '#F59E0B';
     case 'error':
-      return '#F87171';
+      return '#EF4444';
     default:
-      return '#7F6DF2'; // Obsidian purple instead of generic blue
+      return '#38BDF8'; // River mist blue
   }
 }
 
@@ -102,9 +102,9 @@ function formatTime(date: Date) {
 
 const styles = StyleSheet.create({
   clearAll: {
-    color: '#7F6DF2', // Obsidian purple highlight
+    color: '#34D399',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   scrollContent: {
     padding: 8,
@@ -115,18 +115,18 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 12,
     marginBottom: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
     borderWidth: 1,
-    borderColor: 'transparent',
+    borderColor: 'rgba(255, 255, 255, 0.05)',
   },
   itemUnread: {
-    backgroundColor: 'rgba(127, 109, 242, 0.06)',
-    borderColor: 'rgba(127, 109, 242, 0.15)',
+    backgroundColor: 'rgba(52, 211, 153, 0.08)',
+    borderColor: 'rgba(52, 211, 153, 0.22)',
   },
   typeIcon: {
     width: 28,
     height: 28,
-    borderRadius: 14,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
@@ -135,13 +135,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   message: {
-    color: '#E2E8F0',
+    color: '#F8FAFC',
     fontSize: 13,
     fontWeight: '500',
     lineHeight: 16,
   },
   time: {
-    color: '#718096',
+    color: '#94A3B8',
     fontSize: 10,
     marginTop: 2,
   },
@@ -149,17 +149,17 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#7F6DF2', // Obsidian purple unread dot
+    backgroundColor: '#34D399',
     marginLeft: 8,
   },
   emptyState: {
-    paddingVertical: 40,
+    paddingVertical: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    gap: 8,
   },
   emptyText: {
-    color: '#4A5568',
+    color: '#94A3B8',
     fontSize: 13,
     fontWeight: '600',
   },

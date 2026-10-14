@@ -50,7 +50,7 @@ export function Input({
 
   return (
     <View style={containerStyle} className={`w-full mb-4 ${className}`}>
-      {label && <Text className="text-sm font-medium text-gray-700 mb-1.5 ml-1">{label}</Text>}
+      {!!label && <Text className="text-sm font-medium text-gray-700 mb-1.5 ml-1">{label}</Text>}
 
       <View
         className={`flex-row items-center border rounded-lg bg-white px-3 h-12
@@ -87,7 +87,7 @@ export function Input({
         )}
       </View>
 
-      {error && <Text className="text-xs text-red-500 mt-1.5 ml-1">{error}</Text>}
+      {!!error && <Text className="text-xs text-red-500 mt-1.5 ml-1">{error}</Text>}
     </View>
   );
 }

@@ -62,8 +62,9 @@ func GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 
 	if database.DB != nil {
 		var dbID int
-		var dbEmail, dbName, dbPicture string
-		err := database.DB.QueryRow("SELECT id, email, name, picture, user_type FROM users WHERE email = $1", email).Scan(&dbID, &dbEmail, &dbName, &dbPicture, &user.UserType)
+		var dbEmail string
+		var dbName, dbPicture, dbUserType sql.NullString
+		err := database.DB.QueryRow("SELECT id, email, name, picture, user_type FROM users WHERE email = $1", email).Scan(&dbID, &dbEmail, &dbName, &dbPicture, &dbUserType)
 		if err == sql.ErrNoRows {
 			log.Printf("Usuario %s no existe en la BD. Registrando...\n", email)
 			err = database.DB.QueryRow("INSERT INTO users (email, name, picture, user_type, status) VALUES ($1, $2, $3, $4, 'active') RETURNING id", email, name, picture, userType).Scan(&dbID)
@@ -89,9 +90,15 @@ func GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			log.Printf("Usuario %s ya existe en la BD. Iniciando sesión...\n", email)
 			user.ID = dbID
-			user.Name = dbName
-			user.Picture = dbPicture
-			if user.UserType == "" {
+			if dbName.Valid && dbName.String != "" {
+				user.Name = dbName.String
+			}
+			if dbPicture.Valid && dbPicture.String != "" {
+				user.Picture = dbPicture.String
+			}
+			if dbUserType.Valid && dbUserType.String != "" {
+				user.UserType = dbUserType.String
+			} else if user.UserType == "" {
 				user.UserType = "citizen"
 			}
 		}

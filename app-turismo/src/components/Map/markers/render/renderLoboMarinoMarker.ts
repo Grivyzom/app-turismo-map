@@ -1,4 +1,5 @@
 import { TurismoEvent } from '../../types';
+
 import { renderVinetaBadge } from './renderVinetaBadge';
 
 export function renderLoboMarinoMarker(
@@ -9,7 +10,8 @@ export function renderLoboMarinoMarker(
 ) {
   pinEl.innerHTML = '';
   const container = document.createElement('div');
-  container.className = 'marker-lobo-marino-container';
+  // `pin-float`: la fauna respira, no late. Es su firma de movimiento.
+  container.className = 'marker-lobo-marino-container pin-float pin-ambient';
   Object.assign(container.style, {
     position: 'relative',
     width: '48px',
@@ -18,9 +20,9 @@ export function renderLoboMarinoMarker(
     alignItems: 'center',
     justifyContent: 'center',
     filter: isSelected
-      ? 'drop-shadow(0 0 8px rgba(255,255,255,0.8))'
-      : 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))',
-    transition: 'transform 0.3s ease, filter 0.3s ease',
+      ? 'drop-shadow(0 0 10px rgba(147,197,253,0.85)) drop-shadow(0 3px 6px rgba(2,6,14,0.5))'
+      : 'drop-shadow(0 3px 5px rgba(2,6,14,0.5))',
+    transition: 'filter 0.3s ease',
   });
 
   const isDark = mapStyleLayer === 'dark';

@@ -33,4 +33,4 @@ Una vez que el usuario se registra exitosamente como ciudadano (`citizen`), es t
 * **Persistencia local y remota:** Las preferencias se guardan en `AsyncStorage` en el cliente y se envían de forma asíncrona mediante un `PATCH` a `/api/v1/profile/preferences` usando el token JWT.
 * **Motor Predictivo:** Estos datos sirven de base fría para el motor de recomendación geoespacial.
 
-*Detalles, diagramas de secuencia Mermaid y especificación técnica completa en:* [[Flujo Ideal de Registro y Onboarding de Preferencias]].
+*Detalles, diagramas de secuencia Mermaid y especificación técnica completa en:* [[Flujo Ideal de Registro y Onboarding de Preferencias]] | [[Especificacion_Requisitos_Funcionales_y_No_Funcionales]].

@@ -1,6 +1,7 @@
+import React from 'react';
 import { Redirect } from 'expo-router';
 
-// Redirige a la vista unificada de autenticación
+// Redirige al mapa principal y abre el modal de inicio de sesión
 export default function LoginRedirect() {
-  return <Redirect href="/ingresar" />;
+  return <Redirect href="/(home)?auth=login" />;
 }

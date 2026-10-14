@@ -24,8 +24,8 @@ func SecurityHeadersMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		// Forzar HTTPS por 1 año (solo efectivo con TLS)
 		w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
-		// Desactivar APIs del navegador que no necesitamos
-		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(self)")
+		// Habilitar APIs necesarias para la app turística (GPS, búsqueda por voz, cámara, sensores de orientación)
+		w.Header().Set("Permissions-Policy", "geolocation=(self), camera=(self), microphone=(self), accelerometer=(self), gyroscope=(self), magnetometer=(self)")
 		// Prevenir caching de respuestas sensibles del admin
 		if len(r.URL.Path) > 6 && r.URL.Path[:7] == "/admin/" {
 			w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, private")

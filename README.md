@@ -66,24 +66,26 @@ APP-TURISMO-MAP/
 
 ---
 
-## 🚀 Flujo de Trabajo en Desarrollo
+## 🚀 Flujo de Trabajo en Desarrollo (con Hot Reload)
 
-Para levantar el ecosistema local de desarrollo, abre dos terminales de manera independiente en sus respectivas carpetas:
+Para desarrollar con **Hot Reload / Fast Refresh en tiempo real** (sin rebuilds de Docker):
 
-### 1️⃣ Levantar el Servidor Backend (Go)
-Accede al directorio del servidor e inicializa el ejecutable de Go:
+### 1️⃣ Iniciar Entorno de Desarrollo (Recomendado)
+Desde la raíz del proyecto, ejecuta:
 ```bash
-cd backend
-go run main.go
+./dev.sh
+# o también:
+pnpm dev
 ```
-*El servidor API se levantará de forma predeterminada, escuchando peticiones geográficas y autenticaciones.*
+Esto se encarga de:
+- Levantar los servicios de fondo en Docker (`backend` en puerto 8081, `redis` en 6380 y `whisper` en 8766).
+- Detener el contenedor frontend estático si existía.
+- Iniciar el servidor local de Expo Web con **Fast Refresh instantáneo** en `http://localhost:8082`.
 
-### 2️⃣ Levantar el Frontend (Expo Híbrido)
-Navega a la carpeta de la aplicación e inicia el Metro Bundler:
+### 2️⃣ Panel de Administración (Vite)
+Si también deseas trabajar en el panel administrativo:
 ```bash
-cd app-turismo
-pnpm expo start
+pnpm dev:admin
+# o: cd admin && npm run dev
 ```
-
-* **📱 Para Entorno Móvil (Android/iOS):** Escanea el código QR que se muestra en tu terminal usando la aplicación **Expo Go** en tu dispositivo físico (ambos dispositivos deben compartir la misma red local Wi-Fi).
-* **🌐 Para Entorno Web (Navegador):** Presiona `w` en la consola de Expo o dirígete a `http://localhost:8081` en tu navegador de preferencia.
+Disponible con HMR instantáneo en `http://localhost:5173/dev/`.

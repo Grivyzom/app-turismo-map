@@ -8,9 +8,13 @@ import (
 	"log"
 	"os"
 
+	_ "embed"
 	_ "github.com/lib/pq"
 	"github.com/redis/go-redis/v9"
 )
+
+//go:embed ciclovias_seed.json
+var cicloviasSeedData []byte
 
 var RDB *redis.Client
 var DB *sql.DB
@@ -140,6 +144,7 @@ func InitDB() {
 		);`,
 		`ALTER TABLE events ADD COLUMN IF NOT EXISTS image_url TEXT;`,
 		`ALTER TABLE events ADD COLUMN IF NOT EXISTS is_live BOOLEAN DEFAULT false;`,
+		`ALTER TABLE company_branches ADD COLUMN IF NOT EXISTS is_indoor BOOLEAN DEFAULT false;`,
 		`CREATE TABLE IF NOT EXISTS fauna_types (
 			id SERIAL PRIMARY KEY,
 			name VARCHAR(255) UNIQUE NOT NULL,
@@ -273,6 +278,45 @@ func InitDB() {
 			rating_avg DECIMAL(3,2) DEFAULT 0.0, -- Expert feature: user ratings
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		);`,
+		`ALTER TABLE routes ADD COLUMN IF NOT EXISTS name VARCHAR(255);`,
+		`UPDATE routes SET name = title WHERE name IS NULL AND title IS NOT NULL;`,
+		`ALTER TABLE routes ADD COLUMN IF NOT EXISTS route_type VARCHAR(50) DEFAULT 'direct';`,
+		`ALTER TABLE routes ADD COLUMN IF NOT EXISTS category VARCHAR(50) DEFAULT 'turistica';`,
+		`ALTER TABLE routes ADD COLUMN IF NOT EXISTS business_id INT;`,
+		`ALTER TABLE routes ADD COLUMN IF NOT EXISTS target_audience VARCHAR(50) DEFAULT 'all';`,
+		`ALTER TABLE routes ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT false;`,
+		`ALTER TABLE routes ADD COLUMN IF NOT EXISTS rating_avg DECIMAL(3,2) DEFAULT 0.0;`,
+		`ALTER TABLE routes ALTER COLUMN business_id DROP NOT NULL;`,
+		`ALTER TABLE routes ADD COLUMN IF NOT EXISTS user_id INT REFERENCES users(id) ON DELETE CASCADE;`,
+		`ALTER TABLE routes ADD COLUMN IF NOT EXISTS visibility VARCHAR(20) DEFAULT 'public';`,
+		`ALTER TABLE routes ADD COLUMN IF NOT EXISTS share_token UUID DEFAULT gen_random_uuid();`,
+		`ALTER TABLE routes ADD COLUMN IF NOT EXISTS is_system_route BOOLEAN DEFAULT false;`,
+		`ALTER TABLE routes ADD COLUMN IF NOT EXISTS original_route_id INT REFERENCES routes(id) ON DELETE SET NULL;`,
+		`ALTER TABLE routes ADD COLUMN IF NOT EXISTS transport_mode VARCHAR(20) DEFAULT 'foot';`,
+		`ALTER TABLE routes ADD COLUMN IF NOT EXISTS geom geometry(LineString, 4326);`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_routes_share_token ON routes(share_token);`,
+		`CREATE INDEX IF NOT EXISTS idx_routes_visibility ON routes(visibility);`,
+		`CREATE INDEX IF NOT EXISTS idx_routes_user_id ON routes(user_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_routes_geom ON routes USING GIST(geom);`,
+		`CREATE TABLE IF NOT EXISTS route_shares (
+			id SERIAL PRIMARY KEY,
+			route_id INT NOT NULL REFERENCES routes(id) ON DELETE CASCADE,
+			shared_with_user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			permission VARCHAR(10) DEFAULT 'view',
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			UNIQUE(route_id, shared_with_user_id)
+		);`,
+		`CREATE INDEX IF NOT EXISTS idx_route_shares_user ON route_shares(shared_with_user_id);`,
+		`CREATE TABLE IF NOT EXISTS user_saved_routes (
+			id SERIAL PRIMARY KEY,
+			user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			route_id INT NOT NULL REFERENCES routes(id) ON DELETE CASCADE,
+			status VARCHAR(20) DEFAULT 'planned',
+			completed_at TIMESTAMP WITH TIME ZONE,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			UNIQUE(user_id, route_id)
+		);`,
+		`CREATE INDEX IF NOT EXISTS idx_user_saved_routes_user ON user_saved_routes(user_id);`,
 		`CREATE TABLE IF NOT EXISTS route_points (
 			id SERIAL PRIMARY KEY,
 			route_id INT NOT NULL REFERENCES routes(id) ON DELETE CASCADE,
@@ -372,6 +416,31 @@ func InitDB() {
 
 		// ── Bio en perfil de ciudadano ────────────────────────────────────────
 		`ALTER TABLE citizen_profiles ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT '';`,
+
+		// ── Soporte para autenticación Clerk ─────────────────────────────────
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS clerk_id VARCHAR(255);`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_clerk_id ON users (clerk_id) WHERE clerk_id IS NOT NULL;`,
+
+		// ── Auditoría y validaciones en users ──────────────────────────────
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`,
+		`CREATE OR REPLACE FUNCTION update_users_updated_at()
+		RETURNS TRIGGER AS $$
+		BEGIN
+			NEW.updated_at = CURRENT_TIMESTAMP;
+			RETURN NEW;
+		END;
+		$$ LANGUAGE plpgsql;`,
+		`DROP TRIGGER IF EXISTS trg_users_updated_at ON users;`,
+		`CREATE TRIGGER trg_users_updated_at
+		BEFORE UPDATE ON users
+		FOR EACH ROW
+		EXECUTE FUNCTION update_users_updated_at();`,
+		`ALTER TABLE users DROP CONSTRAINT IF EXISTS chk_user_type;`,
+		`ALTER TABLE users ADD CONSTRAINT chk_user_type CHECK (user_type IN ('citizen', 'tourist', 'partner_owner', 'partner_worker'));`,
+		`ALTER TABLE users DROP CONSTRAINT IF EXISTS chk_user_status;`,
+		`ALTER TABLE users ADD CONSTRAINT chk_user_status CHECK (status IN ('active', 'pending', 'suspended'));`,
+		`ALTER TABLE citizen_profiles DROP CONSTRAINT IF EXISTS citizen_profiles_user_id_fkey;`,
+		`ALTER TABLE citizen_profiles ADD CONSTRAINT citizen_profiles_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;`,
 
 		// Asegurar restricciones de tipo de entidad en base de datos existente
 		`ALTER TABLE companies DROP CONSTRAINT IF EXISTS chk_entity_type;`,
@@ -612,15 +681,19 @@ func SeedCycleways() {
 
 	log.Println("Seeding cycleways database from json seed file...")
 
-	seedPath := "database/ciclovias_seed.json"
-	if _, err := os.Stat(seedPath); os.IsNotExist(err) {
-		seedPath = "backend/database/ciclovias_seed.json"
-	}
+	data := cicloviasSeedData
+	if len(data) == 0 {
+		seedPath := "database/ciclovias_seed.json"
+		if _, err := os.Stat(seedPath); os.IsNotExist(err) {
+			seedPath = "backend/database/ciclovias_seed.json"
+		}
 
-	data, err := os.ReadFile(seedPath)
-	if err != nil {
-		log.Printf("Error reading cycleways seed file: %v", err)
-		return
+		var err error
+		data, err = os.ReadFile(seedPath)
+		if err != nil {
+			log.Printf("Error reading cycleways seed file: %v", err)
+			return
+		}
 	}
 
 	type SeedItem struct {

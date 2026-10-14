@@ -50,6 +50,8 @@ services:
         condition: service_started
 
   frontend:
+    profiles:
+      - prod
     build:
       context: .
       dockerfile: app-turismo/Dockerfile
@@ -60,6 +62,7 @@ services:
         EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: ${EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID}
         EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID: ${EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID}
         EXPO_PUBLIC_BACKEND_URL: ${EXPO_PUBLIC_BACKEND_URL:-http://localhost:8081}
+        EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: ${EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY:-${PUBLIC_CLERK_PUBLISHABLE_KEY:-${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-${CLERK_PUBLISHABLE_KEY:-${VITE_CLERK_PUBLISHABLE_KEY}}}}}
         VITE_API_URL: ""
     container_name: turismo_frontend
     restart: unless-stopped
@@ -76,7 +79,7 @@ services:
     container_name: turismo_whisper
     restart: unless-stopped
     ports:
-      - "8765:8765"
+      - "8766:8765"
     volumes:
       - whisper_cache:/root/.cache/huggingface
     # deploy:

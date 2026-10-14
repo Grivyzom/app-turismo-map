@@ -23,7 +23,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { StatusBar } from 'expo-status-bar';
 
-import { SidebarSubmenu } from '../../src/components/MapUI/SidebarSubmenu';
+import { SidebarSubmenu } from '../../src/components/ui/SidebarSubmenu';
 import { PlaceDetailsIsland } from '../../src/components/MapUI/PlaceDetailsIsland';
 import { TelemetryWidget } from '../../src/components/MapUI/TelemetryWidget';
 import {
@@ -32,6 +32,7 @@ import {
   NotificationTray,
   RouterHUD,
   TacticalHUD,
+  ToolsFilterPanel,
 } from '../../src/components/MapUI';
 import { TelemetryHUD } from '../../src/components/MapUI/TelemetryHUD';
 import { BuildingGallery } from '../../src/components/MapUI/BuildingGallery';
@@ -46,7 +47,6 @@ import {
 import { MapContainer } from '../../src/components/Map/MapContainer';
 import { getCategoryColor, getCategoryIcon } from '../../src/utils/mapUtils';
 import { CHECKIN_EXCLUDED_CATEGORIES } from '../../src/utils/checkInStorage';
-import { getMockEvents, subscribeToEvents } from '../../src/data/mockEvents';
 import { calculateDistance } from '../../src/utils/locationUtils';
 import { getZoneCentroid } from '../../src/utils/locationUtils';
 import FloatingIsland from '../../src/components/ui/FloatingIsland';
@@ -60,15 +60,20 @@ import { CreatePointModal } from '../../src/components/MapUI/CreatePointModal';
 import { CreateSectorModal } from '../../src/components/MapUI/CreateSectorModal';
 import { CoordsEditorHUD } from '../../src/components/MapUI/CoordsEditorHUD';
 import { CategoryFilter, CATEGORY_ICONS, MAP_LAYER_OPTIONS } from '../../src/data/mockEvents';
-import { ContextualSurveyWidget } from '../../src/components/ui/ContextualSurveyWidget';
+import { isNoModalCategory } from '../../src/components/Map/design/pinDesignSystem';
 import { useAuth } from '../../src/context/AuthContext';
 import { lazyWithRetry } from '../../src/utils/lazyWithRetry';
-import { PlacesShelfTrigger, PlacesShelfPanel, PlaceItem } from '../../src/components/ui/BottomPlaceCarousel';
+import {
+  PlacesShelfTrigger,
+  PlacesShelfPanel,
+  PlaceItem,
+} from '../../src/components/ui/BottomPlaceCarousel';
+import { AuthModal } from '../../src/components/Auth/AuthModal';
 
-import { useHomeScreenState } from './useHomeScreenState';
-import { styles, NAVBAR_CLEARANCE } from './styles';
+import { useHomeScreenState } from '../../src/hooks/useHomeScreenState';
+import { styles, NAVBAR_CLEARANCE } from '../../src/styles/homeScreenStyles';
 import { NavigationHUD } from '../../src/components/MapUI/NavigationHUD';
-import { fetchOsrmRoute, OsrmRoute } from '../../src/utils/osrmService';
+import { fetchOsrmRoute, OsrmRoute, TransportMode } from '../../src/utils/osrmService';
 
 // --- Lazy-loaded screens ---
 const UserProfileScreen = lazyWithRetry(() => import('../../src/screens/UserProfileScreen'));
@@ -114,28 +119,34 @@ const ControlTooltip: React.FC<ControlTooltipProps> = ({ label, children, button
     timerRef.current = setTimeout(() => setVisible(false), 1500);
   }, []);
 
-  React.useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+  React.useEffect(
+    () => () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    },
+    [],
+  );
 
   // Web event handlers — objeto estable via useMemo
   const webProps = React.useMemo(
-    () => Platform.OS === 'web' ? { onMouseEnter: show, onMouseLeave: hide } : null,
+    () => (Platform.OS === 'web' ? { onMouseEnter: show, onMouseLeave: hide } : null),
     [show, hide],
   );
 
   // Inyecta onLongPress en el child sin sobreescribir el existente
   const child = children as React.ReactElement;
-  const childWithPress = Platform.OS !== 'web'
-    ? React.cloneElement(child as React.ReactElement<any>, {
-        onLongPress: () => {
-          (child.props as any)?.onLongPress?.();
-          showMobile();
-        },
-      })
-    : child;
+  const childWithPress =
+    Platform.OS !== 'web'
+      ? React.cloneElement(child as React.ReactElement<any>, {
+          onLongPress: () => {
+            (child.props as any)?.onLongPress?.();
+            showMobile();
+          },
+        })
+      : child;
 
   // Posicionamiento numérico exacto: tooltip a la izquierda del botón
   const tooltipRight = buttonSize + 10; // gap de 10px
-  const tooltipTop   = Math.round((buttonSize - TOOLTIP_H) / 2);
+  const tooltipTop = Math.round((buttonSize - TOOLTIP_H) / 2);
 
   return (
     <View style={tooltipWrap} {...(webProps as any)}>
@@ -145,7 +156,9 @@ const ControlTooltip: React.FC<ControlTooltipProps> = ({ label, children, button
           style={[tooltipStyles.bubble, { right: tooltipRight, top: tooltipTop }]}
           pointerEvents="none"
         >
-          <Text style={tooltipStyles.text} numberOfLines={1}>{label}</Text>
+          <Text style={tooltipStyles.text} numberOfLines={1}>
+            {label}
+          </Text>
           <View style={tooltipStyles.arrow} />
         </View>
       )}
@@ -201,61 +214,21 @@ function deterministicRating(id: string | number): { rating: number; reviews: nu
   return { rating, reviews };
 }
 
-interface MapLayerMenuProps {
-  currentLayer: any;
-  onSelectLayer: (layer: any) => void;
-  isReady: boolean;
-}
-
-const MapLayerMenu: React.FC<MapLayerMenuProps> = ({ currentLayer, onSelectLayer, isReady }) => {
-  return (
-    <View style={{ marginTop: 16, paddingHorizontal: 16 }}>
-      <Text
-        style={[
-          styles.filterSectionTitle,
-          { paddingHorizontal: 0, marginBottom: 8, color: '#94A3B8' },
-        ]}
-      >
-        Capa del Mapa
-      </Text>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-        {MAP_LAYER_OPTIONS.map((layer) => {
-          const IconComponent = layer.iconFamily === 'Ionicons' ? Ionicons : MaterialIcons;
-          const isActive = currentLayer === layer.key;
-          return (
-            <TouchableOpacity
-              key={layer.key}
-              style={[
-                styles.layerChip,
-                isActive && styles.activeLayerChip,
-                { flex: 1, minWidth: 80 },
-              ]}
-              onPress={() => onSelectLayer(layer.key)}
-              disabled={!isReady}
-            >
-              <IconComponent
-                name={layer.iconName}
-                size={14}
-                color={isActive ? '#34D399' : '#CBD5E0'}
-                style={{ marginRight: 6 }}
-              />
-              <Text style={[styles.layerChipText, isActive && styles.activeLayerChipText]}>
-                {layer.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-    </View>
-  );
-};
-
 export default function HomeScreen() {
-  const { token } = useAuth();
+  const { token, isAuthModalOpen, openAuthModal, isAuthenticated } = useAuth();
   const { userLocation, retryLocation } = useUserLocationContext();
   console.log('[DEBUG] Rendering HomeScreen v2.2');
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
+
+  useEffect(() => {
+    if (params.auth === 'login' || params.auth === 'register') {
+      if (!isAuthenticated) {
+        openAuthModal(params.auth as any);
+      }
+      router.setParams({ auth: undefined });
+    }
+  }, [params.auth, openAuthModal, isAuthenticated]);
 
   const [collectionModalVisible, setCollectionModalVisible] = useState(false);
   const [locationToSave, setLocationToSave] = useState<any>(null);
@@ -275,6 +248,8 @@ export default function HomeScreen() {
 
   const {
     events,
+    selectedCategories,
+    setSelectedCategories,
     selectedCategory,
     setSelectedCategory,
     selectedEvent,
@@ -369,6 +344,8 @@ export default function HomeScreen() {
     showCycleways,
     setShowCycleways,
     cycleways,
+    cameraAnimationsEnabled,
+    toggleCameraAnimations,
 
     // Routing Mode (Geo-Router)
     isRoutingActive,
@@ -382,6 +359,7 @@ export default function HomeScreen() {
     draftRouteName,
     setDraftRouteName,
     isRouteFinished,
+    setIsRouteFinished,
     savedRoutes,
     showSavedRoutes,
     setShowSavedRoutes,
@@ -390,6 +368,22 @@ export default function HomeScreen() {
     saveRoute,
     cancelRouting,
     rateRoute,
+    transportMode,
+    setTransportMode,
+    routeVisibility,
+    setRouteVisibility,
+    draftRouteGeojson,
+    osrmDistance,
+    osrmDuration,
+    isCalculatingOsrm,
+    undoLastRoutePoint,
+    recalculateDraftRoute,
+    latestShareToken,
+    routeAlternatives,
+    selectedAlternativeIndex,
+    selectRouteAlternative,
+    optimizeDraftRouteOrder,
+    isOptimizingTrip,
     viewMode,
     handleToggleViewMode,
     mapDisplayMode,
@@ -423,7 +417,7 @@ export default function HomeScreen() {
             userLocation.latitude,
             userLocation.longitude,
             e.latitude,
-            e.longitude
+            e.longitude,
           );
           distNum = meters / 1000;
           dist = distNum.toFixed(1) + ' km';
@@ -467,24 +461,67 @@ export default function HomeScreen() {
     }
   }, [params.action]);
 
+  // Cerrar dropdown de herramientas si se abre cualquier otro modal, menú o panel
+  useEffect(() => {
+    if (
+      collectionModalVisible ||
+      showCollectionsIsland ||
+      showCoordsEditor ||
+      shelfOpen ||
+      showNearbyEvents ||
+      showSectorsConfig ||
+      selectedEvent ||
+      showNotificationTray ||
+      showCreateEventModal ||
+      showCheckInModal
+    ) {
+      setShowFilters(false);
+    }
+  }, [
+    collectionModalVisible,
+    showCollectionsIsland,
+    showCoordsEditor,
+    shelfOpen,
+    showNearbyEvents,
+    showSectorsConfig,
+    selectedEvent,
+    showNotificationTray,
+    showCreateEventModal,
+    showCheckInModal,
+    setShowFilters,
+  ]);
+
   const isEmergencyEvent = selectedEvent
     ? ['choque', 'incendio', 'accidente', 'calle_cortada'].includes(selectedEvent.category)
     : false;
 
   const hasFloatingMinimodal = selectedEvent
-    ? ['tienda', 'fauna', 'hospital', 'clinica', 'universidad', 'bombero', 'carabinero', 'camara'].includes(
-        selectedEvent.category?.toLowerCase() || ''
-      )
+    ? [
+        'tienda',
+        'fauna',
+        'hospital',
+        'clinica',
+        'universidad',
+        'bombero',
+        'carabinero',
+        'camara',
+      ].includes(selectedEvent.category?.toLowerCase() || '')
     : false;
 
   // ── OSRM In-app Navigation ──────────────────────────────────────────────
   const [navRoute, setNavRoute] = useState<OsrmRoute | null>(null);
   const [navLoading, setNavLoading] = useState(false);
+  const [navTransportMode, setNavTransportMode] = useState<TransportMode>('foot');
+  const [navDestinationCoords, setNavDestinationCoords] = useState<{ lat: number; lng: number } | null>(null);
   const userLocationRef = React.useRef(userLocation);
-  useEffect(() => { userLocationRef.current = userLocation; }, [userLocation]);
+  useEffect(() => {
+    userLocationRef.current = userLocation;
+  }, [userLocation]);
 
   const handleNavigateTo = useCallback(
-    async (destLat: number, destLng: number) => {
+    async (destLat: number, destLng: number, modeOverride?: TransportMode) => {
+      const mode = modeOverride ?? navTransportMode;
+      setNavDestinationCoords({ lat: destLat, lng: destLng });
       setNavLoading(true);
       try {
         // Si no hay GPS, pedir permiso y esperar hasta 6s
@@ -493,34 +530,51 @@ export default function HomeScreen() {
           retryLocation();
           await new Promise<void>((resolve) => {
             const check = setInterval(() => {
-              if (userLocationRef.current) { clearInterval(check); resolve(); }
+              if (userLocationRef.current) {
+                clearInterval(check);
+                resolve();
+              }
             }, 300);
-            setTimeout(() => { clearInterval(check); resolve(); }, 6000);
+            setTimeout(() => {
+              clearInterval(check);
+              resolve();
+            }, 6000);
           });
           origin = userLocationRef.current;
         }
 
         // Fallback: centro de Valdivia si GPS sigue sin responder
-        const originLat = origin?.latitude  ?? -39.8142;
+        const originLat = origin?.latitude ?? -39.8142;
         const originLng = origin?.longitude ?? -73.2459;
 
-        console.log('[NAV] Calculando ruta OSRM:', originLat, originLng, '→', destLat, destLng);
-        const route = await fetchOsrmRoute(originLat, originLng, destLat, destLng);
+        console.log(`[NAV] Calculando ruta OSRM (${mode}):`, originLat, originLng, '→', destLat, destLng);
+        const route = await fetchOsrmRoute(originLat, originLng, destLat, destLng, mode, { includeAlternatives: true });
         console.log('[NAV] Ruta obtenida:', route.distance, 'm,', route.duration, 's');
         setNavRoute(route);
       } catch (err) {
         console.error('[NAV] OSRM falló:', err);
-        Linking.openURL(
-          `https://www.google.com/maps/dir/?api=1&destination=${destLat},${destLng}`,
-        );
+        Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${destLat},${destLng}`);
       } finally {
         setNavLoading(false);
       }
     },
-    [retryLocation],
+    [retryLocation, navTransportMode],
   );
 
-  const handleCancelNav = useCallback(() => setNavRoute(null), []);
+  const handleNavTransportModeChange = useCallback(
+    (newMode: TransportMode) => {
+      setNavTransportMode(newMode);
+      if (navDestinationCoords) {
+        handleNavigateTo(navDestinationCoords.lat, navDestinationCoords.lng, newMode);
+      }
+    },
+    [navDestinationCoords, handleNavigateTo],
+  );
+
+  const handleCancelNav = useCallback(() => {
+    setNavRoute(null);
+    setNavDestinationCoords(null);
+  }, []);
 
   const handleSectorPress = useCallback(
     (zone: any) => {
@@ -577,13 +631,13 @@ export default function HomeScreen() {
     (data: any) => {
       if (!token) {
         showNotification('Inicia sesión para guardar ubicaciones', 'warning');
-        router.push('/ingresar');
+        openAuthModal('login');
         return;
       }
       setLocationToSave(data);
       setCollectionModalVisible(true);
     },
-    [token, showNotification],
+    [token, showNotification, openAuthModal],
   );
 
   const handleSaveSector = useCallback(() => {
@@ -636,7 +690,7 @@ export default function HomeScreen() {
 
   // Posición medida de los botones "Herramientas" y "Notificaciones" del navbar,
   // para anclar sus paneles justo debajo (en vez de una posición fija).
-  const FILTERS_PANEL_WIDTH = 300;
+  const FILTERS_PANEL_WIDTH = 320;
   const NOTIFICATIONS_PANEL_WIDTH = 320;
   const [filtersAnchor, setFiltersAnchor] = React.useState({
     top: NAVBAR_CLEARANCE,
@@ -732,7 +786,7 @@ export default function HomeScreen() {
     }
   }, [showCreateEventModal, resolvedAddress]);
 
-  if (!isDesktop && activeTab === 'profile') {
+  if (!isDesktop && !isAuthModalOpen && activeTab === 'profile') {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar style="light" />
@@ -761,7 +815,7 @@ export default function HomeScreen() {
     );
   }
 
-  if (!isDesktop && activeTab === 'feed') {
+  if (!isDesktop && !isAuthModalOpen && activeTab === 'feed') {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar style="light" />
@@ -774,6 +828,7 @@ export default function HomeScreen() {
             onVoicePartialSearch={handleVoicePartialSearch}
             notificationsCount={notifications.filter((n) => !n.isRead).length}
             onNotificationClick={() => setShowNotificationTray(!showNotificationTray)}
+            isNotificationsOpen={showNotificationTray}
             onNotificationsAnchorChange={handleNotificationsAnchorChange}
             onTabHover={prefetchFeed}
             mapDisplayMode={mapDisplayMode}
@@ -795,7 +850,7 @@ export default function HomeScreen() {
     );
   }
 
-  if (!isDesktop && activeTab === 'eventos') {
+  if (!isDesktop && !isAuthModalOpen && activeTab === 'eventos') {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar style="light" />
@@ -808,6 +863,7 @@ export default function HomeScreen() {
             onVoicePartialSearch={handleVoicePartialSearch}
             notificationsCount={notifications.filter((n) => !n.isRead).length}
             onNotificationClick={() => setShowNotificationTray(!showNotificationTray)}
+            isNotificationsOpen={showNotificationTray}
             onNotificationsAnchorChange={handleNotificationsAnchorChange}
             onTabHover={prefetchEventos}
             mapDisplayMode={mapDisplayMode}
@@ -829,7 +885,7 @@ export default function HomeScreen() {
     );
   }
 
-  if (!isDesktop && activeTab === 'historial') {
+  if (!isDesktop && !isAuthModalOpen && activeTab === 'historial') {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar style="light" />
@@ -842,6 +898,7 @@ export default function HomeScreen() {
             onVoicePartialSearch={handleVoicePartialSearch}
             notificationsCount={notifications.filter((n) => !n.isRead).length}
             onNotificationClick={() => setShowNotificationTray(!showNotificationTray)}
+            isNotificationsOpen={showNotificationTray}
             onNotificationsAnchorChange={handleNotificationsAnchorChange}
             onTabHover={prefetchHistorial}
             mapDisplayMode={mapDisplayMode}
@@ -863,7 +920,7 @@ export default function HomeScreen() {
     );
   }
 
-  if (!isDesktop && activeTab === 'saved') {
+  if (!isDesktop && !isAuthModalOpen && activeTab === 'saved') {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar style="light" />
@@ -876,6 +933,7 @@ export default function HomeScreen() {
             onVoicePartialSearch={handleVoicePartialSearch}
             notificationsCount={notifications.filter((n) => !n.isRead).length}
             onNotificationClick={() => setShowNotificationTray(!showNotificationTray)}
+            isNotificationsOpen={showNotificationTray}
             onNotificationsAnchorChange={handleNotificationsAnchorChange}
             onTabHover={prefetchSaved}
             mapDisplayMode={mapDisplayMode}
@@ -897,7 +955,7 @@ export default function HomeScreen() {
     );
   }
 
-  if (!isDesktop && activeTab === 'forum') {
+  if (!isDesktop && !isAuthModalOpen && activeTab === 'forum') {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar style="light" />
@@ -910,6 +968,7 @@ export default function HomeScreen() {
             onVoicePartialSearch={handleVoicePartialSearch}
             notificationsCount={notifications.filter((n) => !n.isRead).length}
             onNotificationClick={() => setShowNotificationTray(!showNotificationTray)}
+            isNotificationsOpen={showNotificationTray}
             onNotificationsAnchorChange={handleNotificationsAnchorChange}
             onTabHover={prefetchForum}
             mapDisplayMode={mapDisplayMode}
@@ -938,10 +997,10 @@ export default function HomeScreen() {
       <LocationErrorNotifier showNotification={showNotification} />
 
       <View
-        pointerEvents={activeTab === 'map' ? 'auto' : 'none'}
+        pointerEvents={activeTab === 'map' && !isAuthModalOpen ? 'auto' : 'none'}
         style={[
           styles.mapContainer,
-          activeTab !== 'map' && {
+          (activeTab !== 'map' || isAuthModalOpen) && {
             ...Platform.select({
               web: {
                 filter: 'blur(12px) brightness(0.65)',
@@ -959,6 +1018,7 @@ export default function HomeScreen() {
           selectedEvent={selectedEvent}
           onSelectEvent={handleSelectEvent}
           mapLayer={mapLayer}
+          onSelectLayer={setMapLayer}
           centerTrigger={centerTrigger}
           tacticalMode={isTacticalModeActive}
           onTacticalLocationChange={setTacticalLocation}
@@ -987,7 +1047,10 @@ export default function HomeScreen() {
           savedRoutes={showSavedRoutes ? savedRoutes : []}
           onRateRoute={rateRoute}
           activeNestedZone={activeNestedZone}
-          navRouteGeojson={navRoute?.geojson ?? null}
+          navRouteGeojson={isRoutingActive ? (draftRouteGeojson ?? null) : (navRoute?.geojson ?? null)}
+          userLocation={userLocation}
+          isAuthenticated={isAuthenticated}
+          cameraAnimationsEnabled={cameraAnimationsEnabled}
         />
       </View>
 
@@ -997,6 +1060,9 @@ export default function HomeScreen() {
           route={navRoute}
           destinationName={selectedEvent.title}
           destinationColor={getCategoryColor(selectedEvent.category)}
+          transportMode={navTransportMode}
+          onChangeTransportMode={handleNavTransportModeChange}
+          isLoadingMode={navLoading}
           onCancel={handleCancelNav}
         />
       )}
@@ -1176,6 +1242,9 @@ export default function HomeScreen() {
         </View>
       )}
 
+      {/* ━━━ MODAL DE AUTENTICACIÓN (sobre el mapa, debajo del navbar superior) ━━━ */}
+      <AuthModal />
+
       {/* ━━━ NAVBAR SUPERIOR ━━━ */}
       <View style={[styles.topBarWrapper, { zIndex: 6000 }]} pointerEvents="box-none">
         <TopAppBar
@@ -1185,6 +1254,7 @@ export default function HomeScreen() {
           onVoicePartialSearch={handleVoicePartialSearch}
           notificationsCount={notifications.filter((n) => !n.isRead).length}
           onNotificationClick={() => setShowNotificationTray(!showNotificationTray)}
+          isNotificationsOpen={showNotificationTray}
           onNotificationsAnchorChange={handleNotificationsAnchorChange}
           mapDisplayMode={mapDisplayMode}
           onMapDisplayModeChange={setMapDisplayMode}
@@ -1205,7 +1275,7 @@ export default function HomeScreen() {
           pointerEvents={shelfOpen ? 'none' : 'auto'}
           style={[
             styles.unifiedControlsContainer,
-            { 
+            {
               bottom: isDesktop ? 20 : Math.max(insets.bottom, 20),
               opacity: unifiedControlsAnim,
               transform: [
@@ -1220,8 +1290,8 @@ export default function HomeScreen() {
                     inputRange: [0, 1],
                     outputRange: [0.95, 1], // slight shrink when hiding
                   }),
-                }
-              ]
+                },
+              ],
             },
           ]}
         >
@@ -1236,7 +1306,7 @@ export default function HomeScreen() {
             >
               <MaterialIcons
                 name="zoom-in"
-                size={isDesktop ? 20 : 24}
+                size={isDesktop ? 18 : 22}
                 color={showZoomSlider ? '#34D399' : '#9CA3AF'}
               />
             </TouchableOpacity>
@@ -1257,10 +1327,7 @@ export default function HomeScreen() {
           {/* Modo Táctico */}
           <ControlTooltip label="Modo Táctico" buttonSize={isDesktop ? 36 : 44}>
             <TouchableOpacity
-              style={[
-                styles.controlButton,
-                isTacticalModeActive && { backgroundColor: 'rgba(52, 211, 153, 0.12)' },
-              ]}
+              style={[styles.controlButton, isTacticalModeActive && styles.controlButtonActive]}
               onPress={() => {
                 const nextState = !isTacticalModeActive;
                 setIsTacticalModeActive(nextState);
@@ -1359,7 +1426,9 @@ export default function HomeScreen() {
       )}
 
       {/* Menú de Herramientas Flotante (State-based) */}
-      {showMainUI && !activeNestedZone && !selectedEvent && <WeatherForecastWidget isDark={mapLayer === 'dark'} />}
+      {showMainUI && !activeNestedZone && !selectedEvent && (
+        <WeatherForecastWidget isDark={mapLayer === 'dark'} />
+      )}
 
       {/* HUD for Nested Zone Exit with Vertical Floor Selector */}
       {activeNestedZone && (
@@ -1537,6 +1606,25 @@ export default function HomeScreen() {
             onSave={saveRoute}
             onCancel={cancelRouting}
             hideSaveBlock={routingType === 'sector'}
+            isPartner={Boolean(
+              userProfile?.userType &&
+              ['partner_owner', 'partner_worker'].includes(userProfile.userType),
+            )}
+            transportMode={transportMode}
+            setTransportMode={setTransportMode}
+            visibility={routeVisibility}
+            setVisibility={setRouteVisibility}
+            onUndoLastPoint={undoLastRoutePoint}
+            onRecalculate={recalculateDraftRoute}
+            osrmDistance={osrmDistance}
+            osrmDuration={osrmDuration}
+            isCalculatingOsrm={isCalculatingOsrm}
+            routeAlternatives={routeAlternatives}
+            selectedAlternativeIndex={selectedAlternativeIndex}
+            onSelectAlternative={selectRouteAlternative}
+            onOptimizeOrder={optimizeDraftRouteOrder}
+            isOptimizingOrder={isOptimizingTrip}
+            onEditRoute={() => setIsRouteFinished(false)}
           />
 
           {isRouteFinished && routingType === 'sector' && (
@@ -1583,243 +1671,76 @@ export default function HomeScreen() {
       )}
 
       {showMainUI && showFilters && (
-        <View style={styles.sidePanelOverlay} pointerEvents="box-none">
-          <Pressable style={styles.sidePanelBackdrop} onPress={() => setShowFilters(false)} />
-          <View
-            style={[
-              styles.filterOverlay,
-              isDesktop
-                ? {
-                    top: filtersAnchor.top,
-                    left: filtersAnchor.left,
-                    bottom: 'auto',
-                    right: 'auto',
-                    width: 300,
-                  }
-                : {
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    width: '100%',
-                    borderBottomLeftRadius: 0,
-                    borderBottomRightRadius: 0,
-                    paddingBottom: Math.max(insets.bottom, 20),
-                  },
-            ]}
-          >
-            {!isDesktop && <View style={styles.sheetHandle} />}
-            <View style={styles.filterHeader}>
-              <Text style={styles.filterSectionTitle}>Explorar</Text>
-              {!isDesktop && (
-                <TouchableOpacity
-                  onPress={() => setShowFilters(false)}
-                  style={styles.closeButtonCompact}
-                >
-                  <Ionicons name="close" size={20} color="#A0AEC0" />
-                </TouchableOpacity>
-              )}
-            </View>
-
-            <ScrollView
-              style={{ flexShrink: 1, maxHeight: isDesktop ? 600 : '70%' }}
-              contentContainerStyle={{ paddingBottom: 20 }}
-              showsVerticalScrollIndicator={false}
-              bounces={false}
-            >
-              <Text style={[styles.filterSectionTitle, { marginTop: 0 }]}>Categorías</Text>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  flexWrap: 'wrap',
-                  paddingHorizontal: 16,
-                  marginBottom: 8,
-                }}
-              >
-                {(
-                  [
-                    'todos',
-                    'ninguno',
-                    'gastronomia',
-                    'cultura',
-                    'naturaleza',
-                    'musica',
-                    'deportes',
-                    'publico',
-                    'emergencia',
-                    'embarcacion',
-                    'tienda',
-                  ] as CategoryFilter[]
-                ).map((cat) => {
-                  const iconData = CATEGORY_ICONS[cat];
-                  const IconComponent = iconData.family === 'Ionicons' ? Ionicons : MaterialIcons;
-                  const isActive = selectedCategory === cat;
-                  return (
-                    <TouchableOpacity
-                      key={cat}
-                      style={[styles.categoryChip, isActive && styles.activeCategoryChip]}
-                      onPress={() => setSelectedCategory(cat)}
-                    >
-                      <IconComponent
-                        name={iconData.name}
-                        size={14}
-                        color={isActive ? '#FFFFFF' : '#CBD5E0'}
-                        style={{ marginRight: 6 }}
-                      />
-                      <Text style={[styles.categoryText, isActive && styles.activeCategoryText]}>
-                        {cat === 'ninguno'
-                          ? 'Ocultar Pines'
-                          : cat === 'embarcacion'
-                            ? 'Embarcaciones'
-                            : cat === 'emergencia'
-                              ? 'Emergencias'
-                              : cat.charAt(0).toUpperCase() + cat.slice(1)}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              <Text style={styles.filterSectionTitle}>Herramientas</Text>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  flexWrap: 'wrap',
-                  paddingHorizontal: 16,
-                  marginBottom: 8,
-                }}
-              >
-                <TouchableOpacity
-                  style={[
-                    styles.toolChip,
-                    showNearbyEvents && styles.activeToolChip,
-                    { paddingHorizontal: 12 },
-                  ]}
-                  onPress={() => {
-                    setShowNearbyEvents(!showNearbyEvents);
-                    showNotification(
-                      !showNearbyEvents ? 'Calendario activado' : 'Calendario desactivado',
-                    );
-                  }}
-                >
-                  <MaterialIcons
-                    name="calendar-today"
-                    size={16}
-                    color={showNearbyEvents ? '#34D399' : '#9CA3AF'}
-                  />
-                  <Text
-                    style={[styles.toolChipText, showNearbyEvents && styles.activeToolChipText]}
-                  >
-                    Eventos
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.toolChip,
-                    showTraffic && styles.activeToolChip,
-                    { paddingHorizontal: 12 },
-                  ]}
-                  onPress={() => {
-                    setShowTraffic(!showTraffic);
-                    showNotification(
-                      !showTraffic ? 'Tráfico en vivo activado' : 'Tráfico desactivado',
-                    );
-                  }}
-                >
-                  <MaterialIcons
-                    name="traffic"
-                    size={16}
-                    color={showTraffic ? '#34D399' : '#9CA3AF'}
-                  />
-                  <Text style={[styles.toolChipText, showTraffic && styles.activeToolChipText]}>
-                    Tráfico
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.toolChip,
-                    showCycleways && styles.activeToolChip,
-                    { paddingHorizontal: 12 },
-                  ]}
-                  onPress={() => {
-                    setShowCycleways(!showCycleways);
-                    showNotification(
-                      !showCycleways ? '🚲 Ciclovías activadas' : 'Ciclovías desactivadas',
-                    );
-                  }}
-                >
-                  <MaterialIcons
-                    name="directions-bike"
-                    size={16}
-                    color={showCycleways ? '#34D399' : '#9CA3AF'}
-                  />
-                  <Text style={[styles.toolChipText, showCycleways && styles.activeToolChipText]}>
-                    Ciclovías
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.toolChip,
-                    showSectors && styles.activeToolChip,
-                    { paddingHorizontal: 12 },
-                  ]}
-                  onPress={() => {
-                    setShowSectors(true);
-                    setShowSectorsConfig(true);
-                    setShowFilters(false);
-                  }}
-                >
-                  <MaterialIcons
-                    name="layers"
-                    size={16}
-                    color={showSectors ? '#34D399' : '#9CA3AF'}
-                  />
-                  <Text style={[styles.toolChipText, showSectors && styles.activeToolChipText]}>
-                    Sectores
-                  </Text>
-                </TouchableOpacity>
-
-                {userProfile?.userType &&
-                  ['partner_owner', 'partner_worker'].includes(userProfile.userType) && (
-                    <TouchableOpacity
-                      style={[
-                        styles.toolChip,
-                        isRoutingActive && styles.activeToolChip,
-                        { paddingHorizontal: 12 },
-                      ]}
-                      onPress={() => {
-                        setIsRoutingActive(!isRoutingActive);
-                        setShowFilters(false);
-                        if (!isRoutingActive) showNotification('Modo Geo-Router activado.');
-                      }}
-                    >
-                      <MaterialIcons
-                        name="route"
-                        size={16}
-                        color={isRoutingActive ? '#34D399' : '#9CA3AF'}
-                      />
-                      <Text
-                        style={[styles.toolChipText, isRoutingActive && styles.activeToolChipText]}
-                      >
-                        Geo-Router
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-              </View>
-
-              <MapLayerMenu
-                currentLayer={mapLayer}
-                onSelectLayer={setMapLayer}
-                isReady={mapLayerReady}
-              />
-            </ScrollView>
-          </View>
-        </View>
+        <ToolsFilterPanel
+          visible={showFilters}
+          onClose={() => setShowFilters(false)}
+          anchor={filtersAnchor}
+          isDesktop={isDesktop}
+          selectedCategories={selectedCategories}
+          onSelectCategories={setSelectedCategories}
+          showNearbyEvents={showNearbyEvents}
+          onToggleNearbyEvents={() => {
+            const next = !showNearbyEvents;
+            setShowNearbyEvents(next);
+            if (next) {
+              setShowFilters(false);
+            }
+            showNotification(next ? 'Calendario activado' : 'Calendario desactivado');
+          }}
+          showTraffic={showTraffic}
+          onToggleTraffic={() => {
+            setShowTraffic(!showTraffic);
+            showNotification(!showTraffic ? 'Tráfico en vivo activado' : 'Tráfico desactivado');
+          }}
+          showCycleways={showCycleways}
+          onToggleCycleways={() => {
+            setShowCycleways(!showCycleways);
+            showNotification(!showCycleways ? '🚲 Ciclovías activadas' : 'Ciclovías desactivadas');
+          }}
+          showSectors={showSectors}
+          onOpenSectors={() => {
+            setShowSectors(true);
+            setShowSectorsConfig(true);
+            setShowFilters(false);
+          }}
+          cameraAnimationsEnabled={cameraAnimationsEnabled}
+          onToggleCameraAnimations={() => {
+            toggleCameraAnimations();
+            if (!cameraAnimationsEnabled && userLocation) {
+              setCenterTrigger((prev) => prev + 1);
+            }
+            showNotification(
+              !cameraAnimationsEnabled
+                ? '🎬 Efectos de cámara GTA V activados'
+                : 'Efectos de cámara desactivados',
+            );
+          }}
+          isRoutingAvailable={true}
+          isPartner={Boolean(
+            userProfile?.userType &&
+            ['partner_owner', 'partner_worker'].includes(userProfile.userType),
+          )}
+          isRoutingActive={isRoutingActive}
+          onToggleRouting={() => {
+            setIsRoutingActive(!isRoutingActive);
+            setShowFilters(false);
+            if (!isRoutingActive) {
+              const isPartner = Boolean(
+                userProfile?.userType &&
+                ['partner_owner', 'partner_worker'].includes(userProfile.userType),
+              );
+              showNotification(
+                isPartner ? 'Modo Geo-Router activado.' : 'Modo Planificador de Ruta activado.',
+              );
+            }
+          }}
+          mapLayer={mapLayer}
+          onSelectMapLayer={setMapLayer}
+          mapLayerReady={mapLayerReady}
+        />
       )}
 
-      {showMainUI && selectedEvent && !hasFloatingMinimodal && (
+      {showMainUI && selectedEvent && !hasFloatingMinimodal && !isNoModalCategory(selectedEvent.category) && (
         <View style={styles.sidePanelOverlay} pointerEvents="box-none">
           {/* Tap-to-dismiss backdrop */}
           <Pressable style={styles.sidePanelBackdrop} onPress={closeEventPanel} />
@@ -1975,9 +1896,7 @@ export default function HomeScreen() {
                   </Text>
                 </View>
 
-
                 <Text style={styles.cardDescPremium}>{selectedEvent.description}</Text>
-
 
                 {/* Rejilla Horizontal de Metadatos (Info Hub) */}
                 <View style={styles.metaInfoGrid}>
@@ -1997,13 +1916,10 @@ export default function HomeScreen() {
                       color={getCategoryColor(selectedEvent.category, selectedEvent.musicStyle)}
                     />
                     <Text style={styles.metaGridText} numberOfLines={1}>
-                      {isEmergencyEvent
-                        ? 'ALERTA'
-                        : selectedEvent.category.toUpperCase()}
+                      {isEmergencyEvent ? 'ALERTA' : selectedEvent.category.toUpperCase()}
                     </Text>
                   </View>
                 </View>
-
 
                 <TouchableOpacity
                   style={[styles.premiumActionButton, { marginTop: 12 }]}
@@ -2033,7 +1949,7 @@ export default function HomeScreen() {
                           onPress={() => setSelectedSpot(spot)}
                           activeOpacity={0.7}
                         >
-                          {spot.imageUrl && (
+                          {!!spot.imageUrl && (
                             <Image source={{ uri: spot.imageUrl }} style={styles.spotCardImage} />
                           )}
                           <View style={styles.spotCardBadge}>
@@ -2121,11 +2037,10 @@ export default function HomeScreen() {
 
           {/* Mini-modal for Spot */}
           {selectedSpot && (
-            <Pressable
-              style={styles.spotModalOverlay}
-              onPress={() => setSelectedSpot(null)}
-            >
-              <View style={[styles.spotModal, { marginBottom: isDesktop ? 0 : insets.bottom + 40 }]}>
+            <Pressable style={styles.spotModalOverlay} onPress={() => setSelectedSpot(null)}>
+              <View
+                style={[styles.spotModal, { marginBottom: isDesktop ? 0 : insets.bottom + 40 }]}
+              >
                 <TouchableOpacity
                   style={styles.spotModalClose}
                   onPress={() => setSelectedSpot(null)}
@@ -2133,7 +2048,7 @@ export default function HomeScreen() {
                   <Ionicons name="close" size={24} color="#94A3B8" />
                 </TouchableOpacity>
 
-                {selectedSpot.imageUrl && (
+                {!!selectedSpot.imageUrl && (
                   <Image source={{ uri: selectedSpot.imageUrl }} style={styles.spotModalImage} />
                 )}
 
@@ -2141,7 +2056,10 @@ export default function HomeScreen() {
                   <View
                     style={[
                       styles.spotModalBadge,
-                      { backgroundColor: getCategoryColor(selectedEvent?.category || 'naturaleza') + '20' },
+                      {
+                        backgroundColor:
+                          getCategoryColor(selectedEvent?.category || 'naturaleza') + '20',
+                      },
                     ]}
                   >
                     <Text
@@ -2171,7 +2089,7 @@ export default function HomeScreen() {
           )}
 
           {/* Island for Place Details (Right side or sliding up overlay) */}
-          {showDetailsIsland && selectedEvent && (
+          {showDetailsIsland && selectedEvent && !isNoModalCategory(selectedEvent.category) && (
             <PlaceDetailsIsland
               selectedEvent={selectedEvent}
               slideAnim={detailsIslandSlide}
@@ -2181,7 +2099,6 @@ export default function HomeScreen() {
           )}
         </View>
       )}
-
 
       {/* --- Sector Info Card (Before Exploring) --- */}
       {showMainUI &&
@@ -2214,7 +2131,7 @@ export default function HomeScreen() {
               <View
                 style={[styles.miniBannerContainer, { height: 100, backgroundColor: '#1E293B' }]}
               >
-                {heroImage && <Image source={{ uri: heroImage }} style={styles.miniBannerImage} />}
+                {!!heroImage && <Image source={{ uri: heroImage }} style={styles.miniBannerImage} />}
                 <View style={styles.miniBannerOverlay} />
                 <TouchableOpacity
                   onPress={closeSectorPanel}
@@ -2254,7 +2171,7 @@ export default function HomeScreen() {
                           </Text>
                         </View>
                       )}
-                      {selectedSector.openingHours && (
+                      {!!selectedSector.openingHours && (
                         <View style={styles.sectorBadgePill}>
                           <Ionicons name="time-outline" size={12} color="#A0AEC0" />
                           <Text style={styles.sectorBadgePillText} numberOfLines={1}>
@@ -2262,7 +2179,7 @@ export default function HomeScreen() {
                           </Text>
                         </View>
                       )}
-                      {selectedSector.parkType && (
+                      {!!selectedSector.parkType && (
                         <View style={styles.sectorBadgePill}>
                           <Ionicons name="leaf-outline" size={12} color="#34D399" />
                           <Text style={styles.sectorBadgePillText} numberOfLines={1}>

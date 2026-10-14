@@ -268,7 +268,7 @@ export const BuildingGallery: React.FC<BuildingGalleryProps> = ({
           </View>
 
           {/* Description */}
-          {currentItem.description && (
+          {!!currentItem.description && (
             <View style={s.lightboxDescriptionContainer}>
               <Text style={s.lightboxDescription}>{currentItem.description}</Text>
             </View>
@@ -513,7 +513,7 @@ const s = StyleSheet.create({
     borderBottomRightRadius: 12,
     ...Platform.select({
       web: {
-        background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0) 100%)',
+        backgroundImage: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0) 100%)',
       } as any,
       default: {
         backgroundColor: 'rgba(0, 0, 0, 0.4)',

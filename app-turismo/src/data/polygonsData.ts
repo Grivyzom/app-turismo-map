@@ -356,6 +356,29 @@ export const SUBMARINO_VALDIVIA_EVENT: TurismoEvent = {
   address: 'Ribera, Valdivia',
 };
 
+export const BOTE_FLUVIAL_SUBMARINO_EVENT: TurismoEvent = {
+  id: 'bote-fluvial-submarino',
+  title: 'Bote Fluvial Submarino',
+  description: 'Embarcación turística fluvial que recorre las aguas del Río Valdivia frente al histórico Submarino O\'Brien y la costanera.',
+  latitude: -39.816053,
+  longitude: -73.249850,
+  category: 'embarcacion',
+  organizer: 'Transporte Fluvial Valdivia',
+  time: 'Lunes a Domingo 09:00 - 20:00',
+  openingHours: 'Lu-Do 09:00-20:00',
+  address: 'Río Valdivia, Sector Submarino O\'Brien',
+  boatType: 'turismo',
+  boatSize: 'mediana',
+  boatSpeed: 7,
+  boatHeading: 350,
+  boatPassengers: 18,
+  vineta: {
+    type: 'calificacion',
+    label: 'Fluvial',
+    active: true,
+  },
+};
+
 export const MERCADO_MUNICIPAL_VALDIVIA_EVENT: TurismoEvent = {
   id: 'mercado-municipal-valdivia',
   title: 'Mercado Municipal de Valdivia',

@@ -57,7 +57,18 @@ export class GlobalErrorBoundary extends Component<Props, State> {
               </Text>
             </TouchableOpacity>
 
-            {__DEV__ && <Text style={styles.debugText}>{this.state.error?.toString()}</Text>}
+            {this.state.error && (
+              <View style={{ marginTop: 16, padding: 12, backgroundColor: 'rgba(239, 68, 68, 0.1)', borderRadius: 8, borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)', width: '100%' }}>
+                <Text style={{ color: '#EF4444', fontSize: 13, fontWeight: '700' }}>
+                  {this.state.error.name}: {this.state.error.message}
+                </Text>
+                {this.state.error.stack ? (
+                  <Text style={{ color: '#9CA3AF', fontSize: 11, marginTop: 6, fontFamily: 'monospace' }}>
+                    {this.state.error.stack.slice(0, 500)}
+                  </Text>
+                ) : null}
+              </View>
+            )}
           </View>
         </View>
       );

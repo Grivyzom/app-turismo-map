@@ -123,6 +123,7 @@ const CAT_COLOR: Record<string, string> = {
   torreon:     '#94A3B8',
   estatua:     '#BAC8D3',
   tienda:      '#60A5FA',
+  embarcacion: '#38BDF8',
 };
 const IMG_H = 132; // altura fija — todos los cards idénticos en proporción
 
@@ -282,6 +283,9 @@ function PlaceCard({ item, index, onPress, onViewMore, onSaveToggle }: PlaceCard
     ? `${userRating}.0`
     : item.rating != null ? item.rating.toFixed(1) : null;
 
+  const infoText = item.openingHours?.trim() || item.address?.trim() || null;
+  const isOpening = Boolean(item.openingHours?.trim());
+
   const webHoverProps = Platform.OS === 'web'
     ? { onMouseEnter: hoverIn, onMouseLeave: hoverOut } as any
     : {};
@@ -296,7 +300,6 @@ function PlaceCard({ item, index, onPress, onViewMore, onSaveToggle }: PlaceCard
         onPressIn={pressIn}
         onPressOut={pressOut}
         style={styles.card}
-        accessibilityRole="button"
         accessibilityLabel={`${item.name}, ${item.category}`}
         {...webHoverProps}
       >
@@ -325,13 +328,13 @@ function PlaceCard({ item, index, onPress, onViewMore, onSaveToggle }: PlaceCard
 
           {/* Badge categoría — sin borde */}
           <View style={styles.catBadgeImg}>
-            {CatIcon && <CatIcon name={iconData!.name as any} size={9} color={catColor} />}
-            <Text style={[styles.catTextImg, { color: catColor }]}>{item.category.toUpperCase()}</Text>
+            {CatIcon ? <CatIcon name={iconData!.name as any} size={9} color={catColor} /> : null}
+            <Text style={[styles.catTextImg, { color: catColor }]}>{(item.category || '').toUpperCase()}</Text>
           </View>
 
           {/* Distancia + spots — esquina inf-der, sin borde */}
           <View style={styles.imgBadgesRight}>
-            {item.distance != null && (
+            {Boolean(item.distance?.trim()) && (
               <View style={styles.distPill}>
                 <MaterialIcons name="near-me" size={8} color="#94A3B8" />
                 <Text style={styles.distPillText}>{item.distance}</Text>
@@ -350,14 +353,24 @@ function PlaceCard({ item, index, onPress, onViewMore, onSaveToggle }: PlaceCard
         <View style={styles.cardInfo}>
           {/* Título — ocupa espacio disponible y empuja rating hacia abajo */}
           <View style={styles.cardNameWrap}>
-            <MarqueeText text={item.name} textStyle={styles.cardName} active={focused} maxLines={2} />
+            <MarqueeText text={item.name || ''} textStyle={styles.cardName} active={focused} maxLines={2} />
           </View>
 
           {/* Rating — siempre anclado sobre el footer */}
           <View style={styles.ratingRow}>
             <View style={styles.starGroup}>
               {[1, 2, 3, 4, 5].map((i) => (
-                <TouchableOpacity key={i} onPress={() => handleRate(i)} hitSlop={6} activeOpacity={0.75}>
+                <TouchableOpacity
+                  key={i}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleRate(i);
+                  }}
+                  hitSlop={6}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Calificar con ${i} estrellas`}
+                >
                   <MaterialIcons name={getStarName(i)} size={15} color={getStarColor(i)} />
                 </TouchableOpacity>
               ))}
@@ -374,28 +387,24 @@ function PlaceCard({ item, index, onPress, onViewMore, onSaveToggle }: PlaceCard
           </View>
 
           {/* Horario o dirección — solo si disponible */}
-          {(item.openingHours || item.address) && (
+          {infoText ? (
             <View style={styles.infoRow}>
-              {item.openingHours ? (
-                <View style={styles.infoPill}>
-                  <MaterialIcons name="access-time" size={9} color={MUTED} />
-                  <Text style={styles.infoPillText} numberOfLines={1}>{item.openingHours}</Text>
-                </View>
-              ) : (
-                <View style={styles.infoPill}>
-                  <MaterialIcons name="location-on" size={9} color={MUTED} />
-                  <Text style={styles.infoPillText} numberOfLines={1}>{item.address}</Text>
-                </View>
-              )}
+              <View style={styles.infoPill}>
+                <MaterialIcons name={isOpening ? 'access-time' : 'location-on'} size={9} color={MUTED} />
+                <Text style={styles.infoPillText} numberOfLines={1}>{infoText}</Text>
+              </View>
             </View>
-          )}
+          ) : null}
         </View>
 
         {/* ── Footer: ghost icons + CTA ─────────────────── */}
         <View style={styles.cardFooter}>
           {/* Ghost: Like */}
           <Pressable
-            onPress={() => setLiked(p => !p)}
+            onPress={(e) => {
+              e.stopPropagation();
+              setLiked(p => !p);
+            }}
             style={styles.ghostBtn}
             hitSlop={8}
             accessibilityRole="button"
@@ -410,7 +419,11 @@ function PlaceCard({ item, index, onPress, onViewMore, onSaveToggle }: PlaceCard
 
           {/* Ghost: Guardar */}
           <Pressable
-            onPress={() => { setBookmarked(p => !p); onSaveToggle(!bookmarked); }}
+            onPress={(e) => {
+              e.stopPropagation();
+              setBookmarked(p => !p);
+              onSaveToggle(!bookmarked);
+            }}
             style={styles.ghostBtn}
             hitSlop={8}
             accessibilityRole="button"
@@ -425,7 +438,10 @@ function PlaceCard({ item, index, onPress, onViewMore, onSaveToggle }: PlaceCard
 
           {/* CTA: Ver más — único elemento estilizado */}
           <TouchableOpacity
-            onPress={onViewMore}
+            onPress={(e) => {
+              e.stopPropagation();
+              onViewMore();
+            }}
             style={styles.viewMoreBtn}
             activeOpacity={0.85}
             accessibilityRole="button"
@@ -910,7 +926,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginVertical: 2,
   },
-  triggerActive: { backgroundColor: 'rgba(52, 211, 153, 0.12)' },
+  triggerActive: { backgroundColor: 'rgba(16, 185, 129, 0.16)' },
   triggerBadge: {
     position: 'absolute',
     top: 2,
@@ -923,7 +939,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 3,
     borderWidth: 1.5,
-    borderColor: 'rgba(10, 17, 32, 0.9)',
+    borderColor: 'rgba(12, 19, 18, 0.95)',
   },
   triggerBadgeText: { color: '#fff', fontSize: 8, fontWeight: '800', lineHeight: 11 },
 

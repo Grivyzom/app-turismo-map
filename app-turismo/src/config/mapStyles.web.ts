@@ -40,10 +40,30 @@ export const getSatelliteStyle = (useCachedProtocol: boolean): maplibregl.StyleS
   ],
 });
 
+/** CARTO API Key para eliminar marcas de agua en teselas vectoriales y raster */
+export const CARTO_API_KEY =
+  process.env.EXPO_PUBLIC_CARTO_API_KEY ||
+  process.env.CARTO_API_KEY ||
+  '';
+
+export const withCartoKey = (url: string): string => {
+  if (!CARTO_API_KEY) return url;
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}api_key=${CARTO_API_KEY}`;
+};
+
 export const WEB_MAP_STYLES: Record<MapLayer, string | maplibregl.StyleSpecification> = {
-  dark: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
-  streets: 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json',
-  light: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+  // Para el modo Noche usamos 'liberty' como base (que ya incluye building-3d nativo)
+  // y luego applyDarkTheme() lo oscurece completamente en style.load.
+  dark: CARTO_API_KEY
+    ? withCartoKey('https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json')
+    : 'https://tiles.openfreemap.org/styles/liberty',
+  streets: CARTO_API_KEY
+    ? withCartoKey('https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json')
+    : 'https://tiles.openfreemap.org/styles/liberty',
+  light: CARTO_API_KEY
+    ? withCartoKey('https://basemaps.cartocdn.com/gl/positron-gl-style/style.json')
+    : 'https://tiles.openfreemap.org/styles/positron',
   satellite: getSatelliteStyle(false), // Default: sin caché (se activa dinámicamente con HD mode)
   terrain: {
     version: 8,
@@ -64,6 +84,12 @@ export const WEB_MAP_STYLES: Record<MapLayer, string | maplibregl.StyleSpecifica
       },
     ],
   },
+  '3d': CARTO_API_KEY
+    ? withCartoKey('https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json')
+    : 'https://tiles.openfreemap.org/styles/liberty',
+  google3d: CARTO_API_KEY
+    ? withCartoKey('https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json')
+    : 'https://tiles.openfreemap.org/styles/liberty',
 };
 
 export const getActiveMapStyles = () => WEB_MAP_STYLES;

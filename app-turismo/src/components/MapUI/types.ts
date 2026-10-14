@@ -16,9 +16,12 @@ export interface TopAppBarProps {
   onTabChange?: (tab: TabType) => void;
   notificationsCount?: number;
   onNotificationClick?: () => void;
+  isNotificationsOpen?: boolean;
   onVoiceSearch?: (query: any) => void;
   onVoicePartialSearch?: (text: string) => void;
   onSearchFocus?: () => void;
+  onSearchClick?: () => void;
+  onAccountClick?: () => void;
   mapDisplayMode?: MapDisplayMode;
   onMapDisplayModeChange?: (mode: MapDisplayMode) => void;
   viewMode?: 'local' | 'tourist';

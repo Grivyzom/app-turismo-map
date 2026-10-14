@@ -63,4 +63,5 @@ La aplicación implementa un lenguaje de diseño llamado **Obsidian Glass**, car
 - **Memoización:** Uso intensivo de `useMemo` y `useCallback` en el procesamiento de clusters para evitar caídas de frames durante el desplazamiento del mapa.
 
 ---
+*Para un análisis profundo del motor geoespacial y el sistema de navegación, ver:* [[Motor_de_Zoom_y_Sistema_de_Navegacion]].  
 *Para detalles sobre la integración con el servidor, ver:* [[Arquitectura_Detallada_y_Funcionamiento]] (Backend).

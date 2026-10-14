@@ -1,6 +1,10 @@
 allowBuilds:
   msgpackr-extract: false
   unrs-resolver: true
+  browser-tabs-lock: false
+  bufferutil: false
+  core-js: false
+  utf-8-validate: false
 minimumReleaseAgeExclude:
   - '@expo/cli@56.1.10'
   - '@expo/fingerprint@0.19.1'

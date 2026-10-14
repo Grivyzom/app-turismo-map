@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Animated, Platform, Dimensions } from 'react-native';
+import { Animated, Platform, Dimensions, DeviceEventEmitter } from 'react-native';
 import { router } from 'expo-router';
 
 import {
@@ -10,30 +10,54 @@ import {
   RouteType,
   RoutePoint,
   RoutePointType,
+  RouteVisibility,
+  Route,
   Zone,
-} from '../../src/components/Map/types';
-import { CheckInRecord } from '../../src/utils/checkInStorage';
-import { ParsedSearch } from '../../src/utils/aiSearchParser';
-import { TabType, MapDisplayMode } from '../../src/components/MapUI';
+} from '../components/Map/types';
+import {
+  fetchOsrmMultiRoute,
+  fetchOptimizedTrip,
+  formatDistance,
+  TransportMode,
+  OsrmRoute,
+} from '../utils/osrmService';
+import { CheckInRecord } from '../utils/checkInStorage';
+import { ParsedSearch } from '../utils/aiSearchParser';
+import { TabType, MapDisplayMode } from '../components/MapUI';
 import {
   DEFAULT_MAP_LAYER,
   loadPersistedMapLayer,
   savePersistedMapLayer,
-} from '../../src/utils/mapPreferences';
-import { loadUserProfile, saveUserProfile } from '../../src/utils/userProfileStorage';
-import { useUserLocationContext } from '../../src/context/UserLocationContext';
+  loadPersistedCameraAnimations,
+  savePersistedCameraAnimations,
+  DEFAULT_CAMERA_ANIMATIONS,
+} from '../utils/mapPreferences';
+import { loadUserProfile, saveUserProfile } from '../utils/userProfileStorage';
+import { useUserLocationContext } from '../context/UserLocationContext';
+import { useAuth } from '../context/AuthContext';
 import {
   buildGoogleMapsSearchUrl,
   buildGoogleStreetViewUrl,
   formatPinchoCoordinates,
   reverseGeocode,
-} from '../../src/utils/mapPincho';
-import { INITIAL_EVENTS, WS_SIMULATION_POOL, CategoryFilter } from '../../src/data/mockEvents';
+} from '../utils/mapPincho';
+import { INITIAL_EVENTS, WS_SIMULATION_POOL, CategoryFilter } from '../data/mockEvents';
+import { API_URL } from '../config/api';
+import { isUtilityCategory } from '../components/Map/design/pinDesignSystem';
 
 // Categorías visibles por modo de mapa. 'mapa' = infraestructura/seguridad de la ciudad,
-// 'turismo' = atractivos y naturaleza, 'comercial' = comercio y gastronomía.
+// 'turismo' = atractivos, naturaleza y amenidades de parques, 'comercial' = comercio y gastronomía.
 const MODE_CATEGORIES: Record<MapDisplayMode, CategoryFilter[]> = {
-  mapa: ['hospital', 'universidad', 'bombero', 'carabinero', 'camara', 'emergencia', 'publico', 'municipalidad'],
+  mapa: [
+    'hospital',
+    'universidad',
+    'bombero',
+    'carabinero',
+    'camara',
+    'emergencia',
+    'publico',
+    'municipalidad',
+  ],
   turismo: [
     'cultura',
     'naturaleza',
@@ -44,6 +68,7 @@ const MODE_CATEGORIES: Record<MapDisplayMode, CategoryFilter[]> = {
     'puerto',
     'musica',
     'deportes',
+    'maquina_ejercicio',
     'embarcacion',
     'parque',
     'agua',
@@ -53,8 +78,210 @@ const MODE_CATEGORIES: Record<MapDisplayMode, CategoryFilter[]> = {
     'estatua',
     'arte',
     'bosque',
+    'sendero',
+    'banca',
+    'silla',
+    'bebedero',
+    'bano',
+    'basurero',
+    'papelera',
   ],
   comercial: ['tienda', 'gastronomia'],
+};
+
+const CATEGORY_ALIASES: Record<string, string[]> = {
+  gastronomia: ['gastronomia'],
+  cultura: ['cultura', 'museo', 'teatro', 'escultura', 'estatua', 'torreon', 'arte', 'coliseo'],
+  naturaleza: ['naturaleza', 'parque', 'bosque', 'humedal', 'fauna', 'agua'],
+  musica: ['musica'],
+  deportes: ['deportes', 'coliseo', 'maquina_ejercicio', 'ejercicio'],
+  publico: [
+    'publico',
+    'municipalidad',
+    'universidad',
+    'hospital',
+    'clinica',
+    'banca',
+    'silla',
+    'bebedero',
+    'bano',
+    'basurero',
+    'papelera',
+    'mobiliario',
+  ],
+  emergencia: [
+    'emergencia',
+    'choque',
+    'incendio',
+    'accidente',
+    'calle_cortada',
+    'bombero',
+    'carabinero',
+    'camara',
+  ],
+  embarcacion: ['embarcacion', 'puerto'],
+  tienda: ['tienda', 'mercado', 'supermercado'],
+};
+
+// ── Filtros contextuales de Pines para Modo Geo-Router ─────────────────────────
+const ROUTER_CATEGORY_PIN_FILTERS: Record<string, (event: TurismoEvent) => boolean> = {
+  // Modo Ciudad: Pines comerciales, gastronomía, tiendas, mercados, ferias
+  ciudad: (e) => {
+    const cat = (e.category || '').toLowerCase();
+    const isCommercialCat = [
+      'tienda',
+      'gastronomia',
+      'mercado',
+      'comercial',
+      'supermercado',
+    ].includes(cat);
+    const isCommercialId =
+      e.id.startsWith('comercial-') ||
+      e.id.includes('mercado') ||
+      e.id.includes('feria') ||
+      e.id.includes('mall');
+    return isCommercialCat || isCommercialId;
+  },
+
+  // Modo Bosque / Naturaleza: Senderos, spots, máquinas de ejercicio, parques
+  bosque: (e) => {
+    const cat = (e.category || '').toLowerCase();
+    const isNatureCat = [
+      'bosque',
+      'sendero',
+      'new_spot',
+      'maquina_ejercicio',
+      'ejercicio',
+      'parque',
+      'naturaleza',
+      'humedal',
+      'fauna',
+      'banca',
+      'bebedero',
+    ].includes(cat);
+    const isNatureId =
+      e.id.startsWith('fitness-') ||
+      e.id.startsWith('spot-') ||
+      e.id.startsWith('parque-');
+    return isNatureCat || isNatureId;
+  },
+
+  // Alias para reserva natural
+  reserva: (e) => {
+    const cat = (e.category || '').toLowerCase();
+    return (
+      [
+        'bosque',
+        'sendero',
+        'new_spot',
+        'maquina_ejercicio',
+        'ejercicio',
+        'parque',
+        'naturaleza',
+        'humedal',
+        'fauna',
+        'banca',
+        'bebedero',
+      ].includes(cat) ||
+      e.id.startsWith('fitness-') ||
+      e.id.startsWith('spot-') ||
+      e.id.startsWith('parque-')
+    );
+  },
+
+  // Modo Turística: Sitios patrimoniales, museos, monumentos, esculturas, comercio tradicional
+  turistica: (e) => {
+    const cat = (e.category || '').toLowerCase();
+    return (
+      [
+        'cultura',
+        'museo',
+        'teatro',
+        'escultura',
+        'torreon',
+        'estatua',
+        'arte',
+        'gastronomia',
+        'mercado',
+        'fauna',
+        'embarcacion',
+        'new_spot',
+        'sendero',
+        'parque',
+      ].includes(cat) ||
+      e.id.startsWith('comercial-') ||
+      e.id.startsWith('spot-')
+    );
+  },
+
+  // Modo Ruta Cervecera: Bares, pubs, cervecerías y gastronomía
+  cervecera: (e) => {
+    const cat = (e.category || '').toLowerCase();
+    const text = `${e.title || ''} ${e.description || ''}`.toLowerCase();
+    return (
+      cat === 'gastronomia' ||
+      cat === 'tienda' ||
+      text.includes('cerve') ||
+      text.includes('bar') ||
+      text.includes('pub') ||
+      text.includes('schop') ||
+      e.id.includes('kunstmann')
+    );
+  },
+
+  // Modo Reto Deportivo: Estaciones de calistenia, máquinas, complejos deportivos
+  reto: (e) => {
+    const cat = (e.category || '').toLowerCase();
+    return (
+      [
+        'deportes',
+        'maquina_ejercicio',
+        'ejercicio',
+        'coliseo',
+        'invitation_sports',
+      ].includes(cat) || e.id.startsWith('fitness-')
+    );
+  },
+
+  // Modo Exploración: Spots, miradores, senderos, hitos históricos
+  exploracion: (e) => {
+    const cat = (e.category || '').toLowerCase();
+    return (
+      [
+        'new_spot',
+        'sendero',
+        'new_item',
+        'bosque',
+        'naturaleza',
+        'humedal',
+        'torreon',
+        'escultura',
+        'embarcacion',
+        'fauna',
+      ].includes(cat) || e.id.startsWith('spot-')
+    );
+  },
+
+  // Modo Edificio: Malls, arquitectura y servicios
+  edificio: (e) => {
+    const cat = (e.category || '').toLowerCase();
+    return [
+      'edificio',
+      'municipalidad',
+      'universidad',
+      'hospital',
+      'clinica',
+      'coliseo',
+      'teatro',
+      'museo',
+    ].includes(cat);
+  },
+
+  // Modo Subzona: Zonas cívicas, barrios y parques vecinales
+  subzona: (e) => {
+    const cat = (e.category || '').toLowerCase();
+    return ['publico', 'municipalidad', 'universidad', 'parque'].includes(cat);
+  },
 };
 
 type MapPinchoState = {
@@ -76,13 +303,43 @@ export interface AppNotification {
 }
 
 export function useHomeScreenState(token: string | null) {
+  const { openAuthModal } = useAuth();
   const [userProfile, setUserProfile] = useState<any>(null);
   const [events, setEvents] = useState<TurismoEvent[]>(INITIAL_EVENTS);
-  const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>('todos');
+  const [selectedCategories, setSelectedCategories] = useState<CategoryFilter[]>(['todos']);
+  const selectedCategory = selectedCategories[0] || 'todos';
+  const setSelectedCategory = useCallback((cat: CategoryFilter | CategoryFilter[]) => {
+    if (Array.isArray(cat)) {
+      setSelectedCategories(cat.length === 0 ? ['todos'] : cat);
+    } else {
+      setSelectedCategories([cat]);
+    }
+  }, []);
   const [selectedEvent, setSelectedEvent] = useState<TurismoEvent | null>(null);
   const [selectedSpot, setSelectedSpot] = useState<any>(null);
   const [viewMode, setViewMode] = useState<'local' | 'tourist'>('local');
   const [mapDisplayMode, setMapDisplayMode] = useState<MapDisplayMode>('mapa');
+
+  const handleMapDisplayModeChange = useCallback((mode: MapDisplayMode) => {
+    setMapDisplayMode(mode);
+    if (mode !== 'turismo') {
+      setSelectedEvent((prev) => {
+        if (!prev) return null;
+        const cat = prev.category?.toLowerCase() || '';
+        if (
+          cat === 'parque' ||
+          cat === 'reserva' ||
+          cat === 'reservas' ||
+          cat === 'naturaleza' ||
+          isUtilityCategory(cat) ||
+          prev.parkId
+        ) {
+          return null;
+        }
+        return prev;
+      });
+    }
+  }, []);
 
   // ── Nested Zones State ─────────────────────────────────────────────────
   const [activeNestedZone, setActiveNestedZone] = useState<any>(null);
@@ -104,6 +361,26 @@ export function useHomeScreenState(token: string | null) {
   const [sectors, setSectors] = useState<any[]>([]);
   const [visibleSectorIds, setVisibleSectorIds] = useState<number[]>([]);
   const [showWeather, setShowWeather] = useState(false);
+  const [cameraAnimationsEnabled, setCameraAnimationsEnabled] =
+    useState<boolean>(DEFAULT_CAMERA_ANIMATIONS);
+
+  useEffect(() => {
+    let isMounted = true;
+    loadPersistedCameraAnimations().then((enabled) => {
+      if (isMounted) setCameraAnimationsEnabled(enabled);
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const toggleCameraAnimations = useCallback(() => {
+    setCameraAnimationsEnabled((prev) => {
+      const next = !prev;
+      savePersistedCameraAnimations(next);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (!selectedEvent) setSelectedSpot(null);
@@ -112,8 +389,7 @@ export function useHomeScreenState(token: string | null) {
   useEffect(() => {
     const fetchCycleways = async () => {
       try {
-        const baseUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8080';
-        const response = await fetch(`${baseUrl}/api/v1/cycleways`);
+        const response = await fetch(`${API_URL}/api/v1/cycleways`);
         if (response.ok) {
           const data = await response.json();
           setCycleways(Array.isArray(data) ? data : []);
@@ -127,8 +403,7 @@ export function useHomeScreenState(token: string | null) {
 
   const fetchSectors = useCallback(async () => {
     try {
-      const baseUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8080';
-      let url = `${baseUrl}/api/v1/zones`;
+      let url = `${API_URL}/api/v1/zones`;
       if (activeNestedZone) {
         url += `?zoneId=${activeNestedZone.id}`;
       }
@@ -168,8 +443,7 @@ export function useHomeScreenState(token: string | null) {
 
       const fetchCycleways = async () => {
         try {
-          const baseUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8080';
-          const response = await fetch(`${baseUrl}/api/v1/cycleways`);
+          const response = await fetch(`${API_URL}/api/v1/cycleways`);
           if (response.ok) {
             const data = await response.json();
             setCycleways(Array.isArray(data) ? data : []);
@@ -196,18 +470,30 @@ export function useHomeScreenState(token: string | null) {
 
   // ── Routing Mode State (Geo-Router) ─────────────────────────────────────
   const [isRoutingActive, setIsRoutingActive] = useState(false);
-  const [routingType, setRoutingType] = useState<RouteType>('direct');
-  const [routeCategory, setRouteCategory] = useState('turistica');
+  const [routingType, setRoutingType] = useState<RouteType>('multi_target');
+  const [routeCategory, setRouteCategory] = useState('ciudad');
   const [draftRoutePoints, setDraftRoutePoints] = useState<RoutePoint[]>([]);
   const [draftRouteName, setDraftRouteName] = useState('');
   const [isRouteFinished, setIsRouteFinished] = useState(false);
   const [savedRoutes, setSavedRoutes] = useState<any[]>([]);
   const [showSavedRoutes, setShowSavedRoutes] = useState(true);
 
+  // Social Geo-Router Additions
+  const [transportMode, setTransportMode] = useState<TransportMode>('foot');
+  const [routeVisibility, setRouteVisibility] = useState<RouteVisibility>('public');
+  const [draftRouteGeojson, setDraftRouteGeojson] = useState<GeoJSON.LineString | null>(null);
+  const [osrmDistance, setOsrmDistance] = useState<number>(0);
+  const [osrmDuration, setOsrmDuration] = useState<number>(0);
+  const [isCalculatingOsrm, setIsCalculatingOsrm] = useState<boolean>(false);
+  const [latestShareToken, setLatestShareToken] = useState<string | null>(null);
+  const [routeAlternatives, setRouteAlternatives] = useState<OsrmRoute[]>([]);
+  const [selectedAlternativeIndex, setSelectedAlternativeIndex] = useState<number>(0);
+  const [isOptimizingTrip, setIsOptimizingTrip] = useState<boolean>(false);
+  const primaryRouteRef = useRef<OsrmRoute | null>(null);
+
   const fetchSavedRoutes = useCallback(async () => {
     try {
-      const baseUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8080';
-      const response = await fetch(`${baseUrl}/api/v1/routes`);
+      const response = await fetch(`${API_URL}/api/v1/routes`);
       if (response.ok) {
         const data = await response.json();
         setSavedRoutes(data);
@@ -264,8 +550,7 @@ export function useHomeScreenState(token: string | null) {
 
     if (token) {
       try {
-        const baseUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8080';
-        await fetch(`${baseUrl}/api/v1/profile/view-mode`, {
+        await fetch(`${API_URL}/api/v1/profile/view-mode`, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${token}`,
@@ -341,13 +626,20 @@ export function useHomeScreenState(token: string | null) {
     (tab: TabType) => {
       if (!token && ['profile', 'feed', 'saved', 'forum', 'historial'].includes(tab)) {
         showNotification('Inicia sesión para usar esta sección', 'warning');
-        router.push('/ingresar');
+        openAuthModal('login');
         return;
       }
       setRawActiveTab(tab);
     },
-    [token, showNotification],
+    [token, showNotification, openAuthModal],
   );
+
+  // Al cerrar sesión, regresar pacíficamente al mapa si la pestaña requería autenticación
+  useEffect(() => {
+    if (!token && ['profile', 'feed', 'saved', 'forum', 'historial'].includes(activeTab)) {
+      setRawActiveTab('map');
+    }
+  }, [token, activeTab]);
   const [panelSlide] = useState(() => new Animated.Value(0));
   const [showRightSheet, setShowRightSheet] = useState(false);
   const [rightSheetSlide] = useState(() => new Animated.Value(0));
@@ -378,8 +670,8 @@ export function useHomeScreenState(token: string | null) {
     ) => {
       try {
         let url = search
-          ? `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/v1/places/search?q=${encodeURIComponent(search)}&viewMode=${viewMode}`
-          : `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/v1/places/search?viewMode=${viewMode}`;
+          ? `${API_URL}/api/v1/places/search?q=${encodeURIComponent(search)}&viewMode=${viewMode}`
+          : `${API_URL}/api/v1/places/search?viewMode=${viewMode}`;
 
         if (bounds) {
           const joinChar = url.includes('?') ? '&' : '?';
@@ -426,32 +718,49 @@ export function useHomeScreenState(token: string | null) {
   }, [searchQuery, mapBounds, fetchRealPlaces, activeNestedZone]);
 
   // ── Smart Recommendations Effect ──────────────────────────────────────────
-  const fetchSmartRecommendations = useCallback(async () => {
-    if (!token) return;
-    try {
-      const response = await fetch(`${process.env.EXPO_PUBLIC_BACKEND_URL}/api/v1/recommendations`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (data.results && data.results.length > 0) {
-          setEvents((prev) => {
-            const existingIds = new Set(prev.map((p) => p.id));
-            const newPlaces = data.results.filter((rp: any) => !existingIds.has(rp.id));
-            return [...prev, ...newPlaces];
-          });
+  const fetchSmartRecommendations = useCallback(
+    async (options?: { forceRefresh?: boolean }) => {
+      if (!token) return;
+      try {
+        const response = await fetch(`${API_URL}/api/v1/recommendations`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.results && data.results.length > 0) {
+            setEvents((prev) => {
+              if (options?.forceRefresh) {
+                // Conservar eventos base del sistema y reemplazar recomendaciones previas
+                const initialEventIds = new Set(INITIAL_EVENTS.map((e) => e.id));
+                const baseEvents = prev.filter((p) => initialEventIds.has(p.id));
+                return [...baseEvents, ...data.results];
+              }
+              const existingIds = new Set(prev.map((p) => p.id));
+              const newPlaces = data.results.filter((rp: any) => !existingIds.has(rp.id));
+              return [...prev, ...newPlaces];
+            });
+          }
         }
+      } catch (err) {
+        console.warn('Error fetching smart recommendations:', err);
       }
-    } catch (err) {
-      console.warn('Error fetching smart recommendations:', err);
-    }
-  }, [token]);
+    },
+    [token],
+  );
 
   useEffect(() => {
     fetchSmartRecommendations();
+  }, [fetchSmartRecommendations]);
+
+  // ── Reactividad Inmediata ante Cambios de Preferencias / Vibe ─────────────
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('MAP_PREFERENCES_UPDATED', () => {
+      fetchSmartRecommendations({ forceRefresh: true });
+    });
+    return () => sub.remove();
   }, [fetchSmartRecommendations]);
 
   // ── Reverse Geocoding Effect ──────────────────────────────────────────────
@@ -586,6 +895,7 @@ export function useHomeScreenState(token: string | null) {
       setShowSectorsConfig(false);
       setShowZoomSlider(false);
       setShowNotificationTray(false);
+      setShowNearbyEvents(false);
     }
   }, [showFilters]);
 
@@ -624,6 +934,24 @@ export function useHomeScreenState(token: string | null) {
       setShowZoomSlider(false);
     }
   }, [showNotificationTray]);
+
+  useEffect(() => {
+    if (showNearbyEvents) {
+      setShowFilters(false);
+    }
+  }, [showNearbyEvents]);
+
+  useEffect(() => {
+    if (selectedEvent) {
+      setShowFilters(false);
+    }
+  }, [selectedEvent]);
+
+  useEffect(() => {
+    if (selectedSpot) {
+      setShowFilters(false);
+    }
+  }, [selectedSpot]);
 
   const handleCreateNewEvent = useCallback(
     (
@@ -670,7 +998,7 @@ export function useHomeScreenState(token: string | null) {
 
     const checkRain = async () => {
       try {
-        const { getLocalizedWeather } = await import('../../src/utils/weatherUtils');
+        const { getLocalizedWeather } = await import('../utils/weatherUtils');
         const data = await getLocalizedWeather();
         const valdivia = data.find((d) => d.name === 'Valdivia');
         if (valdivia) {
@@ -697,12 +1025,12 @@ export function useHomeScreenState(token: string | null) {
     (result: ParsedSearch) => {
       setSelectedCategory(result.category as CategoryFilter);
       setSearchQuery(result.query);
-      
+
       if (result.query === '') {
-         setSelectedEvent(null);
+        setSelectedEvent(null);
       } else {
         if (result.eventId) {
-          const ev = events.find(e => String(e.id) === String(result.eventId));
+          const ev = events.find((e) => String(e.id) === String(result.eventId));
           if (ev) {
             setSelectedEvent(ev);
           }
@@ -903,27 +1231,59 @@ export function useHomeScreenState(token: string | null) {
     }
   }, [mapPincho, pinchoSlide]);
 
-  const filteredEvents = useMemo(
-    () =>
-      events.filter((event) => {
-        const isEmergencyEvent = ['choque', 'incendio', 'accidente', 'calle_cortada'].includes(
-          event.category,
-        );
-        const matchesCategory =
-          selectedCategory === 'todos'
-            ? isEmergencyEvent ||
-              MODE_CATEGORIES[mapDisplayMode].includes(event.category as CategoryFilter)
-            : (selectedCategory === 'emergencia' && isEmergencyEvent) ||
-              event.category === selectedCategory;
-        const query = searchQuery.toLowerCase();
-        const matchesSearch =
+  const filteredEvents = useMemo(() => {
+    // Si el Geo-Router está activo, filtrar pines contextuales según el filtro seleccionado
+    // (ej. 'ciudad' -> comercios, 'bosque' -> senderos, spots y máquinas)
+    if (isRoutingActive) {
+      const activeFilterKey = (routeCategory || 'ciudad').toLowerCase();
+      const filterFn =
+        ROUTER_CATEGORY_PIN_FILTERS[activeFilterKey] || ROUTER_CATEGORY_PIN_FILTERS.ciudad;
+      const query = searchQuery.toLowerCase();
+      return events.filter((event) => {
+        if (!filterFn(event)) return false;
+        if (!query) return true;
+        return (
           (event.title?.toLowerCase() || '').includes(query) ||
           (event.description?.toLowerCase() || '').includes(query) ||
-          (event.organizer?.toLowerCase() || '').includes(query);
-        return matchesCategory && matchesSearch;
-      }),
-    [events, selectedCategory, searchQuery, mapDisplayMode],
-  );
+          (event.organizer?.toLowerCase() || '').includes(query)
+        );
+      });
+    }
+
+    return events.filter((event) => {
+      const isEmergencyEvent = ['choque', 'incendio', 'accidente', 'calle_cortada'].includes(
+        event.category,
+      );
+      if (selectedCategories.includes('ninguno')) {
+        return false;
+      }
+
+      // Los pines de utilidad (bancas, basureros, bebederos, ejercicio) NUNCA se muestran en modo 'mapa' ni 'comercial'.
+      // En modo 'turismo', solo son elegibles aquellos que pertenecen al polígono regular de un parque o reserva.
+      if (isUtilityCategory(event.category)) {
+        if (mapDisplayMode !== 'turismo') {
+          return false;
+        }
+        if (!event.parkId) {
+          return false;
+        }
+      }
+
+      const matchesCategory =
+        selectedCategories.includes('todos') || selectedCategories.length === 0
+          ? isEmergencyEvent ||
+            MODE_CATEGORIES[mapDisplayMode].includes(event.category as CategoryFilter)
+          : (selectedCategories.includes('emergencia') && isEmergencyEvent) ||
+            selectedCategories.includes(event.category as CategoryFilter) ||
+            selectedCategories.some((cat) => CATEGORY_ALIASES[cat]?.includes(event.category));
+      const query = searchQuery.toLowerCase();
+      const matchesSearch =
+        (event.title?.toLowerCase() || '').includes(query) ||
+        (event.description?.toLowerCase() || '').includes(query) ||
+        (event.organizer?.toLowerCase() || '').includes(query);
+      return matchesCategory && matchesSearch;
+    });
+  }, [events, isRoutingActive, routeCategory, selectedCategories, searchQuery, mapDisplayMode]);
 
   const isTacticalModeActiveRef = useRef(isTacticalModeActive);
   useEffect(() => {
@@ -992,13 +1352,21 @@ export function useHomeScreenState(token: string | null) {
     return R * c; // in metres
   };
 
+  const hasAutoInjectedOriginRef = useRef(false);
+
   useEffect(() => {
+    if (!isRoutingActive) {
+      hasAutoInjectedOriginRef.current = false;
+      return;
+    }
+
     if (
-      isRoutingActive &&
+      !hasAutoInjectedOriginRef.current &&
       (routingType === 'single_target' || routingType === 'ciclovia' || routingType === 'sector') &&
       draftRoutePoints.length === 0 &&
       userLocation
     ) {
+      hasAutoInjectedOriginRef.current = true;
       setDraftRoutePoints([
         {
           latitude: userLocation.latitude,
@@ -1009,18 +1377,199 @@ export function useHomeScreenState(token: string | null) {
       ]);
       showNotification('Origen fijado en tu ubicación GPS', 'info');
     }
-  }, [isRoutingActive, routingType, draftRoutePoints.length, userLocation, showNotification]);
+  }, [isRoutingActive, routingType, userLocation, showNotification]);
+
+  // Previsualización automática del trazado en calles reales con OSRM Multi-Stop
+  useEffect(() => {
+    if (
+      !isRoutingActive ||
+      routingType === 'sector' ||
+      routingType === 'measure' ||
+      draftRoutePoints.length < 2
+    ) {
+      if (draftRoutePoints.length < 2) {
+        setDraftRouteGeojson(null);
+        setOsrmDistance(0);
+        setOsrmDuration(0);
+        setRouteAlternatives([]);
+        setSelectedAlternativeIndex(0);
+        primaryRouteRef.current = null;
+      }
+      return;
+    }
+
+    let isCancelled = false;
+    const timer = setTimeout(async () => {
+      setIsCalculatingOsrm(true);
+      try {
+        const route = await fetchOsrmMultiRoute(
+          draftRoutePoints.map((p) => ({ latitude: p.latitude, longitude: p.longitude, name: p.name })),
+          transportMode,
+          { includeAlternatives: true },
+        );
+        if (!isCancelled) {
+          primaryRouteRef.current = route;
+          setDraftRouteGeojson(route.geojson);
+          setOsrmDistance(route.distance);
+          setOsrmDuration(route.duration);
+          setRouteAlternatives(route.alternatives ?? []);
+          setSelectedAlternativeIndex(0);
+        }
+      } catch (err) {
+        console.warn('[Social Geo-Router] Error calculando OSRM:', err);
+      } finally {
+        if (!isCancelled) {
+          setIsCalculatingOsrm(false);
+        }
+      }
+    }, 350);
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
+  }, [isRoutingActive, routingType, draftRoutePoints, transportMode]);
+
+  const selectRouteAlternative = useCallback(
+    (index: number) => {
+      if (index === 0 && primaryRouteRef.current) {
+        setSelectedAlternativeIndex(0);
+        setDraftRouteGeojson(primaryRouteRef.current.geojson);
+        setOsrmDistance(primaryRouteRef.current.distance);
+        setOsrmDuration(primaryRouteRef.current.duration);
+        return;
+      }
+      const alt = routeAlternatives[index - 1];
+      if (alt) {
+        setSelectedAlternativeIndex(index);
+        setDraftRouteGeojson(alt.geojson);
+        setOsrmDistance(alt.distance);
+        setOsrmDuration(alt.duration);
+      }
+    },
+    [routeAlternatives],
+  );
+
+  const optimizeDraftRouteOrder = useCallback(async () => {
+    if (draftRoutePoints.length < 3) {
+      showNotification('Se necesitan al menos 3 paradas para optimizar el recorrido', 'info');
+      return;
+    }
+    setIsOptimizingTrip(true);
+    try {
+      const res = await fetchOptimizedTrip(
+        draftRoutePoints.map((p) => ({ latitude: p.latitude, longitude: p.longitude, name: p.name })),
+        transportMode,
+      );
+
+      const reordered: RoutePoint[] = res.orderedIndices.map((origIdx, newIdx) => {
+        const p = draftRoutePoints[origIdx];
+        let pType: RoutePointType = 'waypoint';
+        if (newIdx === 0) pType = 'origin';
+        else if (newIdx === res.orderedIndices.length - 1 && isRouteFinished) pType = 'destination';
+        return {
+          ...p,
+          type: pType,
+          orderIndex: newIdx,
+        };
+      });
+
+      setDraftRoutePoints(reordered);
+      primaryRouteRef.current = res.route;
+      setDraftRouteGeojson(res.route.geojson);
+      setOsrmDistance(res.route.distance);
+      setOsrmDuration(res.route.duration);
+      setRouteAlternatives(res.route.alternatives ?? []);
+      setSelectedAlternativeIndex(0);
+
+      const savedMsg =
+        res.distanceSavedMeters > 30
+          ? `¡Ruta optimizada! Se redujo ${formatDistance(res.distanceSavedMeters)} de recorrido`
+          : '¡Ruta optimizada con el itinerario de paradas más eficiente!';
+      showNotification(savedMsg, 'success');
+    } catch (err: any) {
+      console.error('[Social Geo-Router] Error optimizando itinerario:', err);
+      showNotification('No se pudo optimizar el orden en este momento', 'warning');
+    } finally {
+      setIsOptimizingTrip(false);
+    }
+  }, [draftRoutePoints, transportMode, isRouteFinished, showNotification]);
+
+  const undoLastRoutePoint = useCallback(() => {
+    setDraftRoutePoints((prev) => {
+      if (prev.length <= 1) {
+        setDraftRouteGeojson(null);
+        setOsrmDistance(0);
+        setOsrmDuration(0);
+        setRouteAlternatives([]);
+        setSelectedAlternativeIndex(0);
+        primaryRouteRef.current = null;
+        return [];
+      }
+      return prev.slice(0, -1);
+    });
+    setIsRouteFinished(false);
+  }, []);
+
+  const recalculateDraftRoute = useCallback(async () => {
+    if (
+      !isRoutingActive ||
+      routingType === 'sector' ||
+      routingType === 'measure' ||
+      draftRoutePoints.length < 2
+    ) {
+      if (draftRoutePoints.length < 2) {
+        showNotification('Añade al menos 2 puntos para calcular una ruta', 'info');
+      }
+      return;
+    }
+
+    setIsCalculatingOsrm(true);
+    showNotification('Recalculando la mejor ruta...', 'info');
+    try {
+      const route = await fetchOsrmMultiRoute(
+        draftRoutePoints.map((p) => ({ latitude: p.latitude, longitude: p.longitude, name: p.name })),
+        transportMode,
+        { includeAlternatives: true },
+      );
+      primaryRouteRef.current = route;
+      setDraftRouteGeojson(route.geojson);
+      setOsrmDistance(route.distance);
+      setOsrmDuration(route.duration);
+      setRouteAlternatives(route.alternatives ?? []);
+      setSelectedAlternativeIndex(0);
+      showNotification('¡Ruta recalculada con éxito!', 'success');
+    } catch (err) {
+      console.warn('[Social Geo-Router] Error recalculando ruta:', err);
+      showNotification('No se pudo recalcular la ruta en este momento', 'warning');
+    } finally {
+      setIsCalculatingOsrm(false);
+    }
+  }, [isRoutingActive, routingType, draftRoutePoints, transportMode, showNotification]);
 
   const handleMapClickForRouting = useCallback(
-    (location: MapCoordinate) => {
+    (location: MapCoordinate & {
+      name?: string;
+      businessId?: number;
+      eventId?: string;
+      category?: string;
+    }) => {
       if (!isRoutingActive || isRouteFinished) return;
 
       const newPoint: RoutePoint = {
         latitude: location.latitude,
         longitude: location.longitude,
+        name: location.name,
         type: 'waypoint',
         orderIndex: draftRoutePoints.length,
+        businessId: location.businessId,
+        eventId: location.eventId,
+        category: location.category,
       };
+
+      if (location.name) {
+        showNotification(`📍 Negocio añadido: ${location.name}`, 'success');
+      }
 
       if (routingType === 'direct') {
         if (draftRoutePoints.length === 0) {
@@ -1090,12 +1639,11 @@ export function useHomeScreenState(token: string | null) {
       setDraftRoutePoints([]);
       return;
     }
-    if (
-      (routingType !== 'single_target' && routingType !== 'ciclovia' && routingType !== 'sector') ||
-      draftRoutePoints.length < (routingType === 'sector' ? 3 : 2)
-    )
-      return;
+    const minPoints = routingType === 'sector' ? 3 : 2;
+    if (draftRoutePoints.length < minPoints) return;
+
     setDraftRoutePoints((prev) => {
+      if (prev.length === 0) return prev;
       const last = prev[prev.length - 1];
       const newPoints = [...prev];
       newPoints[newPoints.length - 1] = { ...last, type: 'destination' };
@@ -1103,17 +1651,15 @@ export function useHomeScreenState(token: string | null) {
     });
     setIsRouteFinished(true);
     showNotification(
-      routingType === 'ciclovia'
-        ? 'Ciclovía trazada exitosamente'
-        : routingType === 'sector'
-          ? 'Polígono cerrado exitosamente'
-          : 'Ruta de objetivo único finalizada',
+      routingType === 'sector'
+        ? 'Polígono cerrado exitosamente'
+        : 'Ruta trazada exitosamente. Asigna un nombre para guardarla.',
       'success',
     );
   }, [routingType, draftRoutePoints, showNotification]);
 
   const saveRoute = useCallback(async () => {
-    if (!draftRouteName) {
+    if (!draftRouteName.trim()) {
       showNotification(
         routingType === 'sector'
           ? 'Debes asignar un nombre al sector'
@@ -1124,43 +1670,47 @@ export function useHomeScreenState(token: string | null) {
     }
 
     try {
-      const baseUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8080';
-      const endpoint =
-        routingType === 'sector' ? `${baseUrl}/api/v1/zones` : `${baseUrl}/api/v1/routes`;
-      const bodyPayload =
-        routingType === 'sector'
-          ? {
-              name: draftRouteName,
-              description: 'Sector creado desde el mapa',
-              category: routeCategory || 'edificio',
-              color:
+      const isSector = routingType === 'sector';
+      const endpoint = isSector
+        ? `${API_URL}/api/v1/zones`
+        : `${API_URL}/api/v1/user/routes`;
+
+      const bodyPayload = isSector
+        ? {
+            name: draftRouteName.trim(),
+            description: 'Sector creado desde el mapa',
+            category: routeCategory || 'edificio',
+            color:
                 routeCategory === 'edificio'
-                  ? '#6366F1'
-                  : routeCategory === 'reserva'
-                    ? '#22C55E'
-                    : routeCategory === 'subzona'
-                      ? '#A855F7'
-                      : '#EAB308',
-              points: draftRoutePoints.map((p, i) => ({
-                latitude: p.latitude,
-                longitude: p.longitude,
-                orderIndex: i,
-                pointType: p.type,
-              })),
-            }
-          : {
-              name: draftRouteName,
-              type: routingType,
-              category: routeCategory,
-              targetAudience: 'all',
-              points: draftRoutePoints.map((p, i) => ({
-                latitude: p.latitude,
-                longitude: p.longitude,
-                orderIndex: i,
-                pointType: p.type,
-                name: p.name || '',
-              })),
-            };
+                ? '#6366F1'
+                : routeCategory === 'reserva' || routeCategory === 'bosque'
+                  ? '#10B981'
+                  : routeCategory === 'subzona'
+                    ? '#A855F7'
+                    : '#F59E0B',
+            points: draftRoutePoints.map((p, i) => ({
+              latitude: p.latitude,
+              longitude: p.longitude,
+              orderIndex: i,
+              pointType: p.type,
+            })),
+          }
+        : {
+            name: draftRouteName.trim(),
+            type: routingType,
+            category: routeCategory,
+            targetAudience: 'all',
+            visibility: routeVisibility,
+            transportMode: transportMode,
+            geomGeojson: draftRouteGeojson ? JSON.stringify(draftRouteGeojson) : '',
+            points: draftRoutePoints.map((p, i) => ({
+              latitude: p.latitude,
+              longitude: p.longitude,
+              orderIndex: i,
+              pointType: p.type,
+              name: p.name || '',
+            })),
+          };
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -1172,22 +1722,40 @@ export function useHomeScreenState(token: string | null) {
       });
 
       if (response.ok) {
+        const resData = await response.json();
+        if (resData.shareToken) {
+          setLatestShareToken(resData.shareToken);
+        }
+
         showNotification(
-          routingType === 'sector' ? 'Sector guardado exitosamente' : 'Ruta guardada exitosamente',
+          isSector
+            ? 'Sector guardado exitosamente'
+            : routeVisibility === 'unlisted'
+              ? 'Ruta creada con enlace para compartir'
+              : 'Ruta guardada exitosamente',
           'success',
         );
+
+        hasAutoInjectedOriginRef.current = false;
         setIsRoutingActive(false);
         setDraftRoutePoints([]);
         setDraftRouteName('');
+        setDraftRouteGeojson(null);
+        setOsrmDistance(0);
+        setOsrmDuration(0);
+        setRouteAlternatives([]);
+        setSelectedAlternativeIndex(0);
+        primaryRouteRef.current = null;
         setIsRouteFinished(false);
-        if (routingType === 'sector') {
+
+        if (isSector) {
           fetchSectors();
         } else {
           fetchSavedRoutes();
         }
       } else {
         showNotification(
-          routingType === 'sector' ? 'Error al guardar el sector' : 'Error al guardar la ruta',
+          isSector ? 'Error al guardar el sector' : 'Error al guardar la ruta',
           'error',
         );
       }
@@ -1195,12 +1763,31 @@ export function useHomeScreenState(token: string | null) {
       console.error('Error saving:', error);
       showNotification('Error de conexión al guardar', 'error');
     }
-  }, [draftRouteName, routingType, draftRoutePoints, token, routeCategory, showNotification]);
+  }, [
+    draftRouteName,
+    routingType,
+    draftRoutePoints,
+    token,
+    routeCategory,
+    routeVisibility,
+    transportMode,
+    draftRouteGeojson,
+    showNotification,
+    fetchSectors,
+    fetchSavedRoutes,
+  ]);
 
   const cancelRouting = useCallback(() => {
+    hasAutoInjectedOriginRef.current = false;
     setIsRoutingActive(false);
     setDraftRoutePoints([]);
     setDraftRouteName('');
+    setDraftRouteGeojson(null);
+    setOsrmDistance(0);
+    setOsrmDuration(0);
+    setRouteAlternatives([]);
+    setSelectedAlternativeIndex(0);
+    primaryRouteRef.current = null;
     setIsRouteFinished(false);
     showNotification('Trazado de ruta cancelado');
   }, [showNotification]);
@@ -1209,13 +1796,12 @@ export function useHomeScreenState(token: string | null) {
     async (routeId: string, rating: number, comment?: string) => {
       if (!token) {
         showNotification('Inicia sesión para calificar rutas', 'warning');
-        router.push('/ingresar');
+        openAuthModal('login');
         return;
       }
 
       try {
-        const baseUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8080';
-        const response = await fetch(`${baseUrl}/api/v1/routes/${routeId}/rate`, {
+        const response = await fetch(`${API_URL}/api/v1/routes/${routeId}/rate`, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${token}`,
@@ -1235,7 +1821,39 @@ export function useHomeScreenState(token: string | null) {
         showNotification('Error de conexión', 'error');
       }
     },
-    [token, showNotification, fetchSavedRoutes],
+    [token, showNotification, fetchSavedRoutes, openAuthModal],
+  );
+
+  const completeRoute = useCallback(
+    async (routeId: string) => {
+      if (!token) {
+        showNotification('Inicia sesión para registrar tus rutas completadas', 'warning');
+        openAuthModal('login');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_URL}/api/v1/routes/${routeId}/save`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ status: 'completed' }),
+        });
+
+        if (response.ok) {
+          showNotification('🎉 ¡Ruta completada! Puedes calificarla y compartir tu experiencia', 'success');
+          fetchSavedRoutes();
+        } else {
+          showNotification('Error al registrar ruta completada', 'error');
+        }
+      } catch (error) {
+        console.error('Error completing route:', error);
+        showNotification('Error de conexión', 'error');
+      }
+    },
+    [token, showNotification, fetchSavedRoutes, openAuthModal],
   );
 
   const handleSelectEvent = useCallback(
@@ -1243,7 +1861,14 @@ export function useHomeScreenState(token: string | null) {
       // If routing is active, clicking an event adds it as a waypoint/target
       if (isRoutingActive) {
         if (event && !isRouteFinished) {
-          handleMapClickForRouting({ latitude: event.latitude, longitude: event.longitude });
+          handleMapClickForRouting({
+            latitude: event.latitude,
+            longitude: event.longitude,
+            name: event.title,
+            businessId: (event as any).businessId,
+            eventId: event.id,
+            category: event.category,
+          });
         }
         return;
       }
@@ -1263,6 +1888,8 @@ export function useHomeScreenState(token: string | null) {
     detailsIslandSlide,
     openDetailsIsland,
     closeDetailsIsland,
+    selectedCategories,
+    setSelectedCategories,
     selectedCategory,
     setSelectedCategory,
     selectedEvent,
@@ -1369,7 +1996,7 @@ export function useHomeScreenState(token: string | null) {
 
     // Map content mode (Mapa/Turismo/Comercial)
     mapDisplayMode,
-    setMapDisplayMode,
+    setMapDisplayMode: handleMapDisplayModeChange,
 
     // Routing Mode (Geo-Router)
     isRoutingActive,
@@ -1392,9 +2019,31 @@ export function useHomeScreenState(token: string | null) {
     saveRoute,
     cancelRouting,
     rateRoute,
+    completeRoute,
+    transportMode,
+    setTransportMode,
+    routeVisibility,
+    setRouteVisibility,
+    draftRouteGeojson,
+    osrmDistance,
+    osrmDuration,
+    isCalculatingOsrm,
+    undoLastRoutePoint,
+    latestShareToken,
+    routeAlternatives,
+    selectedAlternativeIndex,
+    selectRouteAlternative,
+    optimizeDraftRouteOrder,
+    isOptimizingTrip,
+    recalculateDraftRoute,
 
     // On-screen Toast notifications
     activeToast,
     setActiveToast,
+
+    // Motor de Cámara y Efectos GTA V
+    cameraAnimationsEnabled,
+    setCameraAnimationsEnabled,
+    toggleCameraAnimations,
   };
 }
