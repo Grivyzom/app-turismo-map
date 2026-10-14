@@ -54,6 +54,10 @@ export function createAestheticsUpdater(
   }: AestheticsRefs,
 ) {
   const updateAesthetics = () => {
+    // map.getLayer() delega en map.style, que queda undefined tras
+    // map.remove() (desmontaje / doble montaje de StrictMode / Fast Refresh).
+    // Un rAF o timeout pendiente puede llegar después: no hay nada que pintar.
+    if (!map.style) return;
     const z = map.getZoom();
     const pitch = map.getPitch();
 
