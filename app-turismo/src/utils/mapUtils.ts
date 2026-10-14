@@ -51,6 +51,8 @@ export const getCategoryColor = (category: string, musicStyle?: string) => {
       return '#A0AEC0'; // Gris piedra
     case 'puerto':
       return '#2B6CB0'; // Azul oceánico
+    case 'embarcacion':
+      return '#0284C7'; // Cyan/Azul náutico
     case 'teatro':
       return '#C53030'; // Rojo teatro
     case 'fauna':
@@ -81,14 +83,23 @@ export const getCategoryColor = (category: string, musicStyle?: string) => {
       return '#8B7355'; // Bronze statue
     case 'arte':
       return '#D97706'; // Amber art
+    case 'maquina_ejercicio':
+    case 'ejercicio':
+      return '#0EA5E9'; // Sky / Fitness Cyan
     case 'banca':
-      return '#94A3B8'; // Gris pizarra — mobiliario neutro
-    case 'basurero':
-      return '#78716C'; // Gris piedra
+    case 'silla':
+      return '#F59E0B'; // Amber / Wood warm gold
     case 'bebedero':
-      return '#38BDF8'; // Celeste agua
+      return '#0284C7'; // Blue water
     case 'bano':
+      return '#6366F1'; // Indigo
+    case 'basurero':
+    case 'papelera':
       return '#64748B'; // Slate
+    case 'sendero':
+      return '#10B981'; // Emerald Trail Green
+    case 'new_spot':
+      return '#06B6D4'; // Cyan Spot
     default:
       return '#3B82F6';
   }
@@ -121,7 +132,7 @@ export const getCategoryIcon = (category: string, musicStyle?: string): Category
     case 'parque':
       return 'park';
     case 'humedal':
-      return 'water-waves'; // Humedal = agua + juncos
+      return 'waves'; // Humedal = agua + juncos / ondas fluviales
     case 'agua':
       return 'water';
     case 'universidad':
@@ -146,6 +157,8 @@ export const getCategoryIcon = (category: string, musicStyle?: string): Category
       return 'account-balance';
     case 'puerto':
       return 'anchor';
+    case 'embarcacion':
+      return 'directions-boat';
     case 'teatro':
       return 'theater-comedy';
     case 'fauna':
@@ -176,14 +189,23 @@ export const getCategoryIcon = (category: string, musicStyle?: string): Category
       return 'public';
     case 'arte':
       return 'palette';
+    case 'maquina_ejercicio':
+    case 'ejercicio':
+      return 'fitness-center';
     case 'banca':
+    case 'silla':
       return 'chair';
-    case 'basurero':
-      return 'delete';
     case 'bebedero':
       return 'water-drop';
     case 'bano':
       return 'wc';
+    case 'basurero':
+    case 'papelera':
+      return 'delete-outline';
+    case 'sendero':
+      return 'directions-walk';
+    case 'new_spot':
+      return 'place';
     default:
       return 'place';
   }

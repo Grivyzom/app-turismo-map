@@ -13,9 +13,11 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/joho/godotenv"
 	"github.com/rs/cors"
 )
@@ -28,6 +30,15 @@ func main() {
 	database.InitDB()
 	database.InitRedis()
 	utils.InitJWT()
+
+	// Inicializar Clerk SDK si la clave secreta está presente
+	clerkKey := os.Getenv("CLERK_SECRET_KEY")
+	if clerkKey != "" {
+		clerk.SetKey(clerkKey)
+		log.Println("Clerk SDK inicializado correctamente")
+	} else {
+		log.Println("Aviso: CLERK_SECRET_KEY no configurado en el servidor")
+	}
 
 	// Inicializar pgxpool para el catálogo y promociones
 	repo, err := intdb.NewRepository(context.Background())
@@ -56,6 +67,7 @@ func main() {
 
 	// ── Rutas públicas de autenticación (usuarios normales) ──────────────
 	mux.HandleFunc("/auth/google", handlers.GoogleAuthHandler)
+	mux.HandleFunc("/auth/clerk", middleware.AuthRateLimiter(handlers.ClerkAuthHandler))
 	mux.HandleFunc("/auth/register", middleware.AuthRateLimiter(handlers.RegisterHandler))
 	mux.HandleFunc("/auth/login", middleware.AuthRateLimiter(handlers.LoginHandler))
 
@@ -75,6 +87,11 @@ func main() {
 	mux.HandleFunc("GET /api/v1/routes", handlers.GetRoutesHandler)
 	mux.HandleFunc("POST /api/v1/routes", middleware.AuthMiddleware(handlers.CreateRouteHandler))
 	mux.HandleFunc("POST /api/v1/routes/{id}/rate", middleware.AuthMiddleware(handlers.RateRouteHandler))
+	mux.HandleFunc("POST /api/v1/user/routes", middleware.AuthMiddleware(handlers.CreateUserRouteHandler))
+	mux.HandleFunc("GET /api/v1/user/routes", middleware.AuthMiddleware(handlers.GetUserRoutesHandler))
+	mux.HandleFunc("GET /api/v1/routes/shared/{token}", handlers.GetSharedRouteHandler)
+	mux.HandleFunc("POST /api/v1/routes/{id}/share", middleware.AuthMiddleware(handlers.ShareRouteHandler))
+	mux.HandleFunc("POST /api/v1/routes/{id}/bookmark", middleware.AuthMiddleware(handlers.BookmarkRouteHandler))
 	mux.HandleFunc("GET /api/v1/fauna-types", handlers.GetFaunaTypesHandler)
 	mux.HandleFunc("POST /api/v1/fauna-types", middleware.AuthMiddleware(handlers.CreateFaunaTypeHandler))
 	mux.HandleFunc("GET /api/v1/cycleways", handlers.GetCyclewaysHandler)
@@ -167,25 +184,59 @@ func main() {
 		fmt.Fprint(w, "¡Backend Go de Turismo funcionando!")
 	})
 
-	// Configurar CORS — solo orígenes permitidos (hardening de seguridad)
+	// Configurar CORS — orígenes permitidos
 	allowedOrigins := map[string]bool{
-		"https://admin.turismomap.com":    true,
-		"https://turismomap.com":          true,
-		"https://www.turismomap.com":      true,
-		"https://api-turismo.broco.dev":   true,
-		"https://app.broco.dev":           true,
+		"https://admin.turismomap.com":  true,
+		"https://turismomap.com":        true,
+		"https://www.turismomap.com":    true,
+		"https://api-turismo.broco.dev": true,
+		"https://app.broco.dev":         true,
+		"http://localhost:3000":         true,
+		"http://localhost:5173":         true,
+		"http://localhost:8082":         true,
+		"http://144.217.10.38:8082":     true,
+		"https://144.217.10.38:8082":    true,
 	}
-	if os.Getenv("ENV") == "development" {
-		allowedOrigins["http://localhost:3000"] = true
-		allowedOrigins["http://localhost:5173"] = true
-		allowedOrigins["http://localhost:8082"] = true
+
+	// Permitir orígenes adicionales mediante la variable de entorno ALLOWED_ORIGINS (separados por coma)
+	if extraOrigins := os.Getenv("ALLOWED_ORIGINS"); extraOrigins != "" {
+		for _, o := range strings.Split(extraOrigins, ",") {
+			o = strings.TrimSpace(o)
+			if o != "" {
+				allowedOrigins[o] = true
+			}
+		}
 	}
+
+	isDev := os.Getenv("ENV") == "development" || os.Getenv("ENV") == "dev" || os.Getenv("ENV") == ""
+
 	c := cors.New(cors.Options{
 		AllowOriginFunc: func(origin string) bool {
-			return allowedOrigins[origin]
+			if origin == "" {
+				return true
+			}
+			if allowedOrigins[origin] {
+				return true
+			}
+			// Permitir cualquier subdominio de broco.dev o turismomap.com
+			if strings.HasSuffix(origin, ".broco.dev") || strings.HasSuffix(origin, ".turismomap.com") {
+				return true
+			}
+			// Permitir cualquier puerto en localhost, 127.0.0.1 o la IP del servidor
+			if strings.HasPrefix(origin, "http://localhost:") ||
+				strings.HasPrefix(origin, "http://127.0.0.1:") ||
+				strings.HasPrefix(origin, "http://144.217.10.38:") ||
+				strings.HasPrefix(origin, "https://144.217.10.38:") {
+				return true
+			}
+			// En entorno de desarrollo permitir cualquier host de pruebas (localhost, IP remota, etc.)
+			if isDev {
+				return true
+			}
+			return false
 		},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Authorization", "Content-Type", "X-Requested-With"},
+		AllowedHeaders:   []string{"*"},
 		AllowCredentials: true,
 		MaxAge:           300,
 	})

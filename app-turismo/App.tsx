@@ -39,6 +39,7 @@ const MAP_LAYER_OPTIONS: { key: MapLayer; label: string; icon: string }[] = [
   { key: 'streets', label: 'Calles', icon: '🛣️' },
   { key: 'satellite', label: 'Satélite', icon: '🛰️' },
   { key: 'terrain', label: 'Relieve', icon: '⛰️' },
+  { key: '3d', label: '3D Inmersivo', icon: '🏛️' },
 ];
 
 const getCategoryColor = (category: string, musicStyle?: string) => {

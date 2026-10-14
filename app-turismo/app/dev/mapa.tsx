@@ -5,7 +5,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Stack, router } from 'expo-router';
 
 import { useAuth } from '../../src/context/AuthContext';
-import { useHomeScreenState } from '../(home)/useHomeScreenState';
+import { useHomeScreenState } from '../../src/hooks/useHomeScreenState';
 import { MapContainer } from '../../src/components/Map/MapContainer';
 import {
   RouterHUD,
@@ -111,6 +111,18 @@ export default function DevMapaScreen() {
           onFinishSingleTarget={state.finishSingleTargetRoute}
           onSave={state.saveRoute}
           onCancel={state.cancelRouting}
+          transportMode={state.transportMode}
+          setTransportMode={state.setTransportMode}
+          osrmDistance={state.osrmDistance}
+          osrmDuration={state.osrmDuration}
+          isCalculatingOsrm={state.isCalculatingOsrm}
+          onUndoLastPoint={state.undoLastRoutePoint}
+          onRecalculate={state.recalculateDraftRoute}
+          routeAlternatives={state.routeAlternatives}
+          selectedAlternativeIndex={state.selectedAlternativeIndex}
+          onSelectAlternative={state.selectRouteAlternative}
+          onOptimizeOrder={state.optimizeDraftRouteOrder}
+          isOptimizingOrder={state.isOptimizingTrip}
         />
       )}
 

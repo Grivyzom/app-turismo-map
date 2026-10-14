@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "vrindaspace": {
+      "type": "http",
+      "url": "https://kyo.broco.dev/api/v1/mcp",
+      "headers": {
+        "Authorization": "Bearer ${KYO_MCP_TOKEN}"
+      }
+    }
+  }
+}

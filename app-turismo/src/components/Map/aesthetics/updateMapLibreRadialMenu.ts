@@ -36,6 +36,11 @@ export function updateMapLibreRadialMenu(
   const pin = pinEl.querySelector('.marker-3d-pin') as HTMLDivElement | null;
   if (!pin) return;
 
+  // El cuerpo del pin puede estar rotado (gota -45°, rombo +45°). Montar el
+  // menú dentro arrastraría los botones con esa rotación, así que se cuelga
+  // del ancla: mismo centro, sin rotar.
+  const host = (pinEl.querySelector('.pin-menu-anchor') as HTMLDivElement | null) ?? pin;
+
   // Pin actual rendered size (default 28px)
   const pinW = pin.offsetWidth || 28;
   const BUTTON_SIZE = Math.max(18, Math.min(22, pinW - 6)); // never larger than pin - 6px
@@ -43,7 +48,7 @@ export function updateMapLibreRadialMenu(
   const ORBIT_R = pinW / 2 + BUTTON_SIZE / 2 + 6; // gap of 6px
 
   const showMenu = isSelected || isHovered;
-  let menuContainer = pin.querySelector('.radial-menu-container') as HTMLDivElement | null;
+  let menuContainer = host.querySelector('.radial-menu-container') as HTMLDivElement | null;
 
   if (showMenu) {
     // Notify registry — closes all other menus (guard to avoid recursive stack overflow)
@@ -63,7 +68,7 @@ export function updateMapLibreRadialMenu(
         pointerEvents: 'none',
         zIndex: '100',
       });
-      pin.appendChild(menuContainer);
+      host.appendChild(menuContainer);
     }
 
     if (menuContainer.children.length === 0) {

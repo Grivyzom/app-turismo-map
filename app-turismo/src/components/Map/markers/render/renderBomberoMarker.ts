@@ -1,5 +1,9 @@
 import { TurismoEvent } from '../../types';
+import { buildServicePlaque } from '../../design/buildServicePlaque';
+
 import { renderVinetaBadge } from './renderVinetaBadge';
+
+const BOMBERO_ACCENT = '#E53E3E';
 
 export function renderBomberoMarker(
   pinEl: HTMLDivElement,
@@ -8,31 +12,31 @@ export function renderBomberoMarker(
   mapLayer: string,
 ) {
   pinEl.innerHTML = '';
-  const container = document.createElement('div');
-  container.className = 'marker-bombero-container';
-  Object.assign(container.style, {
-    position: 'relative',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '40px',
-    height: '40px',
-    transition: 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
-    transform: isSelected ? 'scale(1.2)' : 'scale(1)',
-    transformOrigin: 'bottom center',
-    filter: isSelected
-      ? 'drop-shadow(0px 8px 12px rgba(0,0,0,0.3))'
-      : 'drop-shadow(0px 4px 6px rgba(0,0,0,0.2))',
-  });
 
-  container.innerHTML = `
-    <svg width="40" height="40" viewBox="0 0 64 64">
-      <ellipse cx="32" cy="54" rx="20" ry="6" fill="rgba(0,0,0,0.2)" />
-      <path d="M32 6 C21 6 12 15 12 26 C12 40 32 58 32 58 C32 58 52 40 52 26 C52 15 43 6 32 6 Z" fill="#FFFFFF" stroke="#CBD5E0" stroke-width="1.5" />
-      <path d="M32 12 Q29 16 29 20 Q29 24 32 25 Q35 24 35 20 Q35 16 32 12 Z" fill="#E53E3E" />
-      <path d="M32 14 Q30 17 30 20 Q30 22 32 23 Q34 22 34 20 Q34 17 32 14 Z" fill="#F97316" />
-    </svg>
+  // Llama a dos tonos: silueta roja + núcleo ámbar, centrada en (32, 26).
+  const emblem = `
+    <path
+      d="M32 13.6 C27.4 19.4 25.8 22.6 25.8 26.4 C25.8 31 28.6 34.2 32 35.8 C35.4 34.2 38.2 31 38.2 26.4 C38.2 22.6 36.6 19.4 32 13.6 Z"
+      fill="${BOMBERO_ACCENT}"
+    />
+    <path
+      d="M32 20.4 C29.6 23.6 28.9 25.5 28.9 27.6 C28.9 30.1 30.3 31.8 32 32.6 C33.7 31.8 35.1 30.1 35.1 27.6 C35.1 25.5 34.4 23.6 32 20.4 Z"
+      fill="#F97316"
+    />
+    <path
+      d="M32 25.4 C30.9 27.1 30.6 28.1 30.6 29.1 C30.6 30.3 31.2 31.1 32 31.5 C32.8 31.1 33.4 30.3 33.4 29.1 C33.4 28.1 33.1 27.1 32 25.4 Z"
+      fill="#FDE68A"
+    />
   `;
+
+  const container = buildServicePlaque({
+    className: 'marker-bombero-container',
+    emblem,
+    accent: BOMBERO_ACCENT,
+    isSelected,
+    isDark: mapLayer === 'dark' || mapLayer === 'satellite',
+    ambient: 'ember',
+  });
   pinEl.appendChild(container);
 
   if (event.vineta) {

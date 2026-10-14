@@ -12,7 +12,6 @@ export function LoadingFallback() {
       <Audio
         height={80}
         width={80}
-        radius={9}
         color="#22c55e"
         ariaLabel="audio-loading"
         wrapperStyle={{}}

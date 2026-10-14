@@ -53,3 +53,16 @@ export const PARQUES_EVENTS: TurismoEvent[] = data.features.map((f: any, i: numb
 
   return event;
 });
+
+export const PARQUE_SPOTS_EVENTS: TurismoEvent[] = ALL_SPOTS.map((s) => ({
+  id: s.id,
+  title: s.name,
+  description: s.description,
+  latitude: s.latitude,
+  longitude: s.longitude,
+  category: s.spotType === 'sendero' ? 'sendero' : s.spotType === 'mirador' ? 'new_spot' : 'bosque',
+  organizer: 'Spot Natural',
+  time: 'Acceso libre 24/7',
+  address: 'Área verde / Parque, Valdivia',
+  imageUrl: s.imageUrl,
+}));

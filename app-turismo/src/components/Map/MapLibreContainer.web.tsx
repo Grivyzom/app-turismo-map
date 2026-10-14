@@ -1,20 +1,33 @@
-import React, { useEffect, useRef, useCallback, useState } from 'react';
+import React, { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import maplibregl, { Map as MapLibreMap } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { StyleSheet, View } from 'react-native';
+
 import { VALDIVIA_LAT, VALDIVIA_LNG } from '../../constants/location';
 import { getCategoryColor, getCategoryIcon } from '../../utils/mapUtils';
-import { addMissingStyleImage, applyDarkTheme } from '../../utils/mapWebUtils';
-import { getActiveMapStyles, getSatelliteStyle } from '../../config/mapStyles.web';
+import {
+  addMissingStyleImage,
+  applyDarkTheme,
+  applyRiverStyling,
+  hideBaseMapPOIs,
+} from '../../utils/mapWebUtils';
+import { getSatelliteStyle, CARTO_API_KEY } from '../../config/mapStyles.web';
 import { SatelliteTileCache } from '../../utils/satelliteTileCache';
 import { TrafficTileCache, TRAFFIC_PROTOCOL } from '../../utils/trafficTileCache';
-import { useSuperclusterEvents, getClusterDominantColor } from '../../utils/clusterUtils';
+import {
+  useSuperclusterEvents,
+  CAMERA_PIN_MIN_ZOOM,
+  CAMERA_GROUP_MAX_ZOOM,
+} from '../../utils/clusterUtils';
+import { MICRODOT_PAINT, microdotFeatures } from '../../utils/semanticZoom';
+import { pickTopPriority, pinHitBox, WALK_LINE_DASHARRAY } from '../../utils/contextualRanking';
 import { radialMenuRegistry } from '../../utils/radialMenuRegistry';
 import { getLatestRadarPath } from '../../utils/weatherUtils';
 import { useRainEffect } from '../../utils/useRainEffect';
 import { CICLOVIAS_GEOJSON } from '../../data/ciclovias';
 import { MOBILIARIO_GEOJSON } from '../../data/mobiliarioData';
 import { FloorSelector } from '../MapUI/FloorSelector';
+import { isPointInPolygon } from '../../utils/locationUtils';
 
 import {
   MapContainerProps,
@@ -23,12 +36,12 @@ import {
   MAX_RAINVIEWER_ZOOM,
   TurismoEvent,
   Cluster,
+  RoutePoint,
+  RouteType,
 } from './types';
-
 
 // ─── Extracted utility modules ────────────────────────────────────────────────
 import {
-  hexToRgba,
   getAccuracyRadiusAtZoom,
   WAVE_PERIOD_MS,
   WAVE_MIN_RADIUS_PX,
@@ -37,7 +50,27 @@ import {
 } from './utils/markerHelpers';
 import { detectSurfaceType, detectSurfaceTypeForBoat } from './utils/surfaceDetection';
 import { createSvgIcon } from './utils/svgIcons';
-import { getBeforeRoadsOrLabelsLayerId, updateMarkerDomRefs } from './utils/mapHelpers';
+import { applyHillshade } from './utils/hillshade';
+import { attachPerformanceWatchdog } from './utils/performanceWatchdog';
+import { CAMERA_CONSTRAINTS, applyCameraGate, resetNorthPitch } from './utils/cameraConstraints';
+import {
+  getBeforeBridgesOrBuildingLayerId,
+  getBeforeRoadsOrLabelsLayerId,
+  getBeforeRoadsLayerId,
+  updateMarkerDomRefs,
+} from './utils/mapHelpers';
+import {
+  NATURE_AREAS_GEOJSON,
+  NATURE_AREA_CATEGORIES,
+  isNatureAreaCategory,
+} from '../../data/natureAreas';
+import {
+  getNatureAreaPalette,
+  NATURE_AREA_MIN_ZOOM,
+  NATURE_AREA_FADE_ZOOM,
+  NATURE_AREA_FADE_FACTOR,
+  NATURE_AREA_OUTLINE_WIDTH,
+} from './design/natureAreaStyle';
 import { renderBoatFlatMarker, renderBoatMarker } from './markers/render/renderBoatMarkers';
 import { renderFlatMarker } from './markers/render/renderFlatMarker';
 import { renderLoboMarinoMarker } from './markers/render/renderLoboMarinoMarker';
@@ -46,16 +79,42 @@ import { renderBomberoMarker } from './markers/render/renderBomberoMarker';
 import { renderCarabineroMarker } from './markers/render/renderCarabineroMarker';
 import { renderCamaraMarker } from './markers/render/renderCamaraMarker';
 import { renderUniversityMarker } from './markers/render/renderUniversityMarker';
+import {
+  renderBenchMarker,
+  renderFitnessMarker,
+  renderTrashMarker,
+  renderWaterMarker,
+} from './markers/render/renderFlatGroundMarkers';
 import { renderPinMarker } from './markers/render/renderPinMarker';
-import { updateMapLibreStoreModal } from './aesthetics/updateMapLibreStoreModal';
-import { updateMapLibreRadialMenu } from './aesthetics/updateMapLibreRadialMenu';
+import { injectMarkerStyles } from './design/markerStyles';
+import {
+  executeMapLibreGtaVSpawn,
+  executeMapLibreGtaVLogout,
+  executeSmoothPinFocus,
+  hasCameraSpawnedInSession,
+  markCameraSpawnedInSession,
+  resetCameraSpawnInSession,
+} from './camera/cameraAnimationEngine';
+import {
+  CUSTOM_RENDERER_CATEGORIES,
+  getPinDesign,
+  isEmergencyCategory,
+  isPinlessCategory,
+  isToggleClickCategory,
+  isUtilityCategory,
+  isNoModalCategory,
+} from './design/pinDesignSystem';
 import { CloudShadows } from './CloudShadows';
-
-// URL de estilo público vectorial de CARTO - Dark Matter (Selva Valdiviana Base)
-const CARTO_VECTOR_STYLE_URL = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
-
-const mapStyles = getActiveMapStyles();
-
+import {
+  CARTO_VECTOR_STYLE_URL,
+  mapStyles,
+} from './utils/mapLibreConfig';
+import { ROUTE_CHEVRON_ID, ensureRouteChevronImage, ensureDraftRouteMarkerStyles } from './utils/routeDraftHelpers';
+import { isClickInsideModalOrInput } from './utils/mapClickGuards';
+import { createBuildingLOD } from './utils/buildingLOD';
+import { createZonesSync } from './utils/zonesLayer';
+import { registerZoneInteractions } from './utils/zoneInteractions';
+import { createAestheticsUpdater } from './utils/aesthetics';
 
 
 export function MapLibreContainer({
@@ -78,6 +137,7 @@ export function MapLibreContainer({
   showSectors = true,
   sectorsData,
   visibleSectorIds,
+  showMobiliario = false,
   showWeather = false,
   weatherType = 'precipitation',
   onSaveLocation,
@@ -87,10 +147,23 @@ export function MapLibreContainer({
   isMagicWandActive = false,
   onMagicWandSelect,
   navRouteGeojson,
+  walkPreviewGeojson,
+  isAuthenticated,
+  cameraAnimationsEnabled = true,
+  isRoutingActive = false,
+  routingType,
+  draftRoutePoints = [],
+  onMapClickForRouting,
+  isRouteFinished = false,
+  mapDisplayMode = 'turismo',
 }: MapContainerProps) {
   const mapNodeRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const pinMarkerRef = useRef<{ marker: maplibregl.Marker; el: HTMLDivElement } | null>(null);
+  const prevAuthRef = useRef<boolean | undefined>(undefined);
+  const hasSpawnedRef = useRef<boolean>(false);
+  const lastCenterTriggerRef = useRef<number>(0);
+  const mapReadyRef = useRef<boolean>(false);
   const [currentBounds, setCurrentBounds] = useState<
     | {
         minLat: number;
@@ -102,6 +175,10 @@ export function MapLibreContainer({
   >(undefined);
   const [radarPath, setRadarPath] = useState<string | null>(null);
   const [internalFloor, setInternalFloor] = useState<number | null>(null);
+  const [is3DActive, setIs3DActive] = useState<boolean>(false);
+  const [lightweightMode, setLightweightMode] = useState<boolean>(false);
+  const [compassVisible, setCompassVisible] = useState<boolean>(false);
+  const compassNeedleRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (selectedEvent?.indoorMap) {
@@ -125,14 +202,15 @@ export function MapLibreContainer({
       domRefs?: {
         pinWrapper: HTMLDivElement | null;
         pin: HTMLDivElement | null;
+        body: HTMLDivElement | null;
         stem: HTMLDivElement | null;
-        stemCamara: HTMLDivElement | null;
         lensContainer: HTMLDivElement | null;
         icon: HTMLDivElement | null;
         flatContainer: HTMLDivElement | null;
         shadowPin: HTMLDivElement | null;
         shadowStem: HTMLDivElement | null;
         puncture: HTMLDivElement | null;
+        pedestal: HTMLDivElement | null;
         ripples: NodeListOf<HTMLDivElement> | null;
         storeModal: HTMLDivElement | null;
         notesContainer: HTMLDivElement | null;
@@ -140,6 +218,8 @@ export function MapLibreContainer({
         loboSVG: SVGElement | null;
         boatBody: HTMLDivElement | null;
         wakeContainer: HTMLDivElement | null;
+        flatGroundEl?: HTMLElement | null;
+        flatMarkerIcon?: HTMLElement | null;
       };
     };
   }>({});
@@ -156,12 +236,14 @@ export function MapLibreContainer({
   const onSelectEventRef = useRef(onSelectEvent);
   const onSaveLocationRef = useRef(onSaveLocation);
   const selectedEventRef = useRef(selectedEvent);
+  const mapDisplayModeRef = useRef(mapDisplayMode);
   const mapLayerRef = useRef(mapLayer);
   const onZoomChangeRef = useRef(onZoomChange);
   const onMapPinchoRef = useRef(onMapPincho);
   const onMapMoveRef = useRef(onMapMove);
   const isDraggingRef = useRef(false);
   const updateAestheticsRef = useRef<() => void>(() => {});
+  const cameraHeatmapKeyRef = useRef<string | null>(null);
   const tileCacheRef = useRef<SatelliteTileCache | null>(null);
   const trafficCacheRef = useRef<TrafficTileCache | null>(null);
   const syncUserLocationRef = useRef<() => void>(() => {});
@@ -171,10 +253,64 @@ export function MapLibreContainer({
   const syncCyclewaysRef = useRef<() => void>(() => {});
   const syncClustersRef = useRef<() => void>(() => {});
   const syncEventPolygonsRef = useRef<() => void>(() => {});
+  // Último array `events` subido a 'event-polygons-source': evita re-subir
+  // el GeoJSON en cada pan/zoom/selección cuando los datos no cambiaron.
+  const polygonEventsUploadedRef = useRef<TurismoEvent[] | null>(null);
+  // Firma (tema + resaltado + categorías) aplicada a la capa natural.
+  const natureAreasKeyRef = useRef<string>('');
+  const sync3DBuildingsRef = useRef<() => void>(() => {});
+  const lastZonePatternPitchTRef = useRef<number>(-1);
+  const activeParkIdRef = useRef<string | null>(null);
+  // Refs de gestos de cámara: permiten adaptar el grace period de eliminación
+  // de marcadores y omitir el queryRenderedFeatures de oclusión cuando el
+  // gesto en curso lo hace innecesariamente costoso.
+  const isPitchingRef = useRef<boolean>(false);
+  const isZoomingRef = useRef<boolean>(false);   // Durante scroll/zoom: sin grace period (LOD intencionado)
+  const isRotatingRef = useRef<boolean>(false);  // Durante rotación: grace corto (150ms)
+  const isMovingRef = useRef<boolean>(false);    // Durante arrastre/paneo: preserva visibilidad sin parpadeos
 
   const sectorsDataRef = useRef(sectorsData);
   const visibleSectorIdsRef = useRef(visibleSectorIds);
   const showSectorsRef = useRef(showSectors);
+
+  // Social Geo-Router Refs
+  const isRoutingActiveRef = useRef(isRoutingActive);
+  const onMapClickForRoutingRef = useRef(onMapClickForRouting);
+  const draftRoutePointsRef = useRef(draftRoutePoints);
+  const routingTypeRef = useRef(routingType);
+  const isRouteFinishedRef = useRef(isRouteFinished);
+  const cameraAnimationsEnabledRef = useRef(cameraAnimationsEnabled);
+  const isGtaVRunningRef = useRef(false);
+  interface DraftRouteMarkerItem {
+    marker: maplibregl.Marker;
+    el: HTMLDivElement;
+    bodyEl: HTMLDivElement;
+    pillEl: HTMLDivElement;
+    pulseEl: HTMLDivElement;
+    role: 'origin' | 'destination' | 'waypoint';
+  }
+  const draftRouteMarkersRef = useRef<DraftRouteMarkerItem[]>([]);
+  const syncDraftRouteRef = useRef<() => void>(() => {});
+
+  useEffect(() => {
+    isRoutingActiveRef.current = isRoutingActive;
+    onMapClickForRoutingRef.current = onMapClickForRouting;
+    draftRoutePointsRef.current = draftRoutePoints;
+    routingTypeRef.current = routingType;
+    isRouteFinishedRef.current = isRouteFinished;
+  }, [isRoutingActive, onMapClickForRouting, draftRoutePoints, routingType, isRouteFinished]);
+
+  // Cambiar cursor a cruz (crosshair) cuando el trazador de ruta está activo
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    try {
+      const canvas = map.getCanvas();
+      if (canvas) {
+        canvas.style.cursor = isRoutingActive ? 'crosshair' : '';
+      }
+    } catch {}
+  }, [isRoutingActive]);
 
   useEffect(() => {
     isMagicWandActiveRef.current = isMagicWandActive;
@@ -198,6 +334,7 @@ export function MapLibreContainer({
     if (!hasLocalMiniModal) {
       selectedEventRef.current = selectedEvent;
     }
+    mapDisplayModeRef.current = mapDisplayMode;
     mapLayerRef.current = mapLayer;
     onZoomChangeRef.current = onZoomChange;
     onMapPinchoRef.current = onMapPincho;
@@ -205,6 +342,7 @@ export function MapLibreContainer({
     latestUserLocationRef.current = userLocation;
     onSectorPressRef.current = onSectorPress;
     activeNestedZoneRef.current = activeNestedZone;
+    cameraAnimationsEnabledRef.current = cameraAnimationsEnabled;
 
     if (updateAestheticsRef.current) {
       updateAestheticsRef.current();
@@ -218,6 +356,7 @@ export function MapLibreContainer({
     selectedEvent,
     mapLayer,
     onZoomChange,
+    cameraAnimationsEnabled,
     onMapPincho,
     onMapMove,
     userLocation,
@@ -311,6 +450,7 @@ export function MapLibreContainer({
           m.keyboard.enable();
           m.doubleClickZoom.enable();
           m.touchZoomRotate.enable();
+          applyCameraGate(m);
           m.getCanvas().style.pointerEvents = 'auto';
           m.getCanvasContainer().style.pointerEvents = 'auto';
         }
@@ -324,6 +464,7 @@ export function MapLibreContainer({
       map.keyboard.enable();
       map.doubleClickZoom.enable();
       map.touchZoomRotate.enable();
+      applyCameraGate(map);
       map.getCanvas().style.pointerEvents = 'auto';
       map.getCanvasContainer().style.pointerEvents = 'auto';
     }
@@ -427,6 +568,12 @@ export function MapLibreContainer({
     if (map.getLayer('zones-outline')) {
       map.setLayoutProperty('zones-outline', 'visibility', visibility);
     }
+    if (map.getLayer('zones-reserva-pattern')) {
+      map.setLayoutProperty('zones-reserva-pattern', 'visibility', visibility);
+    }
+    if (map.getLayer('zones-reserva-flat-fallback')) {
+      map.setLayoutProperty('zones-reserva-flat-fallback', 'visibility', visibility);
+    }
   }, [showSectors]);
 
   // Initialization
@@ -446,6 +593,8 @@ export function MapLibreContainer({
     // Determinar estilo inicial
     const initialLayer = mapLayerRef.current;
     const initialMaxZoom = MAX_ZOOM_PER_LAYER[initialLayer] || 18;
+    const initialPitch = initialLayer === '3d' ? CAMERA_CONSTRAINTS.pitch3D : 0;
+    const initialBearing = initialLayer === '3d' ? CAMERA_CONSTRAINTS.bearing3D : 0;
     // Satélite siempre usa el protocolo cacheado para Ultra HD automático
     const initialStyle =
       initialLayer === 'satellite'
@@ -457,8 +606,28 @@ export function MapLibreContainer({
       style: initialStyle,
       center: [VALDIVIA_LNG, VALDIVIA_LAT],
       zoom: 13,
+      pitch: initialPitch,
+      bearing: initialBearing,
       maxZoom: initialMaxZoom,
+      maxPitch: CAMERA_CONSTRAINTS.maxPitch,
       attributionControl: false,
+      transformRequest: (url: string) => {
+        const cartoKey =
+          CARTO_API_KEY ||
+          process.env.EXPO_PUBLIC_CARTO_API_KEY ||
+          process.env.CARTO_API_KEY ||
+          '';
+
+        if (cartoKey && (url.includes('basemaps.cartocdn.com') || url.includes('carto.com'))) {
+          if (!url.includes('api_key=') && !url.includes('key=')) {
+            const separator = url.includes('?') ? '&' : '?';
+            return {
+              url: `${url}${separator}api_key=${cartoKey}`,
+            };
+          }
+        }
+        return { url };
+      },
     });
 
     mapRef.current = map;
@@ -515,11 +684,36 @@ export function MapLibreContainer({
       }, 80);
     };
 
+    const buildingLOD = createBuildingLOD({
+      map,
+      getMap: () => mapRef.current,
+      getLayerMode: () => mapLayerRef.current,
+    });
+    sync3DBuildingsRef.current = buildingLOD.sync3DBuildings;
+
     map.on('load', () => {
+      mapReadyRef.current = true;
       const center = map.getCenter();
       lastStableCenter = { lat: center.lat, lng: center.lng };
       lastStableZoom = map.getZoom();
       setCurrentBounds(getStableBounds());
+
+      // Comprobar spawn inicial si el usuario ya está autenticado con ubicación
+      if (isAuthenticated) {
+        const targetLoc = latestUserLocationRef.current || userLocation;
+        if (targetLoc && !hasSpawnedRef.current) {
+          hasSpawnedRef.current = true;
+          prevAuthRef.current = true;
+          const alreadySpawned = hasCameraSpawnedInSession();
+          executeMapLibreGtaVSpawn(map, targetLoc, !alreadySpawned && cameraAnimationsEnabled);
+          markCameraSpawnedInSession();
+        }
+      } else {
+        prevAuthRef.current = false;
+      }
+
+      // Silenciar POIs estáticos del mapa base (OpenFreeMap / OpenMapTiles)
+      hideBaseMapPOIs(map);
 
       // ── Native Mobiliario Layer (Static High-Perf POIs) ──
       const addSvgImageToMap = (id: string, svgString: string) => {
@@ -544,26 +738,37 @@ export function MapLibreContainer({
       addSvgImageToMap('drinking_water', svgWater);
       addSvgImageToMap('toilets', svgToilet);
 
+      // Edificios 3D ('building-3d') deben dibujarse DESPUÉS (encima) de estos
+      // marcadores nativos para que la extrusión los oculte de verdad — un
+      // circle/symbol layer de MapLibre no hace depth-test contra fill-extrusion,
+      // solo respeta orden de pintado. Insertarlos antes de 'building-3d' logra
+      // la oclusión sin tocar el estilo base.
+      const buildingBeforeId = map.getLayer('building-3d') ? 'building-3d' : undefined;
+
       if (!map.getSource('mobiliario-source')) {
         map.addSource('mobiliario-source', {
           type: 'geojson',
           data: MOBILIARIO_GEOJSON as any,
         });
-        map.addLayer({
-          id: 'mobiliario-layer',
-          type: 'symbol',
-          source: 'mobiliario-source',
-          minzoom: 15,
-          layout: {
-            'icon-image': ['get', 'amenity'],
-            'icon-size': 0.8,
-            'icon-allow-overlap': true,
-            'icon-ignore-placement': true,
+        map.addLayer(
+          {
+            id: 'mobiliario-layer',
+            type: 'symbol',
+            source: 'mobiliario-source',
+            minzoom: 15,
+            layout: {
+              'icon-image': ['get', 'amenity'],
+              'icon-size': 0.8,
+              'icon-allow-overlap': true,
+              'icon-ignore-placement': true,
+              visibility: showMobiliario ? 'visible' : 'none',
+            },
+            paint: {
+              'icon-opacity': ['interpolate', ['linear'], ['zoom'], 15, 0, 15.5, 1],
+            },
           },
-          paint: {
-            'icon-opacity': ['interpolate', ['linear'], ['zoom'], 15, 0, 15.5, 1],
-          },
-        });
+          buildingBeforeId,
+        );
       }
 
       // ── Native Cluster Layers (rendered on WebGL canvas, not DOM) ──
@@ -574,710 +779,100 @@ export function MapLibreContainer({
         });
 
         // Circle background layer - pitch-aligned to map surface
-        map.addLayer({
-          id: 'cluster-circles',
-          type: 'circle',
-          source: 'clusters-source',
-          paint: {
-            'circle-color': ['get', 'color'],
-            'circle-radius': ['get', 'radius'],
-            'circle-stroke-width': 2,
-            'circle-stroke-color': 'rgba(255, 255, 255, 0.85)',
-            'circle-pitch-alignment': 'map',
-            'circle-opacity': 1,
-            'circle-stroke-opacity': 1,
+        // Micro-dots semánticos (sin clusters numéricos): un punto por evento en su coordenada real.
+        map.addLayer(
+          {
+            id: 'cluster-circles',
+            type: 'circle',
+            source: 'clusters-source',
+            paint: MICRODOT_PAINT as any,
           },
-        });
-
-        // Text label layer - also pitch-aligned to map surface
-        map.addLayer({
-          id: 'cluster-labels',
-          type: 'symbol',
-          source: 'clusters-source',
-          layout: {
-            'text-field': ['get', 'count'],
-            'text-size': ['get', 'fontSize'],
-            'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-            'text-allow-overlap': false,
-            'text-ignore-placement': false,
-            'text-pitch-alignment': 'map',
-            'text-rotation-alignment': 'map',
-          },
-          paint: {
-            'text-color': '#ffffff',
-            'text-halo-color': 'rgba(0,0,0,0.2)',
-            'text-halo-width': 1,
-          },
-        });
+          buildingBeforeId,
+        );
       }
 
-      // Click handler for cluster circles
-      map.on('click', 'cluster-circles', (e) => {
-        if (!e.features || e.features.length === 0) return;
-        const feature = e.features[0];
-        const props = feature.properties;
-        if (!props) return;
-
-        const centroidLng = props.centroidLng as number;
-        const centroidLat = props.centroidLat as number;
-        const maxPossibleZoom = MAX_ZOOM_PER_LAYER[mapLayerRef.current] || 18;
-        const nextZoom = Math.min(map.getZoom() + 3, maxPossibleZoom - 1);
-        if (onZoomChangeRef.current) {
-          onZoomChangeRef.current(nextZoom);
+      // Micro-dots tocables: caja de 52x52px (hit target expandido) y gana el de mayor priority_rank.
+      map.on('click', (e) => {
+        if ((e.originalEvent as any)._turismoHandled) return;
+        if (!map.getLayer('cluster-circles')) return;
+        const hit = pickTopPriority(
+          map.queryRenderedFeatures(pinHitBox(e.point.x, e.point.y), { layers: ['cluster-circles'] }),
+        );
+        const hitId = hit?.properties?.id;
+        if (!hitId || isClickInsideModalOrInput(e)) return;
+        if (isRoutingActiveRef.current && onMapClickForRoutingRef.current) return;
+        const event = eventsRef.current.find((ev) => ev.id === hitId);
+        if (event && onSelectEventRef.current) {
+          (e.originalEvent as any)._turismoHandled = true;
+          onSelectEventRef.current(event);
         }
-        map.easeTo({
-          center: [centroidLng, centroidLat],
-          zoom: nextZoom,
-          duration: 600,
-        });
+      });
+      map.on('mousemove', (e) => {
+        if (!map.getLayer('cluster-circles')) return;
+        const over = map.queryRenderedFeatures(pinHitBox(e.point.x, e.point.y), {
+          layers: ['cluster-circles'],
+        }).length;
+        map.getCanvas().style.cursor = over ? 'pointer' : '';
       });
 
-      // Cursor feedback for clusters
-      map.on('mouseenter', 'cluster-circles', () => {
-        map.getCanvas().style.cursor = 'pointer';
-      });
-      map.on('mouseleave', 'cluster-circles', () => {
-        map.getCanvas().style.cursor = '';
-      });
+      if (sync3DBuildingsRef.current) {
+        sync3DBuildingsRef.current();
+      }
     });
-    map.on('moveend', debouncedUpdateBounds);
+    let moveSettleTimer: ReturnType<typeof setTimeout> | null = null;
+    map.on('moveend', () => {
+      debouncedUpdateBounds();
+      if (moveSettleTimer) clearTimeout(moveSettleTimer);
+      moveSettleTimer = setTimeout(() => {
+        isMovingRef.current = false;
+        isDraggingRef.current = false;
+        // Solo cuando la cámara se detuvo completamente, corremos la estética
+        // para resolver la oclusión 3D real de edificios en reposo.
+        if (updateAestheticsRef.current) updateAestheticsRef.current();
+      }, 140);
+    });
     map.on('zoomend', debouncedUpdateBounds);
+    map.on('pitch', () => {
+      const next3D = map.getPitch() > 25;
+      // Solo disparar re-render si el estado 3D realmente cambió
+      setIs3DActive((prev) => (prev !== next3D ? next3D : prev));
+      isPitchingRef.current = true;
+    });
 
-    // Inyectar estilos personalizados para hacer la atribución ultra-discreta y estética
-    const styleId = 'maplibre-custom-attribution-styles';
-    if (!document.getElementById(styleId)) {
-      const style = document.createElement('style');
-      style.id = styleId;
-      style.innerHTML = `
-        .maplibregl-ctrl-attrib {
-          opacity: 0.25 !important;
-          transition: opacity 0.2s ease !important;
-          background-color: transparent !important;
-          border: none !important;
-          box-shadow: none !important;
-        }
-        .maplibregl-ctrl-attrib:hover {
-          opacity: 0.85 !important;
-        }
-        .maplibregl-ctrl-attrib-button {
-          background-color: rgba(34, 34, 34, 0.6) !important;
-          border-radius: 50% !important;
-        }
-        @keyframes webPublicPulse {
-          0% { transform: scale(1); opacity: 0.6; }
-          50% { transform: scale(var(--max-scale, 3)); opacity: 0.3; }
-          100% { transform: scale(calc(var(--max-scale, 3) * 0.4)); opacity: 0; }
-        }
-        @keyframes popularAuraPulse {
-          0% { transform: scale(1); opacity: 0.8; }
-          100% { transform: scale(1.6); opacity: 0; }
-        }
-        @keyframes clusterDataRing {
-          0% { transform: scale(1) rotate(0deg); opacity: 0.6; }
-          50% { transform: scale(1.6) rotate(180deg); opacity: 0.3; }
-          100% { transform: scale(1.1) rotate(360deg); opacity: 0; }
-        }
-        @keyframes rewardPop {
-          0% { transform: translate(-50%, 0) scale(0.5); opacity: 0; }
-          50% { transform: translate(-50%, -20px) scale(1.2); opacity: 1; }
-          100% { transform: translate(-50%, -30px) scale(1); opacity: 0; }
-        }
-        @keyframes emergencyPerimeterRotate {
-          0% { transform: rotateZ(0deg); }
-          100% { transform: rotateZ(360deg); }
-        }
-        @keyframes emergencyPerimeterFlash {
-          0%, 100% { opacity: 0.35; }
-          50% { opacity: 0.8; }
-        }
-        .marker-3d-pin.emergency-pin::after {
-          content: '';
-          position: absolute;
-          top: -2px; left: -2px; right: -2px; bottom: -2px;
-          border-radius: inherit;
-          border: 2px solid var(--emergency-color, #EF4444);
-          animation: emergencyRipple 1.5s infinite cubic-bezier(0.25, 1, 0.5, 1);
-          pointer-events: none;
-        }
-        @keyframes emergencyRipple {
-          0% { transform: scale(1); opacity: 0.8; }
-          50% { transform: scale(1.4); opacity: 0.4; }
-          100% { transform: scale(1.1); opacity: 0; }
-        }
-        @keyframes floatNote1 {
-          0% { transform: translate(-50%, 0) translateY(0) scale(0.6) rotate(0deg); opacity: 0; }
-          15% { opacity: 0.85; }
-          85% { opacity: 0.85; }
-          100% { transform: translate(-50%, 0) translateY(-65px) translateX(-18px) scale(1.1) rotate(-15deg); opacity: 0; }
-        }
-        @keyframes floatNote2 {
-          0% { transform: translate(-50%, 0) translateY(0) scale(0.6) rotate(0deg); opacity: 0; }
-          15% { opacity: 0.85; }
-          85% { opacity: 0.85; }
-          100% { transform: translate(-50%, 0) translateY(-75px) translateX(18px) scale(1) rotate(15deg); opacity: 0; }
-        }
-        @keyframes floatNote3 {
-          0% { transform: translate(-50%, 0) translateY(0) scale(0.6) rotate(0deg); opacity: 0; }
-          15% { opacity: 0.85; }
-          85% { opacity: 0.85; }
-          100% { transform: translate(-50%, 0) translateY(-55px) translateX(-5px) scale(1.2) rotate(5deg); opacity: 0; }
-        }
-        .marker-note {
-          position: absolute;
-          bottom: 12px;
-          left: 50%;
-          font-size: 14px;
-          color: inherit;
-          text-shadow: 0 0 3px rgba(0,0,0,0.6);
-          pointer-events: none;
-          opacity: 0;
-          transform-origin: bottom center;
-        }
-        @keyframes webClusterPulse {
-          0% { transform: scale(1); opacity: 0.65; }
-          50% { transform: scale(2.0); opacity: 0.3; }
-          100% { transform: scale(1.2); opacity: 0; }
-        }
-        .cluster-marker-container {
-          transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease;
-        }
-        .cluster-marker-entering {
-          animation: clusterEnter 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-        }
-        @keyframes clusterEnter {
-          0% { transform: scale(0); opacity: 0; }
-          100% { transform: scale(1); opacity: 1; }
-        }
-        @keyframes pinBobbing {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-1px); }
-        }
-        .marker-bobbing {
-          animation: pinBobbing 2.2s infinite ease-in-out !important;
-        }
-        @keyframes iconBreathing {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.15); opacity: 0.9; }
-        }
-        @keyframes fireRise {
-          0% { transform: translateY(0) scale(1) rotate(0deg); opacity: 0.8; background: #fb923c; }
-          50% { transform: translateY(-10px) scale(1.2) rotate(15deg); opacity: 0.9; background: #ef4444; }
-          100% { transform: translateY(-20px) scale(0.5) rotate(-15deg); opacity: 0; background: #b91c1c; }
-        }
-        .marker-fire-particle {
-          position: absolute;
-          bottom: 16px;
-          left: 50%;
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          transform-origin: center;
-          filter: blur(1px);
-        }
-        .fire-particle-1 { animation: fireRise 1.2s infinite ease-in; margin-left: -4px; }
-        .fire-particle-2 { animation: fireRise 1.4s infinite ease-in 0.3s; margin-left: -1px; width: 10px; height: 10px; }
-        .fire-particle-3 { animation: fireRise 1.1s infinite ease-in 0.6s; margin-left: 2px; }
+    // Restablecer flag de pitch cuando el gesto termina; pequeño delay de asentamiento
+    // para evitar que un último queryRenderedFeatures dispare antes de que los tiles terminen.
+    let pitchSettleTimer: ReturnType<typeof setTimeout> | null = null;
+    map.on('pitchend', () => {
+      if (pitchSettleTimer) clearTimeout(pitchSettleTimer);
+      pitchSettleTimer = setTimeout(() => {
+        isPitchingRef.current = false;
+        // Forzar un re-chequeo de oclusión ahora que la cámara está quieta
+        if (updateAestheticsRef.current) updateAestheticsRef.current();
+      }, 120);
+    });
 
-        @keyframes smokeRise {
-          0% { transform: translateY(0) scale(1); opacity: 0.7; }
-          100% { transform: translateY(-25px) scale(2.5); opacity: 0; }
-        }
-        .marker-smoke-particle {
-          position: absolute;
-          bottom: 16px;
-          left: 50%;
-          width: 10px;
-          height: 10px;
-          background: #94a3b8;
-          border-radius: 50%;
-          filter: blur(2px);
-        }
-        .smoke-particle-1 { animation: smokeRise 1.5s infinite ease-out; margin-left: -5px; }
-        .smoke-particle-2 { animation: smokeRise 1.8s infinite ease-out 0.4s; margin-left: -2px; }
-        .smoke-particle-3 { animation: smokeRise 1.6s infinite ease-out 0.8s; margin-left: 3px; }
-        @keyframes boatBobbing {
-          0%, 100% { transform: translateZ(0); }
-          50% { transform: translateZ(1.5px) rotateX(0.5deg) rotateY(0.5deg); }
-        }
-        .marker-boat-bobbing {
-          animation: boatBobbing 3s infinite ease-in-out !important;
-          transform-style: preserve-3d;
-        }
-        @keyframes cloudMove {
-          0% { transform: translate(-120%, -120%) scale(1); opacity: 0; }
-          10% { opacity: 0.15; }
-          90% { opacity: 0.15; }
-          100% { transform: translate(250%, 250%) scale(1.5); opacity: 0; }
-        }
-        .cloud-shadows-container {
-          position: absolute;
-          top: 0; left: 0; width: 100%; height: 100%;
-          overflow: hidden;
-          pointer-events: none;
-          z-index: 5;
-        }
-        .cloud-shadow {
-          position: absolute;
-          background: rgba(0, 0, 0, 0.2);
-          filter: blur(80px);
-          border-radius: 50%;
-          width: 600px;
-          height: 400px;
-          animation: cloudMove 60s infinite linear;
-        }
-        @keyframes waterRipple {
-          0% { transform: scale(0.3); opacity: 0.8; }
-          50% { transform: scale(1.4); opacity: 0.4; }
-          100% { transform: scale(0.9); opacity: 0; }
-        }
-        .water-ripple {
-          position: absolute;
-          width: 24px;
-          height: 24px;
-          border-radius: 50%;
-          border: 1.5px solid #60A5FA;
-          pointer-events: none;
-          animation: waterRipple 2.4s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
-          transform-origin: center center;
-          z-index: 1;
-          display: none; /* hidden by default, toggled in JS */
-        }
-        .water-ripple-delay {
-          animation-delay: 1.2s;
-        }
-        @keyframes boatWakeLeft {
-          0% { transform: scale(0.5, 0.5) translate(0, 0) rotate(10deg); opacity: 0; }
-          20% { opacity: 0.6; }
-          100% { transform: scale(1.5, 3.0) translate(-18px, 45px) rotate(20deg); opacity: 0; }
-        }
-        @keyframes boatWakeRight {
-          0% { transform: scale(0.5, 0.5) translate(0, 0) rotate(-10deg); opacity: 0; }
-          20% { opacity: 0.6; }
-          100% { transform: scale(1.5, 3.0) translate(18px, 45px) rotate(-20deg); opacity: 0; }
-        }
-        @keyframes boatBowWave {
-          0% { transform: scale(0.4) translateX(-50%); opacity: 0; }
-          30% { opacity: 0.4; }
-          100% { transform: scale(1.4) translateX(-50%); opacity: 0; }
-        }
-        @keyframes boatFoam {
-          0% { transform: scale(0.7) translate(-50%, 0); opacity: 0.7; }
-          100% { transform: scale(2.2) translate(-50%, 25px); opacity: 0; }
-        }
-        .boat-bow-wave {
-          position: absolute;
-          top: -4px;
-          left: 50%;
-          width: 24px;
-          height: 12px;
-          border-top: 2px solid rgba(255, 255, 255, 0.4);
-          border-radius: 50% 50% 0 0;
-          transform: translateX(-50%);
-          filter: blur(1.5px);
-          animation: boatBowWave 2.8s infinite ease-out;
-          pointer-events: none;
-          z-index: 1;
-        }
-        .marker-flat-container {
-          overflow: visible; /* Fix: allow waves to expand beyond 28px without clipping */
-        }
-
-        /* ─── Selected Pin Glow Animation ───────────────────────────── */
-        @keyframes selectedPinPulse {
-          0% { box-shadow: 0 0 0 0px var(--selected-glow-color, rgba(59, 130, 246, 0.6)); }
-          100% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
-        }
-        .marker-3d-pin.selected-pin-glow::before {
-          content: '';
-          position: absolute;
-          top: -4px; left: -4px; right: -4px; bottom: -4px;
-          border-radius: inherit;
-          border: 1.5px solid var(--selected-glow-color, #3B82F6);
-          animation: selectedPinPulse 1.8s infinite cubic-bezier(0.25, 1, 0.5, 1);
-          pointer-events: none;
-          z-index: -1;
-        }
-
-        /* ─── Viñeta (Badge) Animations ─────────────────────────────── */
-        @keyframes vinetaEnter {
-          0% { transform: translateX(-50%) scale(0); opacity: 0; }
-          60% { transform: translateX(-50%) scale(1.15); opacity: 1; }
-          100% { transform: translateX(-50%) scale(1); opacity: 1; }
-        }
-        @keyframes vinetaPulse {
-          0%, 100% { transform: translateX(-50%) scale(1); opacity: 1; }
-          50% { transform: translateX(-50%) scale(1.12); opacity: 0.85; }
-        }
-        @keyframes vinetaGlowRing {
-          0%, 100% { transform: scale(1); opacity: 0.7; }
-          50% { transform: scale(1.5); opacity: 0; }
-        }
-        @keyframes vinetaGoldShine {
-          0% { background-position: 0% center; }
-          100% { background-position: 200% center; }
-        }
-        @keyframes vinetaHeartbeat {
-          0%, 100% { transform: translateX(-50%) scale(1); }
-          14% { transform: translateX(-50%) scale(1.15); }
-          28% { transform: translateX(-50%) scale(1); }
-          42% { transform: translateX(-50%) scale(1.15); }
-          70% { transform: translateX(-50%) scale(1); }
-        }
-        @keyframes vinetaCriticalPulse {
-          0%, 100% { transform: translateX(-50%) scale(1); box-shadow: 0 2px 8px rgba(220, 38, 38, 0.6), 0 0 0 1.5px rgba(0,0,0,0.3); }
-          50% { transform: translateX(-50%) scale(1.15); box-shadow: 0 2px 12px rgba(220, 38, 38, 0.95), 0 0 0 1.5px rgba(220,38,38,0.5); }
-        }
-        .vineta-badge {
-          transition: width 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), 
-                      padding 0.35s ease, 
-                      border-radius 0.35s ease, 
-                      transform 0.2s ease, 
-                      box-shadow 0.2s ease;
-        }
-        .vineta-label {
-          transition: opacity 0.2s ease, max-width 0.35s cubic-bezier(0.25, 1, 0.5, 1), margin-left 0.35s ease;
-          display: inline-block;
-          max-width: 0;
-          opacity: 0;
-          overflow: hidden;
-          vertical-align: middle;
-          white-space: nowrap;
-        }
-        .vineta-badge.vineta-expanded .vineta-label {
-          max-width: 80px;
-          opacity: 1;
-          margin-left: 2px;
-        }
-        .vineta-en_vivo {
-          animation: vinetaPulse 1.8s infinite ease-in-out !important;
-        }
-        .vineta-gold-sparkle {
-          background-size: 200% auto !important;
-          animation: vinetaGoldShine 2.5s infinite linear, vinetaEnter 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
-        }
-        .vineta-heartbeat {
-          animation: vinetaHeartbeat 2s infinite ease-in-out !important;
-        }
-        .vineta-critical-pulse {
-          animation: vinetaCriticalPulse 1.2s infinite ease-in-out !important;
-        }
-      `;
-      document.head.appendChild(style);
-    }
+    // Estilos y animaciones de marcadores: design/markerStyles.ts
+    injectMarkerStyles();
 
     // Agregar atribución compacta de forma segura en la esquina inferior izquierda
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left');
 
-    const updateAesthetics = () => {
-      const z = map.getZoom();
-      const pitch = map.getPitch();
-      const accuracyState = userAccuracyRef.current;
-      if (accuracyState && map.getLayer('user-wave-layer')) {
-        userAccuracyRef.current = { ...accuracyState, latitude: accuracyState.latitude };
-      }
-
-      Object.keys(markersRef.current).forEach((id) => {
-        const markerObj = markersRef.current[id];
-        if (!markerObj) return;
-
-        if (markerObj.isCluster) {
-          // Clusters are now rendered as native MapLibre layers — skip DOM handling
-          return;
-        }
-
-        const pinEl = markerObj.pinEl;
-        const flatEl = markerObj.flatEl;
-        const isSelected =
-          selectedEventRef.current?.id === id || pinEl.dataset.localSelected === 'true';
-
-        const cat = pinEl.dataset.category || '';
-        const isEmergencyState = ['choque', 'incendio', 'accidente', 'calle_cortada'].includes(cat);
-        const rotateTransform = isEmergencyState ? 'rotate(45deg)' : '';
-
-        // 1. Zoom Adaptation
-        let zoomScale = 1;
-        let zoomOpacity = 1;
-        let showIcon = true;
-        let isVisible = true;
-
-        const isBoat = cat === 'embarcacion';
-        const boatVisibilityThreshold = 14;
-
-        if (isBoat && z < boatVisibilityThreshold) {
-          isVisible = false;
-          zoomScale = 0;
-          zoomOpacity = 0;
-        }
-
-        // Apply visibility and pointer-events
-        pinEl.style.visibility = isVisible ? 'visible' : 'hidden';
-        pinEl.style.pointerEvents = isVisible ? 'auto' : 'none';
-
-        // Update z-index dynamically: selected or hovered pins get high priority
-        const isHovered = pinEl.dataset.hovered === 'true';
-        const baseZ = isBoat ? '1' : '10';
-        pinEl.style.zIndex = isSelected || isHovered ? '9999' : baseZ;
-
-        const flatScale = 1;
-
-        const surface = pinEl.dataset.surface || 'land';
-
-        // Pitch 3D Effect Calculation
-
-        // Dynamic Elevation: Selected pin floats even higher into the sky as zoom increases
-        // to emphasize the 3D landmark pop-out effect.
-        const isCamara = cat === 'camara';
-
-        const baseMaxElevation = isBoat ? 0 : isCamara ? 0 : isSelected ? 26 : isHovered ? 22 : 18;
-        const elevationGrow = isSelected && !isCamara && z > 13 ? (z - 13) * 5.0 : 0;
-        const maxElevation = baseMaxElevation + elevationGrow;
-
-        const elevation = isVisible
-          ? Math.sin((pitch * Math.PI) / 180) * maxElevation * zoomScale
-          : 0;
-
-        let selectedZoomGrow = 1.0;
-        if (isSelected && !isCamara && z > 13) {
-          selectedZoomGrow = 1.0 + (z - 13) * 0.38;
-        }
-        const baseScale = isCamara ? 1.0 : isSelected ? 1.25 * selectedZoomGrow : isHovered ? 1.15 : 1.0;
-        const finalScale = baseScale * zoomScale;
-
-        if (!markerObj.domRefs) {
-          updateMarkerDomRefs(markerObj);
-        }
-        const domRefs = markerObj.domRefs!;
-        const pinWrapper = domRefs.pinWrapper;
-        const pin = domRefs.pin;
-        const stem = domRefs.stem;
-        const icon = domRefs.icon;
-
-        if (flatEl) {
-          flatEl.style.visibility = isVisible ? 'visible' : 'hidden';
-          flatEl.style.pointerEvents = isVisible ? 'auto' : 'none';
-
-          // Update flat container scale/opacity based on zoom
-          const flatContainer = domRefs.flatContainer;
-          if (flatContainer) {
-            flatContainer.style.opacity = `${zoomOpacity}`;
-            flatContainer.style.transform = `scale(${flatScale})`;
-          }
-
-          // Fetch shadow/puncture/ripple elements
-          const shadowPin = domRefs.shadowPin;
-          const shadowStem = domRefs.shadowStem;
-          const puncture = domRefs.puncture;
-          const ripples = domRefs.ripples;
-
-          if (surface === 'water') {
-            // Water layout
-            if (puncture) puncture.style.display = 'none';
-            if (shadowStem) shadowStem.style.display = 'none';
-            if (ripples) {
-              ripples.forEach((r) => (r.style.display = isVisible ? 'block' : 'none'));
-            }
-
-            if (shadowPin) {
-              shadowPin.style.display = isVisible ? 'block' : 'none';
-              // Faint, circular refracted shadow under water
-              shadowPin.style.backgroundColor = 'rgba(17, 24, 39, 0.15)';
-              shadowPin.style.filter = 'blur(2.5px)';
-              shadowPin.style.transform = `translateY(0px) scale(${finalScale * 0.75})`;
-              shadowPin.style.opacity = `${zoomOpacity}`;
-            }
-
-            if (pin) {
-              if (isBoat) {
-                pin.classList.remove('marker-bobbing');
-                pin.classList.add('marker-boat-bobbing');
-              } else {
-                pin.classList.add('marker-bobbing');
-                pin.classList.remove('marker-boat-bobbing');
-              }
-            }
-            if (stem) {
-              stem.style.height = '0px';
-              stem.style.opacity = '0';
-            }
-          } else {
-            // Land layout
-            if (puncture) puncture.style.display = isVisible ? 'block' : 'none';
-            if (shadowStem) {
-              shadowStem.style.display = isVisible ? 'block' : 'none';
-              shadowStem.style.opacity = isVisible ? `${(pitch / 60) * 0.55}` : '0';
-              // Stretch the stem shadow backwards on the ground
-              shadowStem.style.height = `${elevation * 0.8}px`;
-            }
-            if (ripples) {
-              ripples.forEach((r) => (r.style.display = 'none'));
-            }
-
-            if (shadowPin) {
-              shadowPin.style.display = isVisible ? 'block' : 'none';
-              shadowPin.style.backgroundColor = 'rgba(0, 0, 0, 0.45)';
-              shadowPin.style.filter = 'blur(1.5px)';
-              // The flex layout pushes shadowPin upward, we just need scale
-              shadowPin.style.transform = `scale(${finalScale})`;
-              shadowPin.style.opacity = isVisible ? `${zoomOpacity * 0.9}` : '0';
-            }
-
-            if (pin) {
-              pin.classList.remove('marker-bobbing');
-            }
-
-            // Standing metallic needle stretches to the center of the elevated pin
-            if (stem) {
-              if (pitch > 0 && isVisible) {
-                // Height to reach center of elevated pin: elevation + 14 * finalScale
-                stem.style.height = `${elevation + 14 * finalScale}px`;
-                stem.style.opacity = `${(pitch / 60) * 0.95}`;
-              } else {
-                stem.style.height = '0px';
-                stem.style.opacity = '0';
-              }
-            }
-
-            // Stem de cámara — llena el gap entre lente (elevada) y el suelo
-            const stemCamara = domRefs.stemCamara;
-            if (stemCamara) {
-              if (pitch > 0 && isVisible && elevation > 0) {
-                // Mismo elevation que el pinWrapper para conectar exacto
-                stemCamara.style.height = `${elevation + 12}px`;
-                stemCamara.style.opacity = `${Math.min(0.85, (pitch / 60) * 0.9)}`;
-              } else {
-                stemCamara.style.height = '0px';
-                stemCamara.style.opacity = '0';
-              }
-            }
-          }
-        }
-
-        // Apply wrapper translation/scaling
-        if (pinWrapper) {
-          if (cat === 'camara') {
-            // Cámara: sin elevation (tooltip no sube) y sin scale (no crece al seleccionar)
-            pinWrapper.style.transform = 'translateY(0px) scale(1)';
-          } else {
-            pinWrapper.style.transform = `translateY(-${elevation}px) scale(${finalScale})`;
-          }
-          pinWrapper.style.opacity = `${zoomOpacity}`;
-        }
-
-        // Apply translation to store modal container without scaling it
-        let storeModal = domRefs.storeModal;
-        if (!storeModal) {
-          storeModal = pinEl.querySelector('.store-modal-container') as HTMLDivElement | null;
-          if (storeModal) domRefs.storeModal = storeModal;
-        }
-        if (storeModal) {
-          storeModal.style.transform = `translateY(-${elevation}px)`;
-        }
-
-        // Apply rotation, glow, and border styles to the inner pin
-        if (pin) {
-          pin.style.transform = rotateTransform;
-          pin.style.opacity = `${zoomOpacity}`;
-
-          // Professional Designer glow enhancement for interactive selection/hover
-          const eventColor = markerObj.event
-            ? getCategoryColor(markerObj.event.category, markerObj.event.musicStyle)
-            : '#3B82F6';
-
-          if (isSelected) {
-            pin.classList.add('selected-pin-glow');
-            pin.style.setProperty('--selected-glow-color', eventColor);
-            pin.style.boxShadow = `0 0 24px ${hexToRgba(eventColor, 0.85)}, 0 8px 28px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.3)`;
-            pin.style.borderColor = eventColor;
-            pin.style.borderWidth = '2.5px';
-          } else {
-            pin.classList.remove('selected-pin-glow');
-            pin.style.boxShadow = isEmergencyState
-              ? '0px 2px 4px rgba(0,0,0,0.5)'
-              : '0px 6px 16px rgba(0,0,0,0.4)';
-            pin.style.borderColor = isEmergencyState ? '#111827' : hexToRgba(eventColor, 0.6);
-            pin.style.borderWidth = isEmergencyState ? '2px' : '1.5px';
-          }
-        }
-
-        const notesContainer = domRefs.notesContainer;
-        if (notesContainer) {
-          notesContainer.style.display = (z >= 15 || isSelected) && isVisible ? 'block' : 'none';
-        }
-
-        if (icon) {
-          icon.style.opacity = showIcon ? '1' : '0';
-        }
-
-        // Dynamically update smart badge (viñeta) expansion
-        const badgeEl = domRefs.badgeEl;
-        if (badgeEl) {
-          const isWideLabel = badgeEl.dataset.wideLabel === 'true';
-          const type = badgeEl.dataset.vinetaType || '';
-
-          // Smart Badge Expansion Rules:
-          // 1. If the pin is selected or hovered, ALWAYS expand.
-          // 2. High zoom (z >= 16) auto-expands ALL badges for glanceability.
-          // 3. Medium zoom (14.5 <= z < 16) auto-expands only high priority badges (en_vivo, oferta).
-          // 4. Otherwise, keep it collapsed (icon only) to avoid clutter.
-          const isHighPriority = type === 'en_vivo' || type === 'oferta';
-          const shouldExpand = isSelected || isHovered || z >= 16 || (z >= 14.5 && isHighPriority);
-
-          if (shouldExpand) {
-            badgeEl.classList.add('vineta-expanded');
-            badgeEl.style.width = isWideLabel ? 'auto' : '16px';
-            badgeEl.style.padding = isWideLabel ? '0 6px' : '0';
-            badgeEl.style.borderRadius = isWideLabel ? '10px' : '50%';
-          } else {
-            badgeEl.classList.remove('vineta-expanded');
-            badgeEl.style.width = '16px';
-            badgeEl.style.padding = '0';
-            badgeEl.style.borderRadius = '50%';
-          }
-        }
-
-        // Dynamically update contextual radial menu or store modal for the pin
-        if (markerObj.event) {
-          const loboSVG = domRefs.loboSVG;
-          if (loboSVG) {
-            loboSVG.setAttribute('fill', isSelected ? '#3B82F6' : '#2D3748');
-          }
-
-          const categoryLower = markerObj.event.category?.toLowerCase() || '';
-          if (
-            [
-              'tienda',
-              'fauna',
-              'hospital',
-              'universidad',
-              'bombero',
-              'carabinero',
-              'camara',
-            ].includes(categoryLower)
-          ) {
-            // Cámara: modal sale del anchor centrado en la lente, no del pinEl
-            const camaraAnchor = pinEl.querySelector('.camara-modal-anchor') as HTMLDivElement | null;
-            updateMapLibreStoreModal(
-              camaraAnchor ?? pinEl,
-              markerObj.event,
-              isSelected,
-              isHovered,
-              mapLayer === 'light' || mapLayer === 'streets',
-            );
-          } else {
-            updateMapLibreRadialMenu(
-              pinEl,
-              markerObj.event,
-              isSelected && isVisible,
-              isHovered && isVisible,
-              onSelectEventRef.current,
-              `maplibre-pin-${markerObj.event.id}`,
-              onSaveLocationRef.current,
-            );
-          }
-        }
-      });
-    };
-
+    const updateAesthetics = createAestheticsUpdater(map, {
+      activeParkIdRef,
+      isDraggingRef,
+      isMovingRef,
+      isPitchingRef,
+      isRotatingRef,
+      isZoomingRef,
+      lastZonePatternPitchTRef,
+      markersRef,
+      mapLayerRef,
+      onSaveLocationRef,
+      onSelectEventRef,
+      selectedEventRef,
+      userAccuracyRef,
+      updateAestheticsRef,
+    });
     updateAestheticsRef.current = updateAesthetics;
 
     // Throttle via rAF to avoid redundant DOM mutations during rapid gestures
@@ -1394,24 +989,83 @@ export function MapLibreContainer({
     // When the map starts moving (pan, programmatic fly, etc.), force-close any
     // hover-only tooltips that are not click-selected. This prevents tooltips from
     // appearing "glued" to a fixed screen position as the map pans beneath them.
-    map.on('movestart', closeHoverTooltips);
+    map.on('movestart', () => {
+      closeHoverTooltips();
+      isMovingRef.current = true;
+    });
 
     // Close tooltips when user starts rotating map
-    map.on('rotatestart', closeHoverTooltips);
+    map.on('rotatestart', () => {
+      closeHoverTooltips();
+      isRotatingRef.current = true;
+    });
+    let rotateSettleTimer: ReturnType<typeof setTimeout> | null = null;
+    map.on('rotateend', () => {
+      if (rotateSettleTimer) clearTimeout(rotateSettleTimer);
+      rotateSettleTimer = setTimeout(() => {
+        isRotatingRef.current = false;
+        if (updateAestheticsRef.current) updateAestheticsRef.current();
+      }, 120);
+    });
 
     // Close tooltips when user starts changing pitch (3D tilt)
     map.on('pitchstart', closeHoverTooltips);
 
+    // Watchdog: degrada a 2D liviano si el dispositivo no sostiene el framerate
+    const detachWatchdog = attachPerformanceWatchdog(map, (reason) => {
+      console.info('[perf] modo liviano 2D activado:', reason);
+      setIs3DActive(false);
+      setLightweightMode(true);
+    });
+
+    // Gate de cámara: 2D norte-arriba bajo minZoomForPitchAndRotate
+    applyCameraGate(map);
+    let lastGateZoom = map.getZoom();
+    map.on('zoomend', () => {
+      applyCameraGate(map);
+      const z = map.getZoom();
+      const crossedDown =
+        lastGateZoom >= CAMERA_CONSTRAINTS.resetBelowZoom && z < CAMERA_CONSTRAINTS.resetBelowZoom;
+      lastGateZoom = z;
+      if (crossedDown && (map.getPitch() !== 0 || map.getBearing() !== 0)) {
+        resetNorthPitch(map, CAMERA_CONSTRAINTS.resetDurationMs);
+      }
+    });
+
+    // Brújula reactiva: visible sólo con bearing/pitch no triviales
+    const syncCompass = () => {
+      const bearing = map.getBearing();
+      const visible =
+        Math.abs(bearing) > CAMERA_CONSTRAINTS.compassBearingThresholdDeg ||
+        map.getPitch() > CAMERA_CONSTRAINTS.compassPitchThresholdDeg;
+      if (compassNeedleRef.current) {
+        compassNeedleRef.current.style.transform = `rotate(${-bearing}deg)`;
+      }
+      setCompassVisible((prev) => (prev !== visible ? visible : prev));
+    };
+    map.on('rotate', syncCompass);
+    map.on('pitch', syncCompass);
+    syncCompass();
+
     map.on('zoomstart', () => {
+      isZoomingRef.current = true;
       if (onMapMoveRef.current) {
         onMapMoveRef.current();
       }
     });
+    map.on('zoomend', () => {
+      // Pequeño delay para asentamiento del zoom antes de reanudar el grace period
+      setTimeout(() => { isZoomingRef.current = false; }, 60);
+    });
 
     map.on('style.load', () => {
+      // Silenciar POIs estáticos del mapa base tras cambio de estilo
+      hideBaseMapPOIs(map);
       if (mapLayerRef.current === 'dark') {
         applyDarkTheme(map);
       }
+      applyRiverStyling(map, mapLayerRef.current === 'dark');
+      applyHillshade(map, mapLayerRef.current, mapLayerRef.current === 'dark');
       if (syncUserLocationRef.current) {
         syncUserLocationRef.current();
       }
@@ -1424,8 +1078,14 @@ export function MapLibreContainer({
       if (syncZonesRef.current) {
         syncZonesRef.current();
       }
+      if (syncEventPolygonsRef.current) {
+        syncEventPolygonsRef.current();
+      }
       if (syncCyclewaysRef.current) {
         syncCyclewaysRef.current();
+      }
+      if (syncDraftRouteRef.current) {
+        syncDraftRouteRef.current();
       }
 
       // Re-add cluster source+layers after style change
@@ -1434,365 +1094,83 @@ export function MapLibreContainer({
           type: 'geojson',
           data: { type: 'FeatureCollection', features: [] },
         });
-        map.addLayer({
-          id: 'cluster-circles',
-          type: 'circle',
-          source: 'clusters-source',
-          paint: {
-            'circle-color': '#0B0F19',
-            'circle-radius': ['get', 'radius'],
-            'circle-stroke-width': 3,
-            'circle-stroke-color': ['get', 'color'],
-            'circle-pitch-alignment': 'map',
-            'circle-opacity': 1,
-            'circle-stroke-opacity': 1,
+        const reloadBuildingBeforeId = map.getLayer('building-3d') ? 'building-3d' : undefined;
+        // Micro-dots semánticos (sin clusters numéricos): un punto por evento en su coordenada real.
+        map.addLayer(
+          {
+            id: 'cluster-circles',
+            type: 'circle',
+            source: 'clusters-source',
+            paint: MICRODOT_PAINT as any,
           },
-        });
-        map.addLayer({
-          id: 'cluster-labels',
-          type: 'symbol',
-          source: 'clusters-source',
-          layout: {
-            'text-field': ['get', 'count'],
-            'text-size': ['get', 'fontSize'],
-            'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-            'text-allow-overlap': false,
-            'text-ignore-placement': false,
-            'text-pitch-alignment': 'map',
-            'text-rotation-alignment': 'map',
-          },
-          paint: {
-            'text-color': '#ffffff',
-            'text-halo-color': 'rgba(0,0,0,0.6)',
-            'text-halo-width': 1,
-          },
-        });
+          reloadBuildingBeforeId,
+        );
       }
       // Immediately sync cluster data after style reload
       if (syncClustersRef.current) {
         syncClustersRef.current();
       }
+      if (sync3DBuildingsRef.current) {
+        sync3DBuildingsRef.current();
+      }
     });
 
-    const syncZones = async () => {
-      const map = mapRef.current;
-      if (!map || typeof map.isStyleLoaded !== 'function' || !map.isStyleLoaded()) return;
-
-      try {
-        let zones = sectorsDataRef.current;
-        if (!zones || zones.length === 0) {
-          const baseUrl =
-            process.env.EXPO_PUBLIC_BACKEND_URL ||
-            process.env.EXPO_PUBLIC_API_URL ||
-            'http://localhost:8080';
-          const response = await fetch(`${baseUrl}/api/v1/zones`);
-          if (!response.ok) throw new Error('Error al cargar zonas');
-          zones = await response.json();
-        }
-
-        if (!map.hasImage('reserva-pattern')) {
-          const isDark = mapLayerRef.current === 'dark';
-          const rLine = isDark ? 'rgba(52,211,153,0.2)' : 'rgba(5,150,105,0.2)';
-          const rFill = isDark ? 'rgba(16,185,129,0.3)' : 'rgba(6,78,59,0.3)';
-          const svgStringReserva = `<svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-            <line x1="-10" y1="50" x2="50" y2="-10" stroke="${rLine}" stroke-width="1.5"/>
-            <line x1="-10" y1="30" x2="30" y2="-10" stroke="${rLine}" stroke-width="1.5"/>
-            <line x1="10" y1="50" x2="50" y2="10" stroke="${rLine}" stroke-width="1.5"/>
-            <path d="M 15 15 C 10 10, 20 5, 20 15 C 25 20, 15 25, 15 15" fill="${rFill}"/>
-            <path d="M 30 30 C 25 25, 35 20, 35 30 C 40 35, 30 40, 30 30" fill="${rFill}"/>
-          </svg>`;
-          const imgReserva = new Image(40, 40);
-          imgReserva.src =
-            'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStringReserva);
-          imgReserva.onload = () => {
-            if (
-              mapRef.current &&
-              typeof mapRef.current.hasImage === 'function' &&
-              !mapRef.current.hasImage('reserva-pattern')
-            ) {
-              mapRef.current.addImage('reserva-pattern', imgReserva);
-              if (syncZonesRef.current) syncZonesRef.current();
-            }
-          };
-        }
-
-        const currentVisibleIds = visibleSectorIdsRef.current;
-        const activeZones = currentVisibleIds
-          ? (Array.isArray(zones) ? zones : []).filter((z: any) => currentVisibleIds.includes(z.id))
-          : Array.isArray(zones)
-            ? zones
-            : [];
-
-        // Ordenar las zonas para que 'edificio' se renderice al final (encima de 'ciudad' y 'reserva')
-        const sortedZones = [...(Array.isArray(activeZones) ? activeZones : [])].sort((a, b) => {
-          const getPriority = (cat: string) => {
-            if (cat === 'edificio') return 3;
-            if (cat === 'reserva') return 2;
-            return 1;
-          };
-          return getPriority(a.category || 'ciudad') - getPriority(b.category || 'ciudad');
-        });
-
-        // Convertir array de zonas a un FeatureCollection de GeoJSON
-        const featureCollection = {
-          type: 'FeatureCollection',
-          features: sortedZones.map((z: any) => ({
-            type: 'Feature',
-            properties: {
-              id: z.id,
-              name: z.name,
-              color: z.color || '#10B981',
-              category: z.category || 'ciudad',
-            },
-            geometry: typeof z.geojson === 'string' ? JSON.parse(z.geojson) : z.geojson,
-          })),
-        };
-
-        if (map.getSource('zones-source')) {
-          (map.getSource('zones-source') as maplibregl.GeoJSONSource).setData(
-            featureCollection as any,
-          );
-        } else {
-          map.addSource('zones-source', {
-            type: 'geojson',
-            data: featureCollection as any,
-          });
-
-          const beforeId = getBeforeRoadsOrLabelsLayerId(map);
-
-          // Capa de Relleno (Fill) diferenciada por tipo
-          map.addLayer(
-            {
-              id: 'zones-fill',
-              type: 'fill',
-              source: 'zones-source',
-              layout: {
-                visibility: showSectorsRef.current ? 'visible' : 'none',
-              },
-              paint: {
-                'fill-color': ['get', 'color'],
-                'fill-opacity': [
-                  'step',
-                  ['zoom'],
-                  ['match', ['get', 'category'], 'edificio', 0, 'reserva', 0, 0.08],
-                  11.5,
-                  ['match', ['get', 'category'], 'edificio', 0, 'reserva', 0, 0.08],
-                  14,
-                  ['match', ['get', 'category'], 'edificio', 0.35, 'reserva', 0, 0.08],
-                ],
-              },
-            },
-            beforeId,
-          );
-
-          // Capa de patrón específico para reservas
-          map.addLayer(
-            {
-              id: 'zones-reserva-pattern',
-              type: 'fill',
-              source: 'zones-source',
-              filter: ['==', ['get', 'category'], 'reserva'],
-              layout: {
-                visibility: showSectorsRef.current ? 'visible' : 'none',
-              },
-              paint: {
-                'fill-pattern': 'reserva-pattern',
-                'fill-opacity': 0.8,
-              },
-            },
-            beforeId,
-          );
-
-          // Capa de Borde diferenciada por tipo
-          map.addLayer(
-            {
-              id: 'zones-outline',
-              type: 'line',
-              source: 'zones-source',
-              layout: {
-                visibility: showSectorsRef.current ? 'visible' : 'none',
-              },
-              paint: {
-                'line-color': ['get', 'color'],
-                'line-width': [
-                  'match',
-                  ['get', 'category'],
-                  'edificio',
-                  3,
-                  'reserva',
-                  2,
-                  1.5, // Ciudad
-                ],
-                'line-blur': 1,
-                'line-opacity': [
-                  'step',
-                  ['zoom'],
-                  ['match', ['get', 'category'], 'edificio', 0, 'reserva', 0, 0.4],
-                  11.5,
-                  ['match', ['get', 'category'], 'edificio', 0, 'reserva', 0, 0.4],
-                  11.5,
-                  ['match', ['get', 'category'], 'edificio', 0, 'reserva', 0, 0.4],
-                  14,
-                  ['match', ['get', 'category'], 'edificio', 0.9, 'reserva', 0, 0.4],
-                ],
-                'line-dasharray': [
-                  'match',
-                  ['get', 'category'],
-                  'reserva',
-                  ['literal', [4, 4]], // dashed para reservas
-                  'ciudad',
-                  ['literal', [2, 4]], // dotted/dashed espaciado para ciudad
-                  ['literal', [1]], // solid para edificio
-                ],
-              },
-            },
-            beforeId,
-          );
-        }
-      } catch (error: any) {
-        if (error && error.message && error.message.includes('Style is not done loading')) {
-          // Ignorar silenciosamente: el estilo se está cargando y se reintentará en el evento style.load
-          return;
-        }
-        console.error('Error sincronizando zonas:', error);
-      } finally {
-        if (map.getLayer('cluster-circles')) map.moveLayer('cluster-circles');
-        if (map.getLayer('cluster-labels')) map.moveLayer('cluster-labels');
-      }
-    };
+    const syncZones = createZonesSync({
+      getMap: () => mapRef.current,
+      getSectors: () => sectorsDataRef.current,
+      getVisibleSectorIds: () => visibleSectorIdsRef.current,
+      getLayerMode: () => mapLayerRef.current,
+      getShowSectors: () => showSectorsRef.current,
+    });
     syncZonesRef.current = syncZones;
 
-    // Click on Sector
-    map.on('click', 'zones-fill', (e) => {
-      if ((e.originalEvent as any)._turismoHandled) return;
-      if (!e.features?.length) return;
-
-      // Verificar si hay un evento con minimodal cerca del punto de clic
-      const minimodalCategories = [
-        'hospital',
-        'universidad',
-        'bombero',
-        'carabinero',
-        'camara',
-        'fauna',
-      ];
-      const clickLng = e.lngLat.lng;
-      const clickLat = e.lngLat.lat;
-
-      let closestEvent: any = null;
-      let closestDist = Infinity;
-
-      for (const ev of eventsRef.current) {
-        if (!minimodalCategories.includes(ev.category?.toLowerCase() || '')) continue;
-        const dLat = (ev.latitude || 0) - clickLat;
-        const dLng = (ev.longitude || 0) - clickLng;
-        const dist = dLat * dLat + dLng * dLng;
-        // ~150m de radio (0.0015 grados ≈ 150m)
-        if (dist < 0.0015 * 0.0015 && dist < closestDist) {
-          closestDist = dist;
-          closestEvent = ev;
-        }
-      }
-
-      if (closestEvent) {
-        // Marcar como handled para que no se propague
-        (e.originalEvent as any)._turismoHandled = true;
-
-        // Simular clic en el pin del evento para abrir su minimodal
-        const markerObj = markersRef.current[closestEvent.id];
-        if (markerObj && markerObj.pinEl) {
-          markerObj.pinEl.click();
-        }
-        return;
-      }
-
-      const feature = e.features[0];
-      const props = feature.properties as any;
-      // Incluir la geometría del feature para que activeNestedZone tenga geojson
-      const zoneData = {
-        ...props,
-        geojson: feature.geometry,
-      };
-      if (onSectorPressRef.current) {
-        onSectorPressRef.current(zoneData);
-      }
-    });
-    map.on('mouseenter', 'zones-fill', () => {
-      map.getCanvas().style.cursor = 'pointer';
-    });
-    map.on('mouseleave', 'zones-fill', () => {
-      map.getCanvas().style.cursor = '';
+    registerZoneInteractions(map, {
+      activeParkIdRef,
+      eventsRef,
+      isRoutingActiveRef,
+      markersRef,
+      onMapClickForRoutingRef,
+      onSectorPressRef,
+      onSelectEventRef,
+      selectedEventRef,
+      syncEventPolygonsRef,
+      updateAestheticsRef,
     });
 
-    // Click on Event Polygons (e.g. Parques, Reservas)
-    map.on('click', 'event-polygons-fill', (e) => {
-      if (!e.features?.length) return;
-      (e.originalEvent as any)._turismoHandled = true;
-      const featureId = e.features[0].properties?.id;
-      if (featureId && onSelectEventRef.current) {
-        const event = eventsRef.current.find((ev) => ev.id === featureId);
-        if (event) {
-          const categoryLower = event.category?.toLowerCase() || '';
-          if (
-            ['hospital', 'clinica', 'universidad', 'bombero', 'carabinero', 'camara', 'fauna'].includes(
-              categoryLower,
-            )
-          ) {
-            const markerObj = markersRef.current[event.id];
-            if (markerObj && markerObj.pinEl) {
-              const isLocal = markerObj.pinEl.dataset.localSelected === 'true';
-              if (!isLocal) {
-                markerObj.pinEl.click();
-              }
-            }
-            return;
-          }
-          onSelectEventRef.current(event);
-        }
-      }
-    });
-    map.on('mouseenter', 'event-polygons-fill', () => {
-      map.getCanvas().style.cursor = 'pointer';
-    });
-    map.on('mouseleave', 'event-polygons-fill', (e) => {
-      map.getCanvas().style.cursor = '';
-      // Punto 2: cerrar minimodal del pin si el mouse sale del área
-      if (!e.features?.length) return;
-      const featureId = e.features[0].properties?.id;
-      if (!featureId) return;
-      const localCategories = [
-        'hospital',
-        'universidad',
-        'bombero',
-        'carabinero',
-        'camara',
-        'fauna',
-      ];
-      const event = eventsRef.current.find((ev) => ev.id === featureId);
-      if (event && localCategories.includes(event.category?.toLowerCase() || '')) {
-        const markerObj = markersRef.current[event.id];
-        if (markerObj && markerObj.pinEl) {
-          const pinEl = markerObj.pinEl;
-          // Sólo cerrar si el pin no está siendo apuntado directamente
-          if (pinEl.dataset.hovered !== 'true') {
-            if (markerObj.closeTimeout) clearTimeout(markerObj.closeTimeout);
-            markerObj.closeTimeout = setTimeout(() => {
-              pinEl.dataset.localSelected = 'false';
-              if (selectedEventRef.current?.id === event.id) {
-                selectedEventRef.current = null;
-                if (syncEventPolygonsRef.current) syncEventPolygonsRef.current();
-              }
-              if (updateAestheticsRef.current) updateAestheticsRef.current();
-              delete markerObj.closeTimeout;
-            }, 800);
-          }
-        }
-      }
-    });
-
-    // Deselect when clicking on empty map (or intercept for magic wand)
+    // Deselect when clicking on empty map (or intercept for magic wand / routing)
     map.on('click', (e) => {
       if ((e.originalEvent as any)._turismoHandled) return;
+      if (isClickInsideModalOrInput(e)) return;
+
+      if (isRoutingActiveRef.current && onMapClickForRoutingRef.current) {
+        // Comprobar si el clic cayó sobre o muy cerca (<= 28px de pantalla) de un negocio/evento
+        let hitEvent: any = null;
+        let minPixelDist = 28;
+
+        const clickPoint = e.point;
+        if (eventsRef.current && eventsRef.current.length > 0) {
+          for (const ev of eventsRef.current) {
+            const evScreenPoint = map.project([ev.longitude, ev.latitude]);
+            const dx = clickPoint.x - evScreenPoint.x;
+            const dy = clickPoint.y - evScreenPoint.y;
+            const distPx = Math.sqrt(dx * dx + dy * dy);
+            if (distPx < minPixelDist) {
+              minPixelDist = distPx;
+              hitEvent = ev;
+            }
+          }
+        }
+
+        onMapClickForRoutingRef.current({
+          latitude: hitEvent ? hitEvent.latitude : e.lngLat.lat,
+          longitude: hitEvent ? hitEvent.longitude : e.lngLat.lng,
+          name: hitEvent?.title,
+          businessId: hitEvent?.businessId,
+          eventId: hitEvent?.id,
+          category: hitEvent?.category,
+        });
+        return;
+      }
 
       if (isMagicWandActiveRef.current && onMagicWandSelectRef.current) {
         // Find building features under the click
@@ -1811,6 +1189,54 @@ export function MapLibreContainer({
         }
       }
 
+      // ── Comprobar si el clic cayó sobre un parque o zona de reserva ─────────────
+      const polyLayers = ['event-polygons-fill', 'nature-areas-fill'].filter((l) =>
+        map.getLayer(l),
+      );
+
+      let hitPolygonEvent: TurismoEvent | null = null;
+      if (polyLayers.length > 0) {
+        const polyHits = map.queryRenderedFeatures(e.point, { layers: polyLayers });
+        // Agua/humedales sin nombre son sólo contexto visual: no abren nada.
+        const hit = polyHits?.find((f) => f.properties?.interactive !== false);
+        if (hit) {
+          const fid = hit.properties?.id;
+          hitPolygonEvent = eventsRef.current.find((ev) => ev.id === fid) ?? null;
+        }
+      }
+
+      // Comprobación matemática exacta (punto-en-polígono) como respaldo
+      if (!hitPolygonEvent) {
+        hitPolygonEvent =
+          eventsRef.current.find((ev) => {
+            if (!ev.polygon || ev.polygon.length < 3) return false;
+            const cat = ev.category?.toLowerCase() || '';
+            if (
+              cat !== 'parque' &&
+              cat !== 'reserva' &&
+              cat !== 'reservas' &&
+              cat !== 'naturaleza'
+            ) {
+              return false;
+            }
+            return isPointInPolygon(
+              { latitude: e.lngLat.lat, longitude: e.lngLat.lng },
+              ev.polygon,
+            );
+          }) ?? null;
+      }
+
+      if (hitPolygonEvent) {
+        (e.originalEvent as any)._turismoHandled = true;
+        activeParkIdRef.current = hitPolygonEvent.id;
+        if (onSelectEventRef.current) {
+          onSelectEventRef.current(hitPolygonEvent);
+        }
+        return;
+      }
+
+      // Si el clic fue en terreno completamente vacío (fuera de parques y pines), deseleccionar
+      activeParkIdRef.current = null;
       onSelectEventRef.current(null);
 
       // Punto 1: cerrar todos los minimodales locales al hacer clic en el mapa vacío
@@ -1842,6 +1268,7 @@ export function MapLibreContainer({
     });
 
     return () => {
+      detachWatchdog();
       // Cleanup all markers
       Object.values(markersRef.current).forEach(({ pinMarker, flatMarker }) => {
         pinMarker.remove();
@@ -1862,10 +1289,12 @@ export function MapLibreContainer({
         map.off('pitch', throttledUpdateAesthetics);
         map.off('rotate', throttledUpdateAesthetics);
         map.off('move', throttledUpdateAesthetics);
+        buildingLOD.dispose();
         if (aestheticsRafId !== null) cancelAnimationFrame(aestheticsRafId);
         if (boundsTimer) clearTimeout(boundsTimer);
         map.remove();
       }
+      mapReadyRef.current = false;
       mapRef.current = null;
     };
   }, []);
@@ -1877,215 +1306,234 @@ export function MapLibreContainer({
     }
   }, [sectorsData, visibleSectorIds]);
 
+  // Parque o zona de reserva activa seleccionada
+  const activeParkId = useMemo(() => {
+    if (mapDisplayMode !== 'turismo') return null;
+    if (!selectedEvent) return null;
+    const cat = selectedEvent.category?.toLowerCase() || '';
+    if (cat === 'parque' || cat === 'reserva' || cat === 'reservas' || cat === 'naturaleza') {
+      return selectedEvent.id;
+    }
+    if (selectedEvent.parkId) {
+      return selectedEvent.parkId;
+    }
+    return null;
+  }, [selectedEvent, mapDisplayMode]);
+
+  activeParkIdRef.current = activeParkId;
+
   // Sync Markers and Data
-  const clusteredItems = useSuperclusterEvents(events, zoom, currentBounds);
+  const clusteredItems = useSuperclusterEvents(
+    events,
+    zoom,
+    currentBounds,
+    selectedEvent?.id,
+    activeParkId,
+  );
+
+  // Categorías naturales activas según los filtros (agua/humedal/parque).
+  // Sólo cambia cuando cambian los filtros, no al hacer pan/zoom.
+  const visibleNatureCategories = useMemo(() => {
+    const present = new Set<string>();
+    for (const e of events) {
+      if (isNatureAreaCategory(e.category)) present.add(e.category);
+    }
+    return NATURE_AREA_CATEGORIES.filter((c) => present.has(c));
+  }, [events]);
+
+  // Capa de contexto natural: fuente estática (se sube una sola vez por
+  // estilo) + 2 capas planas. Selección, tema y filtros se resuelven con
+  // setPaintProperty/setFilter, que no re-tilean nada.
+  const syncNatureAreas = (map: MapLibreMap) => {
+    const palette = getNatureAreaPalette(mapLayerRef.current);
+    const highlightId = activeParkIdRef.current ?? selectedEventRef.current?.id ?? '';
+    const isHighlighted = ['==', ['get', 'id'], highlightId];
+    const restOpacity = [
+      'match',
+      ['get', 'category'],
+      'agua',
+      palette.restOpacity.agua,
+      'humedal',
+      palette.restOpacity.humedal,
+      palette.restOpacity.parque,
+    ];
+    const fillColor = [
+      'match',
+      ['get', 'category'],
+      'agua',
+      palette.color.agua,
+      'humedal',
+      palette.color.humedal,
+      palette.color.parque,
+    ];
+    // Fade-in a escala de barrio y atenuación a escala de calle; el área
+    // resaltada se mantiene visible a cualquier zoom.
+    const fillOpacity = [
+      'interpolate',
+      ['linear'],
+      ['zoom'],
+      NATURE_AREA_MIN_ZOOM - 0.5,
+      ['case', isHighlighted, palette.selectedOpacity, 0],
+      NATURE_AREA_MIN_ZOOM + 0.5,
+      ['case', isHighlighted, palette.selectedOpacity, restOpacity],
+      NATURE_AREA_FADE_ZOOM - 1,
+      ['case', isHighlighted, palette.selectedOpacity, restOpacity],
+      NATURE_AREA_FADE_ZOOM + 1,
+      ['case', isHighlighted, palette.selectedOpacity, ['*', restOpacity, NATURE_AREA_FADE_FACTOR]],
+    ];
+    const categoryFilter = ['in', ['get', 'category'], ['literal', visibleNatureCategories]];
+    const outlineFilter = ['==', ['get', 'id'], highlightId];
+
+    if (!map.getSource('nature-areas-source')) {
+      map.addSource('nature-areas-source', {
+        type: 'geojson',
+        data: NATURE_AREAS_GEOJSON as any,
+        // Simplificación por tile algo más agresiva que el default (0.375):
+        // son tintes de fondo, no necesitan precisión sub-píxel.
+        tolerance: 0.75,
+      });
+      const beforeId = getBeforeRoadsLayerId(map);
+      map.addLayer(
+        {
+          id: 'nature-areas-fill',
+          type: 'fill',
+          source: 'nature-areas-source',
+          filter: categoryFilter as any,
+          paint: {
+            'fill-color': fillColor as any,
+            'fill-opacity': fillOpacity as any,
+            'fill-antialias': false,
+          },
+        },
+        beforeId,
+      );
+      map.addLayer(
+        {
+          id: 'nature-areas-outline',
+          type: 'line',
+          source: 'nature-areas-source',
+          filter: outlineFilter as any,
+          layout: { 'line-join': 'round' },
+          paint: {
+            'line-color': fillColor as any,
+            'line-width': NATURE_AREA_OUTLINE_WIDTH,
+            'line-opacity': 0.9,
+          },
+        },
+        beforeId,
+      );
+
+      // Cursor de mano sólo sobre áreas que abren información al tocarlas.
+      if (!(map as any)._nature_bound) {
+        (map as any)._nature_bound = true;
+        map.on('mousemove', 'nature-areas-fill', (e) => {
+          const interactive = e.features?.some((f) => f.properties?.interactive === true);
+          map.getCanvas().style.cursor = interactive ? 'pointer' : '';
+        });
+        map.on('mouseleave', 'nature-areas-fill', () => {
+          map.getCanvas().style.cursor = '';
+        });
+      }
+      natureAreasKeyRef.current = '';
+    }
+
+    const key = `${mapLayerRef.current}|${highlightId}|${visibleNatureCategories.join(',')}`;
+    if (key === natureAreasKeyRef.current) return;
+    natureAreasKeyRef.current = key;
+
+    map.setFilter('nature-areas-fill', categoryFilter as any);
+    map.setFilter('nature-areas-outline', outlineFilter as any);
+    map.setPaintProperty('nature-areas-fill', 'fill-color', fillColor);
+    map.setPaintProperty('nature-areas-fill', 'fill-opacity', fillOpacity);
+    map.setPaintProperty('nature-areas-outline', 'line-color', fillColor);
+  };
 
   const syncEventPolygons = () => {
     const map = mapRef.current;
     if (!map || typeof map.isStyleLoaded !== 'function' || !map.isStyleLoaded()) return;
 
-    if (!map.hasImage('humedal-pattern')) {
-      const isDark = mapLayerRef.current === 'dark';
-      const hWater = isDark ? 'rgba(59,130,246,0.3)' : 'rgba(37,99,235,0.4)';
-      const hReed = isDark ? 'rgba(52,211,153,0.4)' : 'rgba(5,150,105,0.5)';
-      const svgString = `<svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-        <path d="M5 32 Q 10 29 15 32 T 25 32" stroke="${hWater}" fill="none" stroke-width="1.5" stroke-linecap="round"/>
-        <path d="M18 36 Q 23 33 28 36 T 38 36" stroke="${hWater}" fill="none" stroke-width="1.5" stroke-linecap="round"/>
-        <path d="M15 32 Q 13 20 8 15" stroke="${hReed}" fill="none" stroke-width="1.5" stroke-linecap="round"/>
-        <path d="M15 32 L 15 10" stroke="${hReed}" fill="none" stroke-width="1.5" stroke-linecap="round"/>
-        <path d="M15 32 Q 17 20 22 15" stroke="${hReed}" fill="none" stroke-width="1.5" stroke-linecap="round"/>
-        <rect x="13.5" y="12" width="3" height="8" rx="1.5" fill="${hReed}" />
-      </svg>`;
-      const img = new Image(40, 40);
-      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
-      img.onload = () => {
-        if (
-          mapRef.current &&
-          typeof mapRef.current.hasImage === 'function' &&
-          !mapRef.current.hasImage('humedal-pattern')
-        ) {
-          mapRef.current.addImage('humedal-pattern', img);
-          syncEventPolygons();
-        }
-      };
-    }
+    syncNatureAreas(map);
 
-    if (!map.hasImage('parque-pattern')) {
-      const isDark = mapLayerRef.current === 'dark';
-      const pTree = isDark ? 'rgba(52,211,153,0.3)' : 'rgba(16,185,129,0.4)';
-      const pTrunk = isDark ? 'rgba(16,185,129,0.4)' : 'rgba(6,78,59,0.5)';
-      const svgStringParque = `<svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-        <path d="M 10 15 L 15 25 L 5 25 Z" fill="${pTree}"/>
-        <rect x="9" y="25" width="2" height="4" fill="${pTrunk}"/>
-        <path d="M 30 5 L 34 13 L 26 13 Z" fill="${pTree}"/>
-        <rect x="29.5" y="13" width="1" height="3" fill="${pTrunk}"/>
-        <path d="M 22 28 L 26 36 L 18 36 Z" fill="${pTree}"/>
-        <rect x="21.5" y="36" width="1.5" height="3" fill="${pTrunk}"/>
-      </svg>`;
-      const imgParque = new Image(40, 40);
-      imgParque.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStringParque);
-      imgParque.onload = () => {
-        if (
-          mapRef.current &&
-          typeof mapRef.current.hasImage === 'function' &&
-          !mapRef.current.hasImage('parque-pattern')
-        ) {
-          mapRef.current.addImage('parque-pattern', imgParque);
-          syncEventPolygons();
-        }
-      };
-    }
+    const highlightId = activeParkIdRef.current ?? selectedEventRef.current?.id ?? '';
+    const selectedId = selectedEventRef.current?.id ?? '';
 
-    if (!map.hasImage('agua-pattern')) {
-      const isDark = mapLayerRef.current === 'dark';
-      const aWave = isDark ? 'rgba(96,165,250,0.4)' : 'rgba(37,99,235,0.4)';
-      const svgStringAgua = `<svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-        <path d="M 0 10 Q 10 5, 20 10 T 40 10" stroke="${aWave}" fill="none" stroke-width="1.5" stroke-linecap="round"/>
-        <path d="M -10 20 Q 0 15, 10 20 T 30 20 T 50 20" stroke="${aWave}" fill="none" stroke-width="1.5" stroke-linecap="round"/>
-        <path d="M 0 30 Q 10 35, 20 30 T 40 30" stroke="${aWave}" fill="none" stroke-width="1.5" stroke-linecap="round"/>
-      </svg>`;
-      const imgAgua = new Image(40, 40);
-      imgAgua.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStringAgua);
-      imgAgua.onload = () => {
-        if (
-          mapRef.current &&
-          typeof mapRef.current.hasImage === 'function' &&
-          !mapRef.current.hasImage('agua-pattern')
-        ) {
-          mapRef.current.addImage('agua-pattern', imgAgua);
-          syncEventPolygons();
-        }
-      };
-    }
-
-    const polyEvents = events.filter((e) => e.polygon && e.polygon.length > 0);
-    const featureCollection = {
+    // Polígonos de eventos (edificios, universidades, …). Las áreas
+    // naturales viven en su propia capa estática (syncNatureAreas).
+    const buildPolygonEventsCollection = () => ({
       type: 'FeatureCollection',
-      features: polyEvents.map((e) => ({
-        type: 'Feature',
-        properties: {
-          id: e.id,
-          category: e.category,
-          color: getCategoryColor(e.category, e.musicStyle),
-        },
-        geometry: {
-          type: 'Polygon',
-          coordinates: [e.polygon!.map((c) => [c.longitude, c.latitude])],
-        },
-      })),
-    };
+      features: events
+        .filter((e) => e.polygon && e.polygon.length > 0 && !isNatureAreaCategory(e.category))
+        .map((e) => ({
+          type: 'Feature',
+          properties: {
+            id: e.id,
+            category: e.category,
+            color: getCategoryColor(e.category, e.musicStyle),
+          },
+          geometry: {
+            type: 'Polygon',
+            coordinates: [e.polygon!.map((c) => [c.longitude, c.latitude])],
+          },
+        })),
+    });
 
-    if (map.getSource('event-polygons-source')) {
-      (map.getSource('event-polygons-source') as maplibregl.GeoJSONSource).setData(
-        featureCollection as any,
-      );
-      if (map.getLayer('event-polygons-fill')) {
-        map.setPaintProperty('event-polygons-fill', 'fill-opacity', [
-          'match',
-          ['get', 'category'],
-          ['agua', 'humedal', 'parque', 'naturaleza'],
-          0,
-          ['case', ['==', ['get', 'id'], selectedEventRef.current?.id ?? ''], 0.35, 0],
-        ]);
-        map.setPaintProperty('event-polygons-outline', 'line-opacity', [
-          'match',
-          ['get', 'category'],
-          ['agua', 'humedal', 'parque', 'naturaleza'],
-          0,
-          ['case', ['==', ['get', 'id'], selectedEventRef.current?.id ?? ''], 0.8, 0],
-        ]);
+    const fillOpacity = ['case', ['==', ['get', 'id'], selectedId], 0.35, 0.01];
+    const outlineOpacity = ['case', ['==', ['get', 'id'], highlightId], 0.85, 0];
+    const outlineWidth = ['case', ['==', ['get', 'id'], highlightId], 2.5, 1];
+
+    const source = map.getSource('event-polygons-source') as maplibregl.GeoJSONSource | undefined;
+    if (source) {
+      if (polygonEventsUploadedRef.current !== events) {
+        polygonEventsUploadedRef.current = events;
+        source.setData(buildPolygonEventsCollection() as any);
       }
-    } else {
-      map.addSource('event-polygons-source', { type: 'geojson', data: featureCollection as any });
-
-      const beforeId = getBeforeRoadsOrLabelsLayerId(map);
-
-      // Capa base de relleno
-      map.addLayer(
-        {
-          id: 'event-polygons-fill',
-          type: 'fill',
-          source: 'event-polygons-source',
-          paint: {
-            'fill-color': ['get', 'color'],
-            'fill-opacity': [
-              'match',
-              ['get', 'category'],
-              ['agua', 'humedal', 'parque', 'naturaleza'],
-              0,
-              ['case', ['==', ['get', 'id'], selectedEventRef.current?.id ?? ''], 0.35, 0.01],
-            ],
-          },
-        },
-        beforeId,
-      );
-
-      // Capa específica de patrón para humedales
-      map.addLayer(
-        {
-          id: 'event-polygons-humedal-pattern',
-          type: 'fill',
-          source: 'event-polygons-source',
-          filter: ['==', ['get', 'category'], 'humedal'],
-          paint: {
-            'fill-pattern': 'humedal-pattern',
-            'fill-opacity': 0.9,
-          },
-        },
-        beforeId,
-      );
-
-      // Capa específica de patrón para parques
-      map.addLayer(
-        {
-          id: 'event-polygons-parque-pattern',
-          type: 'fill',
-          source: 'event-polygons-source',
-          filter: ['in', ['get', 'category'], ['literal', ['parque', 'naturaleza']]],
-          paint: {
-            'fill-pattern': 'parque-pattern',
-            'fill-opacity': 0.8,
-          },
-        },
-        beforeId,
-      );
-
-      // Capa específica de patrón para agua
-      map.addLayer(
-        {
-          id: 'event-polygons-agua-pattern',
-          type: 'fill',
-          source: 'event-polygons-source',
-          filter: ['==', ['get', 'category'], 'agua'],
-          paint: {
-            'fill-pattern': 'agua-pattern',
-            'fill-opacity': 0.9,
-          },
-        },
-        beforeId,
-      );
-
-      // Borde exterior (solo para eventos seleccionados que no sean agua/humedal)
-      map.addLayer(
-        {
-          id: 'event-polygons-outline',
-          type: 'line',
-          source: 'event-polygons-source',
-          paint: {
-            'line-color': ['get', 'color'],
-            'line-width': 2,
-            'line-opacity': [
-              'match',
-              ['get', 'category'],
-              ['agua', 'humedal'],
-              0,
-              ['case', ['==', ['get', 'id'], selectedEventRef.current?.id ?? ''], 0.8, 0],
-            ],
-          },
-        },
-        beforeId,
-      );
+      if (map.getLayer('event-polygons-fill')) {
+        map.setPaintProperty('event-polygons-fill', 'fill-opacity', fillOpacity);
+        map.setPaintProperty('event-polygons-outline', 'line-opacity', outlineOpacity);
+        map.setPaintProperty('event-polygons-outline', 'line-width', outlineWidth);
+      }
+      return;
     }
+
+    polygonEventsUploadedRef.current = events;
+    map.addSource('event-polygons-source', {
+      type: 'geojson',
+      data: buildPolygonEventsCollection() as any,
+    });
+
+    // Bajo puentes y bajo 'building-3d': MapLibre pinta por orden de capas
+    // (painter's algorithm), no por profundidad real, así que un fill 2D
+    // insertado por encima de un puente o de la extrusión de un edificio
+    // siempre se ve, sin importar la geometría real de esas estructuras.
+    const beforeId = getBeforeBridgesOrBuildingLayerId(map);
+
+    map.addLayer(
+      {
+        id: 'event-polygons-fill',
+        type: 'fill',
+        source: 'event-polygons-source',
+        paint: {
+          'fill-color': ['get', 'color'],
+          'fill-opacity': fillOpacity as any,
+        },
+      },
+      beforeId,
+    );
+
+    // Borde exterior (sólo para el evento seleccionado)
+    map.addLayer(
+      {
+        id: 'event-polygons-outline',
+        type: 'line',
+        source: 'event-polygons-source',
+        paint: {
+          'line-color': ['get', 'color'],
+          'line-width': outlineWidth as any,
+          'line-opacity': outlineOpacity as any,
+        },
+      },
+      beforeId,
+    );
   };
 
   syncEventPolygonsRef.current = syncEventPolygons;
@@ -2095,76 +1543,113 @@ export function MapLibreContainer({
     if (!map || typeof map.isStyleLoaded !== 'function' || !map.isStyleLoaded()) return;
 
     const cameraEvents = events.filter((e) => e.category && e.category.toLowerCase() === 'camara');
-    
+
+    // sync() corre en cada tick de zoom; re-subir el GeoJSON sólo si cambió el
+    // set de cámaras (p. ej. al activar/desactivar la capa) o si un cambio de
+    // estilo se llevó la fuente.
+    const heatmapKey = cameraEvents.map((e) => e.id).join(',');
+    if (map.getSource('camera-heatmap-source') && cameraHeatmapKeyRef.current === heatmapKey) {
+      return;
+    }
+    cameraHeatmapKeyRef.current = heatmapKey;
+
     const featureCollection = {
       type: 'FeatureCollection',
       features: cameraEvents.map((e) => ({
         type: 'Feature',
         geometry: {
           type: 'Point',
-          coordinates: [e.longitude, e.latitude]
+          coordinates: [e.longitude, e.latitude],
         },
         properties: {
-          weight: 1
-        }
-      }))
+          weight: 1,
+        },
+      })),
     };
 
     if (map.getSource('camera-heatmap-source')) {
-      (map.getSource('camera-heatmap-source') as maplibregl.GeoJSONSource).setData(featureCollection as any);
+      (map.getSource('camera-heatmap-source') as maplibregl.GeoJSONSource).setData(
+        featureCollection as any,
+      );
     } else {
       map.addSource('camera-heatmap-source', {
         type: 'geojson',
-        data: featureCollection as any
+        data: featureCollection as any,
       });
-      
-      const beforeId = getBeforeRoadsOrLabelsLayerId(map);
-      
-      map.addLayer({
-        id: 'camera-heatmap-layer',
-        type: 'heatmap',
-        source: 'camera-heatmap-source',
-        maxzoom: 18,
-        paint: {
-          'heatmap-weight': 1,
-          'heatmap-intensity': [
-            'interpolate',
-            ['linear'],
-            ['zoom'],
-            11, 1,
-            18, 3
-          ],
-          'heatmap-color': [
-            'interpolate',
-            ['linear'],
-            ['heatmap-density'],
-            0, 'rgba(59, 130, 246, 0)',
-            0.2, 'rgba(96, 165, 250, 0.4)',
-            0.4, 'rgba(147, 197, 253, 0.6)',
-            0.6, 'rgba(167, 139, 250, 0.7)',
-            0.8, 'rgba(139, 92, 246, 0.8)',
-            1, 'rgba(124, 58, 237, 0.85)' // Purple/Blue neon for surveillance
-          ],
-          'heatmap-radius': [
-            'interpolate',
-            ['linear'],
-            ['zoom'],
-            11, 20,
-            18, 60
-          ],
-          'heatmap-opacity': [
-            'interpolate',
-            ['linear'],
-            ['zoom'],
-            11, 0.7,
-            16, 0.7,
-            18, 0
-          ]
-        }
-      }, beforeId);
+
+      // Bajo 'building-3d' para que un edificio en cámara tape el resplandor,
+      // en vez de dibujarse siempre encima de la extrusión.
+      const beforeId = map.getLayer('building-3d')
+        ? 'building-3d'
+        : getBeforeRoadsOrLabelsLayerId(map);
+
+      map.addLayer(
+        {
+          id: 'camera-heatmap-layer',
+          type: 'heatmap',
+          source: 'camera-heatmap-source',
+          // Vista de conjunto ("zonas vigiladas") hasta que aparecen los pines;
+          // a escala ciudad no aporta y sólo ensucia el mapa.
+          minzoom: 12,
+          maxzoom: CAMERA_PIN_MIN_ZOOM + 0.5,
+          paint: {
+            'heatmap-weight': 1,
+            'heatmap-intensity': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              12,
+              1,
+              CAMERA_PIN_MIN_ZOOM,
+              2.5,
+            ],
+            'heatmap-color': [
+              'interpolate',
+              ['linear'],
+              ['heatmap-density'],
+              0,
+              'rgba(59, 130, 246, 0)',
+              0.2,
+              'rgba(96, 165, 250, 0.4)',
+              0.4,
+              'rgba(147, 197, 253, 0.6)',
+              0.6,
+              'rgba(167, 139, 250, 0.7)',
+              0.8,
+              'rgba(139, 92, 246, 0.8)',
+              1,
+              'rgba(124, 58, 237, 0.85)', // Purple/Blue neon for surveillance
+            ],
+            'heatmap-radius': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              12,
+              18,
+              CAMERA_PIN_MIN_ZOOM,
+              50,
+            ],
+            // Se desvanece justo cuando entran los pines: antes seguía visible
+            // hasta z18 y se dibujaba por debajo de los pines ya renderizados.
+            'heatmap-opacity': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              12,
+              0,
+              13,
+              0.6,
+              CAMERA_PIN_MIN_ZOOM - 0.7,
+              0.6,
+              CAMERA_PIN_MIN_ZOOM,
+              0,
+            ],
+          },
+        },
+        beforeId,
+      );
     }
   };
-
 
   const sync = useCallback(() => {
     const map = mapRef.current;
@@ -2181,39 +1666,10 @@ export function MapLibreContainer({
     ) as Cluster[];
 
     // ── Update native cluster layers ──
-    const clusterFeatures = clusterItems.map((cluster) => {
-      const count = cluster.events.length;
-      const dominantColor = getClusterDominantColor(cluster.events);
-      const badgeRadius = Math.min(22, Math.max(16, 16 + Math.log2(count) * 2));
-      const fontSize = badgeRadius < 18 ? 12 : badgeRadius < 20 ? 13 : 14;
-
-      // Compute true centroid for click zoom target
-      let cLat = 0,
-        cLng = 0;
-      for (const ev of cluster.events) {
-        cLat += ev.latitude;
-        cLng += ev.longitude;
-      }
-      cLat /= cluster.events.length;
-      cLng /= cluster.events.length;
-
-      return {
-        type: 'Feature' as const,
-        geometry: {
-          type: 'Point' as const,
-          coordinates: [cluster.longitude, cluster.latitude],
-        },
-        properties: {
-          id: cluster.id,
-          count: String(count),
-          color: dominantColor,
-          radius: badgeRadius,
-          fontSize,
-          centroidLng: cLng,
-          centroidLat: cLat,
-        },
-      };
-    });
+    const clusterFeatures = microdotFeatures(
+      clusterItems.flatMap((c) => c.events),
+      (ev) => getCategoryColor(ev.category, ev.musicStyle),
+    );
 
     if (map.getSource('clusters-source')) {
       (map.getSource('clusters-source') as any).setData({
@@ -2234,17 +1690,139 @@ export function MapLibreContainer({
 
     const newMarkerIds = new Set(nonClusterItems.map((e) => e.id));
 
-    // Remove old markers (only non-cluster)
+    // ── Eliminación diferida adaptativa ─────────────────────────────────────
+    // El grace period varía según el gesto de cámara activo:
+    //   • Zoom (rueda scroll) → eliminación inmediata.
+    //     Los cambios de LOD son intencionados; no tiene sentido diferir.
+    //   • Rotación            → 150ms + animación de salida.
+    //     Pequeño bounce de bounds al terminar la rotación.
+    //   • Pitch / Pan         → 350ms + animación de salida.
+    //     El bounds puede oscilar mientras se asienta la cámara inclinada.
+    //
+    // En todos los casos con grace > 0, se aplica 'pin-dismiss' (CSS) al
+    // pinEl ANTES de ocultarlo para que el usuario vea una transición suave
+    // en vez de una desaparición instantánea.
+    const graceMs = isZoomingRef.current ? 0
+                  : isRotatingRef.current ? 150
+                  : isDraggingRef.current || isMovingRef.current ? 500
+                  : 350;
+
+    const dismissMarker = (markerObj: typeof markersRef.current[string]) => {
+      // Animación de salida visible antes de ocultar
+      markerObj.pinEl.classList.remove('pin-enter');
+      markerObj.pinEl.classList.add('pin-dismiss');
+      // Quitar interactividad de inmediato
+      markerObj.pinEl.style.pointerEvents = 'none';
+      if (markerObj.flatEl) markerObj.flatEl.style.pointerEvents = 'none';
+    };
+
+    const removeMarkerNow = (id: string) => {
+      const obj = markersRef.current[id];
+      if (!obj) return;
+      obj.pinMarker.remove();
+      if (obj.flatMarker) obj.flatMarker.remove();
+      if ((obj as any).unsubRegistry) (obj as any).unsubRegistry();
+      delete markersRef.current[id];
+    };
+
     Object.keys(markersRef.current).forEach((id) => {
       if (!newMarkerIds.has(id)) {
         const markerObj = markersRef.current[id];
-        markerObj.pinMarker.remove();
-        if (markerObj.flatMarker) markerObj.flatMarker.remove();
-        // Clean up registry subscription if any
-        if ((markerObj as any).unsubRegistry) (markerObj as any).unsubRegistry();
-        delete markersRef.current[id];
+        // Si ya hay un timer de remoción pendiente, no resetear
+        if ((markerObj as any)._removalTimer) return;
+
+        if (graceMs === 0) {
+          // Zoom: eliminar del DOM directamente (sin animación, sin delay)
+          markerObj.pinEl.style.visibility = 'hidden';
+          removeMarkerNow(id);
+        } else {
+          // Pitch / Rotate / Pan: animación de salida + eliminación diferida
+          dismissMarker(markerObj);
+
+          (markerObj as any)._removalTimer = setTimeout(() => {
+            if (!markersRef.current[id]) return;
+            // Asegurar que la animación terminó y ocultamos antes de destruir
+            markersRef.current[id].pinEl.style.visibility = 'hidden';
+            removeMarkerNow(id);
+          }, graceMs);
+        }
       }
     });
+
+    /**
+     * Pinta el contenido de un marcador según su categoría.
+     * Único punto de despacho: creación y re-render comparten camino.
+     */
+    const renderMarkerContent = (
+      pinEl: HTMLDivElement,
+      flatEl: HTMLDivElement | undefined,
+      event: TurismoEvent,
+      isSelected: boolean,
+      color: string,
+      iconName: string,
+      isEmergencyState: boolean,
+      isNew: boolean,
+    ) => {
+      const cat = event.category?.toLowerCase() || '';
+      switch (cat) {
+        case 'embarcacion':
+          if (flatEl) renderBoatFlatMarker(flatEl, event);
+          renderBoatMarker(pinEl, event, isSelected);
+          break;
+        case 'fauna':
+          renderLoboMarinoMarker(pinEl, event, isSelected, mapLayer);
+          break;
+        case 'hospital':
+          renderHospitalMarker(pinEl, event, isSelected, mapLayer);
+          break;
+        case 'clinica':
+          renderClinicaMarker(pinEl, event, isSelected, mapLayer);
+          break;
+        case 'universidad':
+          renderUniversityMarker(pinEl, event, isSelected, mapLayer);
+          break;
+        case 'bombero':
+          renderBomberoMarker(pinEl, event, isSelected, mapLayer);
+          break;
+        case 'carabinero':
+          renderCarabineroMarker(pinEl, event, isSelected, mapLayer);
+          break;
+        case 'camara':
+          renderCamaraMarker(pinEl, event, isSelected, mapLayer);
+          break;
+        case 'banca':
+        case 'silla':
+          renderBenchMarker(pinEl, event, isSelected, mapLayer);
+          break;
+        case 'basurero':
+        case 'papelera':
+          renderTrashMarker(pinEl, event, isSelected, mapLayer);
+          break;
+        case 'bebedero':
+        case 'fuente':
+        case 'fuente_agua':
+        case 'drinking_water':
+          renderWaterMarker(pinEl, event, isSelected, mapLayer);
+          break;
+        case 'maquina_ejercicio':
+        case 'ejercicio':
+          renderFitnessMarker(pinEl, event, isSelected, mapLayer);
+          break;
+        default:
+          if (flatEl) renderFlatMarker(flatEl, event, color, isEmergencyState, mapLayer);
+          renderPinMarker(
+            pinEl,
+            event,
+            color,
+            iconName,
+            isEmergencyState,
+            isSelected,
+            mapLayer,
+            isNew,
+          );
+          break;
+      }
+    };
 
     // Add or update markers
     // Add or update non-cluster markers only (clusters are handled via native layers above)
@@ -2253,9 +1831,21 @@ export function MapLibreContainer({
       const isSelected = selectedEvent?.id === event.id;
       const color = getCategoryColor(event.category, event.musicStyle);
       const iconName = getCategoryIcon(event.category, event.musicStyle);
-      const isEmergencyState = ['choque', 'incendio', 'accidente', 'calle_cortada'].includes(
-        event.category,
+      const isEmergencyState = isEmergencyCategory(event.category);
+      // Firma del render: si no cambia, no vale la pena reconstruir el DOM
+      // (además reiniciaría las animaciones ambientales en cada zoom).
+      // Sólo los markers con renderer propio dependen de `isSelected` en su
+      // DOM; en los genéricos la selección la resuelve updateAesthetics.
+      const selectionAffectsDom = CUSTOM_RENDERER_CATEGORIES.includes(
+        event.category?.toLowerCase() || '',
       );
+      const renderKey = [
+        event.category,
+        mapLayer,
+        selectionAffectsDom && isSelected ? 'sel' : '',
+        event.vineta?.type || '',
+        event.vineta?.label || '',
+      ].join('|');
 
       let markerObj = markersRef.current[event.id];
 
@@ -2274,6 +1864,7 @@ export function MapLibreContainer({
           pitchAlignment: 'map',
           rotationAlignment,
           anchor: 'center',
+          opacityWhenCovered: 0, // Se oculta detrás de edificios 3D
         })
           .setLngLat([event.longitude, event.latitude])
           .addTo(map);
@@ -2287,35 +1878,45 @@ export function MapLibreContainer({
         pinEl.style.justifyContent = 'center';
 
         const catLower = event.category?.toLowerCase() || '';
-        if (catLower === 'fauna') {
-          pinEl.style.width = '48px';
-          pinEl.style.height = '48px';
-        } else if (
-          ['camara', 'hospital', 'clinica', 'universidad', 'bombero', 'carabinero'].includes(catLower)
-        ) {
-          pinEl.style.width = '40px';
-          pinEl.style.height = '40px';
-        } else if (catLower === 'embarcacion') {
+        if (catLower === 'embarcacion') {
           let w = 24;
           if (event.boatSize === 'grande') w = 32;
           else if (event.boatSize === 'mediana') w = 28;
           pinEl.style.width = `${w}px`;
           pinEl.style.height = `${w}px`;
-        } else if (['parque', 'reserva', 'reservas', 'naturaleza'].includes(catLower)) {
+        } else if (isUtilityCategory(catLower)) {
+          pinEl.style.width = '28px';
+          pinEl.style.height = '28px';
+        } else if (isPinlessCategory(catLower)) {
           pinEl.style.width = '0px';
           pinEl.style.height = '0px';
         } else {
-          pinEl.style.width = '28px';
-          pinEl.style.height = '28px';
+          // El tamaño lo dicta el design system, no una lista paralela
+          const boxSize = getPinDesign(event, mapLayer).size;
+          pinEl.style.width = `${boxSize}px`;
+          pinEl.style.height = `${boxSize}px`;
         }
 
         pinEl.dataset.hovered = 'false';
         pinEl.dataset.category = event.category;
 
+        // Animación de despliegue desde el punto de anclaje al mapa.
+        // Solo se aplica fuera de zoom (en zoom se crean muchos pines a la vez
+        // y la animación escalonada quedaría caótica).
+        if (!isZoomingRef.current && !isPinlessCategory(catLower)) {
+          pinEl.classList.add('pin-enter');
+          // Auto-remover la clase tras la duración de la animación para no
+          // interferir con transforms posteriores de updateAesthetics.
+          setTimeout(() => { pinEl.classList.remove('pin-enter'); }, 600);
+        }
+
         // A11y: Accesibilidad y teclado
         pinEl.tabIndex = 0;
 
         const handleOpenMinimodal = () => {
+          // Los pines de utilidad no tienen efecto hover ni abren minimodals al pasar el cursor
+          if (isUtilityCategory(event.category)) return;
+
           // Immediately force-close any other hovered/tooltip markers to prevent multiple mini-modals
           Object.values(markersRef.current).forEach((otherObj: any) => {
             if (otherObj.event?.id !== event.id && otherObj.pinEl) {
@@ -2343,6 +1944,11 @@ export function MapLibreContainer({
         };
 
         const handleCloseMinimodal = () => {
+          if (isUtilityCategory(event.category)) {
+            pinEl.dataset.hovered = 'false';
+            return;
+          }
+
           const markerObj = markersRef.current[event.id];
           if (!markerObj) return;
 
@@ -2392,27 +1998,98 @@ export function MapLibreContainer({
 
         pinEl.addEventListener('click', (e) => {
           e.stopPropagation();
-          const categoryLower = event.category?.toLowerCase() || '';
-          if (categoryLower === 'fauna') {
+
+          // Grupo de cámaras: no es un destino, sólo un atajo para separarlas.
+          if (event.cameraGroup) {
+            pinEl.dataset.hovered = 'false';
+            map.fitBounds(event.cameraGroup.bounds, {
+              padding: 80,
+              maxZoom: CAMERA_GROUP_MAX_ZOOM,
+              duration: cameraAnimationsEnabledRef.current === false ? 0 : 650,
+            });
+            return;
+          }
+
+          if (isRoutingActiveRef.current && onMapClickForRoutingRef.current) {
+            onMapClickForRoutingRef.current({
+              latitude: event.latitude,
+              longitude: event.longitude,
+              name: event.title,
+              businessId: (event as any)?.businessId,
+              eventId: event.id,
+              category: event.category,
+            });
+            return;
+          }
+
+          // Pines de utilidad que NO abren modal (banco, fuente de agua, basurero):
+          // 1. Quitar cualquier hover residual y foco
+          // 2. Vuelo suave y cinemático hacia el pin (sin saltos bruscos)
+          // 3. Resaltar localmente el pin sin abrir modal ni ocultar la interfaz
+          if (isNoModalCategory(event.category)) {
+            pinEl.dataset.hovered = 'false';
+            pinEl.blur();
+
+            isGtaVRunningRef.current = true;
+            executeSmoothPinFocus(
+              map,
+              {
+                latitude: event.latitude,
+                longitude: event.longitude,
+                heading: 0,
+              },
+              cameraAnimationsEnabledRef.current ?? true,
+              () => {
+                isGtaVRunningRef.current = false;
+              },
+            );
+
+            // Resaltar visualmente el pin sin abrir ningún modal ni alterar la interfaz
             const isLocal = pinEl.dataset.localSelected === 'true';
-            pinEl.dataset.localSelected = isLocal ? 'false' : 'true';
+            const nextLocal = !isLocal;
+            Object.values(markersRef.current).forEach((m) => {
+              if (m.pinEl !== pinEl && m.pinEl.dataset.localSelected === 'true') {
+                m.pinEl.dataset.localSelected = 'false';
+              }
+            });
+            pinEl.dataset.localSelected = nextLocal ? 'true' : 'false';
+            selectedEventRef.current = nextLocal ? event : null;
             if (updateAestheticsRef.current) updateAestheticsRef.current();
             return;
           }
-          if (
-            ['hospital', 'clinica', 'universidad', 'bombero', 'carabinero', 'camara'].includes(categoryLower)
-          ) {
+
+          // Otras utilidades que sí abren modal (ej. estaciones de calistenia / ejercicio):
+          if (isUtilityCategory(event.category)) {
+            pinEl.dataset.hovered = 'false';
+            pinEl.blur();
+
+            isGtaVRunningRef.current = true;
+            executeSmoothPinFocus(
+              map,
+              {
+                latitude: event.latitude,
+                longitude: event.longitude,
+                heading: 0,
+              },
+              cameraAnimationsEnabledRef.current ?? true,
+              () => {
+                isGtaVRunningRef.current = false;
+              },
+            );
+
+            onSelectEventRef.current(event);
+            return;
+          }
+
+          // `toggle` = el pin fija/suelta su mini-modal in-situ.
+          // `full`   = el pin abre la ficha extensa.
+          if (isToggleClickCategory(event.category)) {
             const isLocal = pinEl.dataset.localSelected === 'true';
             const nextLocal = !isLocal;
-            // Clear any other local minimodal that may be locally selected
+            // Sólo un mini-modal fijado a la vez
             if (nextLocal) {
               Object.values(markersRef.current).forEach((m) => {
-                if (
-                  ['hospital', 'clinica', 'universidad', 'bombero', 'carabinero', 'camara'].includes(
-                    m.event?.category?.toLowerCase() || '',
-                  ) &&
-                  m.pinEl !== pinEl
-                ) {
+                if (isToggleClickCategory(m.event?.category) && m.pinEl !== pinEl) {
                   m.pinEl.dataset.localSelected = 'false';
                 }
               });
@@ -2428,11 +2105,16 @@ export function MapLibreContainer({
         });
 
         const isBoat = event.category === 'embarcacion';
+        const isFlatMarker =
+          isBoat ||
+          event.isFlat === true ||
+          isUtilityCategory(event.category);
         const pinMarker = new maplibregl.Marker({
           element: pinEl,
-          pitchAlignment: isBoat ? 'map' : 'viewport',
-          rotationAlignment: isBoat ? 'map' : 'viewport',
-          anchor: isBoat ? 'center' : 'bottom',
+          pitchAlignment: isFlatMarker ? 'map' : 'viewport',
+          rotationAlignment: isFlatMarker ? 'map' : 'viewport',
+          anchor: isFlatMarker ? 'center' : 'bottom',
+          opacityWhenCovered: isFlatMarker ? 1 : 0, // Los marcadores planos se proyectan al suelo y no deben ser ocultados por WebGL
         })
           .setLngLat([event.longitude, event.latitude])
           .addTo(map);
@@ -2482,59 +2164,56 @@ export function MapLibreContainer({
           flatEl.dataset.surface = initialSurface;
         }
 
-        // Render vanilla DOM contents once during creation
-        if (event.category === 'embarcacion') {
-          renderBoatFlatMarker(flatEl, event);
-          renderBoatMarker(pinEl, event, isSelected);
-        } else if (event.category?.toLowerCase() === 'fauna') {
-          renderLoboMarinoMarker(pinEl, event, isSelected, mapLayer);
-        } else if (event.category?.toLowerCase() === 'hospital') {
-          renderHospitalMarker(pinEl, event, isSelected, mapLayer);
-        } else if (event.category?.toLowerCase() === 'clinica') {
-          renderClinicaMarker(pinEl, event, isSelected, mapLayer);
-        } else if (event.category?.toLowerCase() === 'universidad') {
-          renderUniversityMarker(pinEl, event, isSelected, mapLayer);
-        } else if (event.category?.toLowerCase() === 'bombero') {
-          renderBomberoMarker(pinEl, event, isSelected, mapLayer);
-        } else if (event.category?.toLowerCase() === 'carabinero') {
-          renderCarabineroMarker(pinEl, event, isSelected, mapLayer);
-        } else if (event.category?.toLowerCase() === 'camara') {
-          renderCamaraMarker(pinEl, event, isSelected, mapLayer);
-        } else {
-          renderFlatMarker(flatEl, event, color, isEmergencyState);
-          renderPinMarker(pinEl, event, color, iconName, isEmergencyState, isSelected);
-        }
+        // Contenido DOM del marcador. Ojo con el orden: los refs se cachean
+        // DESPUÉS de pintar, si no quedan todos en null y el sistema 3D
+        // (aguja, sombra, viñeta, pedestal) nunca llega a activarse.
+        renderMarkerContent(
+          pinEl,
+          flatEl,
+          event,
+          isSelected,
+          color,
+          iconName,
+          isEmergencyState,
+          true,
+        );
+        pinEl.dataset.renderKey = renderKey;
+        updateMarkerDomRefs(markerObj);
       } else {
+        // ── Re-adopción (cancelar remoción diferida si el pin volvió) ────────
+        if ((markerObj as any)._removalTimer) {
+          clearTimeout((markerObj as any)._removalTimer);
+          delete (markerObj as any)._removalTimer;
+          // Cancelar animación de salida y restaurar estado visible
+          markerObj.pinEl.classList.remove('pin-dismiss');
+          markerObj.pinEl.style.visibility = 'visible';
+          markerObj.pinEl.style.pointerEvents = 'auto';
+          if (markerObj.flatEl) {
+            markerObj.flatEl.style.visibility = 'visible';
+            markerObj.flatEl.style.pointerEvents = 'none';
+          }
+        }
+
         // Update position if it changed
         markerObj.pinMarker.setLngLat([event.longitude, event.latitude]);
         if (markerObj.flatMarker) {
           markerObj.flatMarker.setLngLat([event.longitude, event.latitude]);
         }
-        // Force re-render of custom markers to adapt to the map style layer
-        let didReRender = false;
-        if (event.category?.toLowerCase() === 'fauna') {
-          renderLoboMarinoMarker(markerObj.pinEl, event, isSelected, mapLayer);
-          didReRender = true;
-        } else if (event.category?.toLowerCase() === 'hospital') {
-          renderHospitalMarker(markerObj.pinEl, event, isSelected, mapLayer);
-          didReRender = true;
-        } else if (event.category?.toLowerCase() === 'clinica') {
-          renderClinicaMarker(markerObj.pinEl, event, isSelected, mapLayer);
-          didReRender = true;
-        } else if (event.category?.toLowerCase() === 'universidad') {
-          renderUniversityMarker(markerObj.pinEl, event, isSelected, mapLayer);
-          didReRender = true;
-        } else if (event.category?.toLowerCase() === 'bombero') {
-          renderBomberoMarker(markerObj.pinEl, event, isSelected, mapLayer);
-          didReRender = true;
-        } else if (event.category?.toLowerCase() === 'carabinero') {
-          renderCarabineroMarker(markerObj.pinEl, event, isSelected, mapLayer);
-          didReRender = true;
-        } else if (event.category?.toLowerCase() === 'camara') {
-          renderCamaraMarker(markerObj.pinEl, event, isSelected, mapLayer);
-          didReRender = true;
-        }
-        if (didReRender) {
+        // Reconstruir el DOM sólo si cambió algo que lo afecta (categoría,
+        // capa del mapa, selección, viñeta). Antes se repintaba en cada
+        // cambio de zoom, lo que reiniciaba todas las animaciones.
+        if (markerObj.pinEl.dataset.renderKey !== renderKey) {
+          renderMarkerContent(
+            markerObj.pinEl,
+            markerObj.flatEl,
+            event,
+            isSelected,
+            color,
+            iconName,
+            isEmergencyState,
+            false,
+          );
+          markerObj.pinEl.dataset.renderKey = renderKey;
           updateMarkerDomRefs(markerObj);
         }
       }
@@ -2544,9 +2223,6 @@ export function MapLibreContainer({
         const isHovered = markerObj.pinEl.dataset.hovered === 'true';
         const isSel = isSelected || isHovered;
         markerObj.pinEl.style.zIndex = isSel ? '9999' : '10';
-        if (isSel && markerObj.pinEl.parentElement) {
-          markerObj.pinEl.parentElement.appendChild(markerObj.pinEl);
-        }
       }
       if (markerObj.flatEl) {
         markerObj.flatEl.style.zIndex = isSelected ? '999' : '0';
@@ -2569,6 +2245,7 @@ export function MapLibreContainer({
           justifyContent: 'center',
           boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
           zIndex: '1500',
+          boxSizing: 'border-box',
         });
 
         // Add the push-pin icon
@@ -2577,7 +2254,7 @@ export function MapLibreContainer({
           el.appendChild(svg);
         }
 
-        const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+        const marker = new maplibregl.Marker({ element: el, anchor: 'center', opacityWhenCovered: 0 })
           .setLngLat([mapPincho.longitude, mapPincho.latitude])
           .addTo(map);
 
@@ -2590,8 +2267,12 @@ export function MapLibreContainer({
       pinMarkerRef.current = null;
     }
 
-    if (map.getLayer('cluster-circles')) map.moveLayer('cluster-circles');
-    if (map.getLayer('cluster-labels')) map.moveLayer('cluster-labels');
+    if (map.getLayer('cluster-circles')) {
+      map.moveLayer('cluster-circles', map.getLayer('building-3d') ? 'building-3d' : undefined);
+    }
+    if (map.getLayer('cluster-labels')) {
+      map.moveLayer('cluster-labels', map.getLayer('building-3d') ? 'building-3d' : undefined);
+    }
 
     // Apply immediate 3D and Zoom styling to all markers
     if (updateAestheticsRef.current) {
@@ -2638,57 +2319,11 @@ export function MapLibreContainer({
 
       latestUserLocationRef.current = loc;
 
-      // 1. Accuracy circle layer handling (only if map style is loaded)
-      if (map.isStyleLoaded() && loc.accuracy) {
-        const accuracyMeters = Math.max(1, loc.accuracy);
-        userAccuracyRef.current = { accuracyMeters, latitude: loc.latitude };
-        const radius = getAccuracyRadiusAtZoom(accuracyMeters, loc.latitude, map.getZoom());
-        const accuracyData: GeoJSON.FeatureCollection = {
-          type: 'FeatureCollection',
-          features: [
-            {
-              type: 'Feature',
-              geometry: {
-                type: 'Point',
-                coordinates: [loc.longitude, loc.latitude],
-              },
-              properties: {},
-            },
-          ],
-        };
-
-        if (!map.getSource('user-accuracy')) {
-          map.addSource('user-accuracy', {
-            type: 'geojson',
-            data: accuracyData,
-          });
-          map.addLayer({
-            id: 'user-wave-layer',
-            type: 'circle',
-            source: 'user-accuracy',
-            paint: {
-              'circle-radius': WAVE_MIN_RADIUS_PX,
-              'circle-color': 'transparent',
-              'circle-opacity': 0,
-              'circle-stroke-width': WAVE_STROKE_WIDTH,
-              'circle-stroke-color': getUserWaveColor(mapLayerRef.current),
-              'circle-stroke-opacity': 0,
-              'circle-pitch-alignment': 'map',
-            },
-          });
-        } else {
-          const source = map.getSource('user-accuracy') as maplibregl.GeoJSONSource;
-          if (source.setData) {
-            source.setData(accuracyData);
-          }
-        }
-      } else if (!loc.accuracy || !map.isStyleLoaded()) {
-        userAccuracyRef.current = null;
-        if (map.isStyleLoaded()) {
-          if (map.getLayer('user-wave-layer')) map.removeLayer('user-wave-layer');
-          if (map.getSource('user-accuracy')) map.removeSource('user-accuracy');
-        }
-      }
+      // 1. Precisión del GPS: la onda es un elemento CSS dentro del marker
+      // (compositor, 0 repintados de WebGL); acá sólo se guarda el dato.
+      userAccuracyRef.current = loc.accuracy
+        ? { accuracyMeters: Math.max(1, loc.accuracy), latitude: loc.latitude }
+        : null;
 
       // 2. DOM marker rendering
       if (!userMarkerRef.current) {
@@ -2698,6 +2333,14 @@ export function MapLibreContainer({
         const coneEl = document.createElement('div');
         coneEl.className = 'user-cone';
         el.appendChild(coneEl);
+
+        const waveEl = document.createElement('div');
+        waveEl.className = 'user-wave';
+        waveEl.innerHTML =
+          '<svg viewBox="-50 -50 100 100" width="100" height="100"><circle r="49" fill="none" stroke="currentColor" stroke-width="' +
+          WAVE_STROKE_WIDTH +
+          '" vector-effect="non-scaling-stroke"/></svg>';
+        el.appendChild(waveEl);
 
         const styleId = 'user-marker-styles';
         if (!document.getElementById(styleId)) {
@@ -2713,6 +2356,30 @@ export function MapLibreContainer({
               box-shadow: 0 0 10px rgba(0,0,0,0.3);
               position: relative;
               z-index: 2000;
+            }
+            .user-wave {
+              position: absolute;
+              top: 50%;
+              left: 50%;
+              width: 100px;
+              height: 100px;
+              margin: -50px 0 0 -50px;
+              color: var(--wave-color, #60A5FA);
+              pointer-events: none;
+              z-index: -1;
+              opacity: 0;
+              display: none;
+              animation: user-wave-pulse var(--wave-period, 1700ms) linear infinite;
+              will-change: transform, opacity;
+            }
+            .user-wave svg { display: block; }
+            @keyframes user-wave-pulse {
+              0%   { transform: scale(var(--wave-s0, 0.12)); opacity: 0.85;
+                     animation-timing-function: cubic-bezier(0.215, 0.61, 0.355, 1); }
+              100% { transform: scale(var(--wave-s1, 1)); opacity: 0; }
+            }
+            @media (prefers-reduced-motion: reduce) {
+              .user-wave { animation: none; opacity: 0.35; transform: scale(var(--wave-s1, 1)); }
             }
             .user-cone {
               position: absolute;
@@ -2733,7 +2400,7 @@ export function MapLibreContainer({
           document.head.appendChild(style);
         }
 
-        const marker = new maplibregl.Marker({ element: el })
+        const marker = new maplibregl.Marker({ element: el, opacityWhenCovered: 0 })
           .setLngLat([loc.longitude, loc.latitude])
           .addTo(map);
 
@@ -2757,57 +2424,42 @@ export function MapLibreContainer({
       }
     };
 
-    window.addEventListener('high-frequency-user-location', handleHighFreqLocation);
+    // Escala de la onda según precisión (metros) y zoom actual.
+    const syncUserWave = () => {
+      const userEl = userMarkerRef.current?.el;
+      const wave = userEl?.querySelector('.user-wave') as HTMLDivElement | null;
+      if (!userEl || !wave) return;
+      const acc = userAccuracyRef.current;
+      if (!acc) {
+        wave.style.display = 'none';
+        return;
+      }
+      const maxR = getAccuracyRadiusAtZoom(acc.accuracyMeters, acc.latitude, map.getZoom());
+      userEl.style.setProperty('--wave-s0', String(WAVE_MIN_RADIUS_PX / 50));
+      userEl.style.setProperty('--wave-s1', String(Math.max(maxR, WAVE_MIN_RADIUS_PX * 2) / 50));
+      userEl.style.setProperty('--wave-period', `${WAVE_PERIOD_MS}ms`);
+      userEl.style.setProperty('--wave-color', getUserWaveColor(mapLayerRef.current));
+      wave.style.display = 'block';
+    };
+    const originalHandler = handleHighFreqLocation;
+    const handler = (e: Event) => {
+      originalHandler(e);
+      syncUserWave();
+    };
+    map.on('zoom', syncUserWave);
+
+    window.addEventListener('high-frequency-user-location', handler);
 
     // Initial marker rendering if location is already loaded
     if (userLocation) {
-      handleHighFreqLocation(
-        new CustomEvent('high-frequency-user-location', { detail: userLocation }),
-      );
+      handler(new CustomEvent('high-frequency-user-location', { detail: userLocation }));
     }
 
     return () => {
-      window.removeEventListener('high-frequency-user-location', handleHighFreqLocation);
+      map.off('zoom', syncUserWave);
+      window.removeEventListener('high-frequency-user-location', handler);
     };
   }, [userLocation]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    const startTs = performance.now();
-    let rafId: number;
-
-    const tick = () => {
-      if (
-        map.isStyleLoaded() &&
-        userAccuracyRef.current &&
-        map.getLayer('user-wave-layer') &&
-        document.visibilityState !== 'hidden'
-      ) {
-        const t = ((performance.now() - startTs) % WAVE_PERIOD_MS) / WAVE_PERIOD_MS;
-        const eased = 1 - Math.pow(1 - t, 3);
-        const maxRadius = getAccuracyRadiusAtZoom(
-          userAccuracyRef.current.accuracyMeters,
-          userAccuracyRef.current.latitude,
-          map.getZoom(),
-        );
-        const radius = WAVE_MIN_RADIUS_PX + Math.max(0, maxRadius - WAVE_MIN_RADIUS_PX) * eased;
-
-        map.setPaintProperty('user-wave-layer', 'circle-radius', radius);
-        map.setPaintProperty('user-wave-layer', 'circle-stroke-opacity', (1 - t) * 0.85);
-        map.setPaintProperty(
-          'user-wave-layer',
-          'circle-stroke-color',
-          getUserWaveColor(mapLayerRef.current),
-        );
-      }
-      rafId = requestAnimationFrame(tick);
-    };
-
-    rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
-  }, []);
 
   useEffect(() => {
     syncUserLocationRef.current = sync;
@@ -2982,7 +2634,16 @@ export function MapLibreContainer({
       // Attach click popup once
       if (!(map as any)._cyclewayListenersAttached) {
         map.on('click', LAYER_LINE, (e: any) => {
+          if (isClickInsideModalOrInput(e)) return;
           if (!e.features?.length) return;
+          if (isRoutingActiveRef.current && onMapClickForRoutingRef.current) {
+            (e.originalEvent as any)._turismoHandled = true;
+            onMapClickForRoutingRef.current({
+              latitude: e.lngLat.lat,
+              longitude: e.lngLat.lng,
+            });
+            return;
+          }
           const props = e.features[0].properties as any;
           new maplibregl.Popup({ closeButton: true, maxWidth: '280px' })
             .setLngLat(e.lngLat)
@@ -3012,8 +2673,12 @@ export function MapLibreContainer({
         (map as any)._cyclewayListenersAttached = true;
       }
 
-      if (map.getLayer('cluster-circles')) map.moveLayer('cluster-circles');
-      if (map.getLayer('cluster-labels')) map.moveLayer('cluster-labels');
+      if (map.getLayer('cluster-circles')) {
+        map.moveLayer('cluster-circles', map.getLayer('building-3d') ? 'building-3d' : undefined);
+      }
+      if (map.getLayer('cluster-labels')) {
+        map.moveLayer('cluster-labels', map.getLayer('building-3d') ? 'building-3d' : undefined);
+      }
     };
 
     const removeLayers = () => {
@@ -3050,6 +2715,48 @@ export function MapLibreContainer({
     }
   }, [showCycleways, cyclewaysData]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Mobiliario Layer Visibility ───────────────────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded() || !map.getLayer('mobiliario-layer')) return;
+    try {
+      map.setLayoutProperty('mobiliario-layer', 'visibility', showMobiliario ? 'visible' : 'none');
+    } catch {}
+  }, [showMobiliario]);
+
+
+  // ── Walk preview: línea punteada usuario → pin (sin fitBounds) ────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const SOURCE = 'walk-preview';
+    const LAYER = 'walk-preview-line';
+    const data: GeoJSON.FeatureCollection = {
+      type: 'FeatureCollection',
+      features: walkPreviewGeojson
+        ? [{ type: 'Feature', geometry: walkPreviewGeojson, properties: {} }]
+        : [],
+    };
+    const apply = () => {
+      if (!map.getSource(SOURCE)) {
+        map.addSource(SOURCE, { type: 'geojson', data });
+      } else {
+        (map.getSource(SOURCE) as maplibregl.GeoJSONSource).setData(data);
+      }
+      if (!map.getLayer(LAYER)) {
+        map.addLayer({
+          id: LAYER,
+          type: 'line',
+          source: SOURCE,
+          layout: { 'line-cap': 'butt', 'line-join': 'round' },
+          paint: { 'line-color': '#1D4ED8', 'line-width': 3.5, 'line-dasharray': WALK_LINE_DASHARRAY },
+        });
+      }
+    };
+    if (map.isStyleLoaded()) apply();
+    else map.once('idle', apply);
+  }, [walkPreviewGeojson]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── OSRM Navigation Route Layer ───────────────────────────────────────────
   useEffect(() => {
     const map = mapRef.current;
@@ -3059,9 +2766,22 @@ export function MapLibreContainer({
     const LAYER_BG = 'osrm-nav-route-bg';
     const LAYER_FG = 'osrm-nav-route-fg';
 
-    const data: GeoJSON.Feature = navRouteGeojson
-      ? { type: 'Feature', geometry: navRouteGeojson, properties: {} }
-      : { type: 'Feature', geometry: { type: 'LineString', coordinates: [] }, properties: {} };
+    const data: GeoJSON.FeatureCollection =
+      navRouteGeojson && !isRoutingActive
+        ? {
+            type: 'FeatureCollection',
+            features: [
+              {
+                type: 'Feature',
+                geometry: navRouteGeojson,
+                properties: {},
+              },
+            ],
+          }
+        : {
+            type: 'FeatureCollection',
+            features: [],
+          };
 
     const applyRoute = () => {
       if (!map.getSource(SOURCE)) {
@@ -3085,25 +2805,31 @@ export function MapLibreContainer({
         // Asegurar que las capas estén encima tras recargas de estilo
         if (!map.getLayer(LAYER_BG)) {
           map.addLayer({
-            id: LAYER_BG, type: 'line', source: SOURCE,
+            id: LAYER_BG,
+            type: 'line',
+            source: SOURCE,
             layout: { 'line-cap': 'round', 'line-join': 'round' },
             paint: { 'line-color': '#1E3A5F', 'line-width': 10, 'line-opacity': 0.85 },
           });
         }
         if (!map.getLayer(LAYER_FG)) {
           map.addLayer({
-            id: LAYER_FG, type: 'line', source: SOURCE,
+            id: LAYER_FG,
+            type: 'line',
+            source: SOURCE,
             layout: { 'line-cap': 'round', 'line-join': 'round' },
             paint: { 'line-color': '#3B82F6', 'line-width': 5, 'line-opacity': 1 },
           });
         }
       }
 
-      // Encuadrar la cámara sobre toda la ruta
+      // Encuadrar la cámara sobre toda la ruta (solo en navegación turn-by-turn, no al trazar en Geo-Router)
       const coords = navRouteGeojson?.coordinates;
-      if (coords && coords.length > 1) {
-        let minLng = coords[0][0], minLat = coords[0][1];
-        let maxLng = coords[0][0], maxLat = coords[0][1];
+      if (!isRoutingActive && coords && coords.length > 1) {
+        let minLng = coords[0][0],
+          minLat = coords[0][1];
+        let maxLng = coords[0][0],
+          maxLat = coords[0][1];
         for (const [lng, lat] of coords) {
           if (lng < minLng) minLng = lng;
           if (lng > maxLng) maxLng = lng;
@@ -3111,7 +2837,10 @@ export function MapLibreContainer({
           if (lat > maxLat) maxLat = lat;
         }
         map.fitBounds(
-          [[minLng, minLat], [maxLng, maxLat]],
+          [
+            [minLng, minLat],
+            [maxLng, maxLat],
+          ],
           { padding: { top: 100, bottom: 260, left: 60, right: 60 }, duration: 800, maxZoom: 16 },
         );
       }
@@ -3122,7 +2851,405 @@ export function MapLibreContainer({
     } else {
       map.once('idle', applyRoute);
     }
-  }, [navRouteGeojson]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [navRouteGeojson, isRoutingActive]); // eslint-disable-line react-hooks/exhaustive-deps
+  // ───────────────────────────────────────────────────────────────────────────
+
+  // ── Social Geo-Router 2D Surface Procedural Line & Direction Chevrons ───────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const DRAFT_ROUTE_SOURCE = 'draft-route-surface-source';
+    const DRAFT_ROUTE_CASING = 'draft-route-surface-casing';
+    const DRAFT_ROUTE_CORE = 'draft-route-surface-core';
+    const DRAFT_ROUTE_DASH = 'draft-route-surface-dash';
+    const DRAFT_ROUTE_ARROWS = 'draft-route-surface-arrows';
+
+    const DRAFT_SECTOR_SOURCE = 'draft-route-sector-source';
+    const DRAFT_SECTOR_FILL = 'draft-route-sector-fill';
+    const DRAFT_SECTOR_STROKE = 'draft-route-sector-stroke';
+
+    // 1. Sincronizar pines HTML en el mapa para cada punto colocado (con reconciliación para evitar parpadeos)
+    if (!isRoutingActive || draftRoutePoints.length === 0) {
+      draftRouteMarkersRef.current.forEach((item) => item.marker.remove());
+      draftRouteMarkersRef.current = [];
+    } else {
+      ensureDraftRouteMarkerStyles();
+
+      // Descartar pines sobrantes si se eliminaron puntos (ej. Deshacer)
+      while (draftRouteMarkersRef.current.length > draftRoutePoints.length) {
+        const removed = draftRouteMarkersRef.current.pop();
+        removed?.marker.remove();
+      }
+
+      draftRoutePoints.forEach((point, idx) => {
+        const isFirst = idx === 0;
+        const isLast = idx === draftRoutePoints.length - 1 && draftRoutePoints.length > 1;
+        const role: 'origin' | 'destination' | 'waypoint' = isFirst
+          ? 'origin'
+          : isLast
+            ? 'destination'
+            : 'waypoint';
+
+        const bodyText = isFirst ? 'A' : isLast ? 'B' : `${idx}`;
+        const labelText =
+          point.name || (isFirst ? 'Inicio' : isLast ? 'Destino' : `Parada ${idx}`);
+
+        const existing = draftRouteMarkersRef.current[idx];
+
+        if (existing) {
+          // Reutilizar marcador existente sin reconstruir el DOM ni disparar animaciones
+          existing.marker.setLngLat([point.longitude, point.latitude]);
+          existing.marker.setOpacity('1', '1');
+          existing.marker.setPitchAlignment('viewport');
+          existing.marker.setRotationAlignment('viewport');
+          try {
+            existing.el.style.zIndex = '3000';
+            existing.el.style.opacity = '1';
+            existing.el.style.visibility = 'visible';
+          } catch {}
+          if (existing.role !== role) {
+            existing.el.classList.remove(
+              'draft-pin-origin',
+              'draft-pin-destination',
+              'draft-pin-waypoint',
+            );
+            existing.el.classList.add(`draft-pin-${role}`);
+            existing.role = role;
+          }
+          if (existing.bodyEl.textContent !== bodyText) {
+            existing.bodyEl.textContent = bodyText;
+          }
+          if (existing.pillEl.textContent !== labelText) {
+            existing.pillEl.textContent = labelText;
+          }
+        } else {
+          // Nuevo marcador: solo este nuevo pin anima su entrada
+          const el = document.createElement('div');
+          el.className = `draft-route-pin-wrapper draft-pin-${role}`;
+          el.style.zIndex = '3000';
+          el.style.opacity = '1';
+          el.style.visibility = 'visible';
+
+          // Anillo de pulso para origen y destino
+          const pulse = document.createElement('div');
+          pulse.className = 'draft-route-pulse';
+          el.appendChild(pulse);
+
+          // Cuerpo del pin con letra o número (la animación pop-in se aísla en el cuerpo)
+          const body = document.createElement('div');
+          body.className = 'draft-route-pin-body draft-pin-enter';
+          body.textContent = bodyText;
+          body.addEventListener(
+            'animationend',
+            () => {
+              body.classList.remove('draft-pin-enter');
+            },
+            { once: true },
+          );
+          el.appendChild(body);
+
+          // Etiqueta flotante con nombre o rol
+          const pill = document.createElement('div');
+          pill.className = 'draft-route-label-pill';
+          pill.textContent = labelText;
+          el.appendChild(pill);
+
+          // pitchAlignment y rotationAlignment en 'viewport' para mantenerse siempre visibles en 3D
+          // Opacidad forzada a 1 y opacityWhenCovered a 1 para que NUNCA se oculte bajo el terreno
+          // Anclaje al 'center' para que el pin quede milimétricamente centrado con el centro del clic y la línea 2D
+          const marker = new maplibregl.Marker({
+            element: el,
+            anchor: 'center',
+            pitchAlignment: 'viewport',
+            rotationAlignment: 'viewport',
+            opacity: '1',
+            opacityWhenCovered: '1',
+          })
+            .setLngLat([point.longitude, point.latitude])
+            .addTo(map);
+
+          marker.setOpacity('1', '1');
+          marker.setPitchAlignment('viewport');
+          marker.setRotationAlignment('viewport');
+
+          try {
+            marker.getElement().style.zIndex = '3000';
+            marker.getElement().style.opacity = '1';
+            marker.getElement().style.visibility = 'visible';
+          } catch {}
+
+          draftRouteMarkersRef.current.push({
+            marker,
+            el,
+            bodyEl: body,
+            pillEl: pill,
+            pulseEl: pulse,
+            role,
+          });
+        }
+      });
+    }
+
+    // 2. Coordenadas de la línea 2D procedural sobre el suelo
+    let lineCoords: [number, number][] = [];
+    if (isRoutingActive && draftRoutePoints.length >= 2) {
+      if (
+        navRouteGeojson &&
+        navRouteGeojson.coordinates &&
+        navRouteGeojson.coordinates.length >= 2
+      ) {
+        lineCoords = navRouteGeojson.coordinates as [number, number][];
+      } else {
+        // Trazado procedural instantáneo entre pines antes de respuesta OSRM
+        lineCoords = draftRoutePoints.map((p) => [p.longitude, p.latitude]);
+      }
+    }
+
+    const lineFeatures: GeoJSON.Feature<GeoJSON.LineString>[] =
+      lineCoords.length >= 2
+        ? [
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'LineString',
+                coordinates: lineCoords,
+              },
+              properties: {},
+            },
+          ]
+        : [];
+
+    const lineData: GeoJSON.FeatureCollection<GeoJSON.LineString> = {
+      type: 'FeatureCollection',
+      features: lineFeatures,
+    };
+
+    // 3. Polígono de sector si aplica
+    const isSector = isRoutingActive && routingType === 'sector' && draftRoutePoints.length >= 3;
+    const sectorCoords = isSector
+      ? [
+          [
+            ...draftRoutePoints.map((p) => [p.longitude, p.latitude]),
+            [draftRoutePoints[0].longitude, draftRoutePoints[0].latitude],
+          ],
+        ]
+      : [];
+
+    const sectorFeatures: GeoJSON.Feature<GeoJSON.Polygon>[] =
+      sectorCoords.length >= 1
+        ? [
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'Polygon',
+                coordinates: sectorCoords,
+              },
+              properties: {},
+            },
+          ]
+        : [];
+
+    const sectorData: GeoJSON.FeatureCollection<GeoJSON.Polygon> = {
+      type: 'FeatureCollection',
+      features: sectorFeatures,
+    };
+
+    const syncDraftLayers = () => {
+      // Línea principal
+      const routeSrc = map.getSource(DRAFT_ROUTE_SOURCE) as maplibregl.GeoJSONSource | undefined;
+      if (!routeSrc) {
+        map.addSource(DRAFT_ROUTE_SOURCE, {
+          type: 'geojson',
+          data: lineData,
+        });
+      } else {
+        routeSrc.setData(lineData);
+      }
+
+      // Casing 2D plano sobre la superficie
+      if (!map.getLayer(DRAFT_ROUTE_CASING)) {
+        map.addLayer({
+          id: DRAFT_ROUTE_CASING,
+          type: 'line',
+          source: DRAFT_ROUTE_SOURCE,
+          layout: {
+            'line-cap': 'round',
+            'line-join': 'round',
+          },
+          paint: {
+            'line-color': '#022c22',
+            'line-width': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              10, 8,
+              14, 12,
+              18, 16,
+            ],
+            'line-opacity': 0.9,
+          },
+        });
+      }
+
+      // Línea core esmeralda neón 2D de alta visibilidad sobre la superficie
+      if (!map.getLayer(DRAFT_ROUTE_CORE)) {
+        map.addLayer({
+          id: DRAFT_ROUTE_CORE,
+          type: 'line',
+          source: DRAFT_ROUTE_SOURCE,
+          layout: {
+            'line-cap': 'round',
+            'line-join': 'round',
+          },
+          paint: {
+            'line-color': '#00E676',
+            'line-width': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              10, 4.5,
+              14, 7,
+              18, 10,
+            ],
+            'line-opacity': 1.0,
+          },
+        });
+      }
+
+      // Línea de pulso dash blanca para indicar flujo
+      if (!map.getLayer(DRAFT_ROUTE_DASH)) {
+        map.addLayer({
+          id: DRAFT_ROUTE_DASH,
+          type: 'line',
+          source: DRAFT_ROUTE_SOURCE,
+          layout: {
+            'line-cap': 'round',
+            'line-join': 'round',
+          },
+          paint: {
+            'line-color': '#FFFFFF',
+            'line-width': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              10, 2,
+              14, 3.5,
+              18, 5,
+            ],
+            'line-opacity': 0.9,
+            'line-dasharray': [0.5, 3],
+          },
+        });
+      }
+
+      // Flechas direccionales que indican hacia dónde va el camino
+      const addArrowsLayer = () => {
+        if (!mapRef.current || mapRef.current.getLayer(DRAFT_ROUTE_ARROWS)) return;
+        try {
+          mapRef.current.addLayer({
+            id: DRAFT_ROUTE_ARROWS,
+            type: 'symbol',
+            source: DRAFT_ROUTE_SOURCE,
+            layout: {
+              'symbol-placement': 'line',
+              'symbol-spacing': 28,
+              'icon-image': ROUTE_CHEVRON_ID,
+              'icon-size': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                10, 0.5,
+                14, 0.7,
+                18, 0.95,
+              ],
+              'icon-allow-overlap': true,
+              'icon-ignore-placement': true,
+              'icon-keep-upright': false,
+              'icon-pitch-alignment': 'map',
+              'icon-rotation-alignment': 'map',
+            },
+          });
+        } catch (err) {
+          console.warn('[MapLibre] Could not add arrows layer:', err);
+        }
+      };
+
+      if (map.hasImage(ROUTE_CHEVRON_ID)) {
+        addArrowsLayer();
+      } else {
+        ensureRouteChevronImage(map, addArrowsLayer);
+      }
+
+      // Capas de sector poligonal
+      const sectorSrc = map.getSource(DRAFT_SECTOR_SOURCE) as maplibregl.GeoJSONSource | undefined;
+      if (!sectorSrc) {
+        map.addSource(DRAFT_SECTOR_SOURCE, {
+          type: 'geojson',
+          data: sectorData,
+        });
+      } else {
+        sectorSrc.setData(sectorData);
+      }
+
+      if (!map.getLayer(DRAFT_SECTOR_FILL)) {
+        map.addLayer({
+          id: DRAFT_SECTOR_FILL,
+          type: 'fill',
+          source: DRAFT_SECTOR_SOURCE,
+          paint: {
+            'fill-color': '#10B981',
+            'fill-opacity': 0.2,
+          },
+        });
+      }
+
+      if (!map.getLayer(DRAFT_SECTOR_STROKE)) {
+        map.addLayer({
+          id: DRAFT_SECTOR_STROKE,
+          type: 'line',
+          source: DRAFT_SECTOR_SOURCE,
+          layout: {
+            'line-cap': 'round',
+            'line-join': 'round',
+          },
+          paint: {
+            'line-color': '#059669',
+            'line-width': 2.5,
+            'line-dasharray': [2, 2],
+          },
+        });
+      }
+
+      // Re-elevar capas de trazado por encima de cualquier otra capa del mapa
+      try {
+        if (map.getLayer(DRAFT_SECTOR_FILL)) map.moveLayer(DRAFT_SECTOR_FILL);
+        if (map.getLayer(DRAFT_SECTOR_STROKE)) map.moveLayer(DRAFT_SECTOR_STROKE);
+        if (map.getLayer(DRAFT_ROUTE_CASING)) map.moveLayer(DRAFT_ROUTE_CASING);
+        if (map.getLayer(DRAFT_ROUTE_CORE)) map.moveLayer(DRAFT_ROUTE_CORE);
+        if (map.getLayer(DRAFT_ROUTE_DASH)) map.moveLayer(DRAFT_ROUTE_DASH);
+        if (map.getLayer(DRAFT_ROUTE_ARROWS)) map.moveLayer(DRAFT_ROUTE_ARROWS);
+      } catch {}
+    };
+
+    syncDraftRouteRef.current = syncDraftLayers;
+
+    const hasStyle = Boolean(map.getStyle() && map.getStyle().layers);
+    if (hasStyle) {
+      syncDraftLayers();
+    } else {
+      map.once('load', syncDraftLayers);
+    }
+  }, [isRoutingActive, routingType, draftRoutePoints, navRouteGeojson]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Limpieza al desmontar
+  useEffect(() => {
+    return () => {
+      draftRouteMarkersRef.current.forEach((m) => m.marker.remove());
+      draftRouteMarkersRef.current = [];
+    };
+  }, []);
+  // ───────────────────────────────────────────────────────────────────────────
   // ───────────────────────────────────────────────────────────────────────────
 
   // Sync Style (with dynamic maxZoom per layer)
@@ -3142,7 +3269,39 @@ export function MapLibreContainer({
     const selectedStyle = mapLayer === 'satellite' ? getSatelliteStyle(true) : mapStyles[mapLayer];
 
     if (selectedStyle) {
-      map.setStyle(selectedStyle);
+      // diff:false fuerza reconstrucción completa del estilo en vez del
+      // parche incremental por defecto (diff:true). Con diff:true, si
+      // Style.setState() logra aplicar el diff sin lanzar excepción,
+      // maplibre NUNCA emite 'style.load' — solo remueve/agrega capas
+      // en silencio, así que nuestras capas custom (event-polygons-*,
+      // zones-*, waterway) quedan borradas sin que el handler de
+      // 'style.load' llegue a restaurarlas. Eso pasaba de forma
+      // asimétrica según la dirección del cambio (p.ej. satélite → día/
+      // noche perdía los polígonos, día/noche → satélite no, porque ahí
+      // el diff sí lanzaba y caía al fallback de reconstrucción). Forzar
+      // reconstrucción completa siempre garantiza que 'style.load' se
+      // dispare y nuestro handler reponga todo, sin depender de si el
+      // diff interno de maplibre tira o no una excepción para ESTE par
+      // de estilos en particular.
+      map.setStyle(selectedStyle, { diff: false });
+    }
+
+    // Si la capa seleccionada es '3d', animar automáticamente cámara a perspectiva 3D
+    if (mapLayer === '3d') {
+      map.easeTo({ pitch: CAMERA_CONSTRAINTS.pitch3D, bearing: CAMERA_CONSTRAINTS.bearing3D, duration: 1000 });
+      setIs3DActive(true);
+    }
+
+    // Re-sincronizar edificios 3D cuando el estilo esté listo
+    const onStyleReady = () => {
+      if (sync3DBuildingsRef.current) {
+        sync3DBuildingsRef.current();
+      }
+    };
+    if (map.isStyleLoaded()) {
+      onStyleReady();
+    } else {
+      map.once('styledata', onStyleReady);
     }
   }, [mapLayer]);
 
@@ -3152,37 +3311,96 @@ export function MapLibreContainer({
     if (!map) return;
 
     if (selectedEvent) {
-      map.flyTo({
+      if (isUtilityCategory(selectedEvent.category)) {
+        if (!isGtaVRunningRef.current) {
+          isGtaVRunningRef.current = true;
+          executeSmoothPinFocus(
+            map,
+            { latitude: selectedEvent.latitude, longitude: selectedEvent.longitude, heading: 0 },
+            cameraAnimationsEnabled,
+            () => {
+              isGtaVRunningRef.current = false;
+            },
+          );
+        }
+        return;
+      }
+
+      const currentZ = typeof map.getZoom === 'function' ? map.getZoom() : 16;
+      const targetZ = Math.min(19.5, Math.max(currentZ, 16.5));
+      map.easeTo({
         center: [selectedEvent.longitude, selectedEvent.latitude],
-        zoom: Math.max(map.getZoom(), 16),
+        zoom: targetZ,
+        pitch: map.getPitch(),
+        duration: 800,
+        easing: (t: number) => 1 - Math.pow(1 - t, 3),
         essential: true,
       });
     }
-  }, [selectedEvent]);
+  }, [selectedEvent, cameraAnimationsEnabled]);
 
-  // Sync Zoom Level
+  // Sync Zoom Level (protegido contra interrupciones de animaciones cinemáticas activas)
   useEffect(() => {
     const map = mapRef.current;
     if (map && zoom !== undefined) {
-      if (Math.round(map.getZoom()) !== zoom) {
+      if (!map.isMoving() && Math.round(map.getZoom()) !== zoom) {
         map.setZoom(zoom);
       }
     }
   }, [zoom]);
 
-  // Center on User Location
+  // Center on User Location con soporte cinematográfico GTA V.
+  // `centerTrigger` es un contador que solo sube (nunca vuelve a 0) — sin
+  // este guard, como `userLocation` también está en el dep array, CUALQUIER
+  // actualización de geolocalización (watchPosition, incluido jitter de GPS
+  // sin que el usuario se mueva) volvía a disparar el flythrough completo,
+  // no solo el tap real en "centrar en mí".
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
-    if (centerTrigger && userLocation) {
-      map.flyTo({
-        center: [userLocation.longitude, userLocation.latitude],
-        zoom: 14,
-        essential: true,
-      });
+    if (centerTrigger !== lastCenterTriggerRef.current && centerTrigger && userLocation) {
+      lastCenterTriggerRef.current = centerTrigger;
+      if (cameraAnimationsEnabled) {
+        executeMapLibreGtaVSpawn(map, userLocation, true);
+      } else {
+        map.flyTo({
+          center: [userLocation.longitude, userLocation.latitude],
+          zoom: 15.5,
+          pitch: 0,
+          essential: true,
+        });
+      }
     }
-  }, [centerTrigger, userLocation]);
+  }, [centerTrigger, userLocation, cameraAnimationsEnabled]);
+
+  // ── Motor de Animaciones y Efectos de Cámara GTA V ────────────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReadyRef.current) return;
+
+    if (isAuthenticated) {
+      // Caso 1: Usuario autenticado al ingresar al mapa o tras iniciar sesión
+      if (!hasSpawnedRef.current && userLocation) {
+        hasSpawnedRef.current = true;
+        prevAuthRef.current = true;
+        const alreadySpawned = hasCameraSpawnedInSession();
+        executeMapLibreGtaVSpawn(map, userLocation, !alreadySpawned && cameraAnimationsEnabled);
+        markCameraSpawnedInSession();
+      }
+    } else {
+      // Caso 2: Logout (cambió de true a false)
+      if (prevAuthRef.current === true) {
+        hasSpawnedRef.current = false;
+        prevAuthRef.current = false;
+        resetCameraSpawnInSession();
+        executeMapLibreGtaVLogout(map, cameraAnimationsEnabled);
+      } else if (prevAuthRef.current === undefined) {
+        // Caso 3: Usuario no logueado por default (normal city center)
+        prevAuthRef.current = false;
+      }
+    }
+  }, [isAuthenticated, userLocation, cameraAnimationsEnabled]);
 
   // Cursor manager (Tactical Mode & Pincho Tool)
   useEffect(() => {
@@ -3307,6 +3525,87 @@ export function MapLibreContainer({
       <div ref={mapNodeRef} style={{ width: '100%', height: '100%' }}>
         <CloudShadows />
       </div>
+
+      {/* Botón flotante para alternar entre vista 2D y perspectiva 3D inclinada */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 80,
+          right: 14,
+          zIndex: 10,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+        }}
+      >
+        {!lightweightMode && <button
+          onClick={() => {
+            const map = mapRef.current;
+            if (!map) return;
+            const currentPitch = map.getPitch();
+            if (currentPitch > 20) {
+              map.easeTo({ pitch: 0, duration: 800 });
+              setIs3DActive(false);
+            } else {
+              map.easeTo({ pitch: CAMERA_CONSTRAINTS.pitch3D, bearing: CAMERA_CONSTRAINTS.bearing3D, duration: 1000 });
+              setIs3DActive(true);
+            }
+          }}
+          title={is3DActive ? 'Cambiar a vista 2D' : 'Ver edificios en 3D'}
+          style={{
+            width: '42px',
+            height: '42px',
+            borderRadius: '12px',
+            background: is3DActive ? 'rgba(52, 211, 153, 0.95)' : 'rgba(15, 23, 42, 0.85)',
+            color: is3DActive ? '#0F172A' : '#34D399',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            fontWeight: 'bold',
+            fontSize: '13px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backdropFilter: 'blur(8px)',
+            transition: 'all 0.2s ease',
+          }}
+        >
+          {is3DActive ? '2D' : '3D'}
+        </button>}
+        {compassVisible && (
+          <button
+            onClick={() => resetNorthPitch(mapRef.current)}
+            title="Restablecer norte"
+            aria-label="Restablecer norte"
+            style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '14px',
+              background: 'rgba(15, 23, 42, 0.85)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backdropFilter: 'blur(8px)',
+              marginLeft: '-3px',
+            }}
+          >
+            <div ref={compassNeedleRef} style={{
+                width: '22px',
+                height: '22px',
+                transform: `rotate(${-(mapRef.current?.getBearing() ?? 0)}deg)`,
+              }}>
+              <svg viewBox="0 0 24 24" width="22" height="22">
+                <polygon points="12,2 16,12 8,12" fill="#F87171" />
+                <polygon points="12,22 16,12 8,12" fill="#E2E8F0" />
+              </svg>
+            </div>
+          </button>
+        )}
+      </div>
+
       {selectedEvent?.indoorMap && internalFloor !== null && (
         <FloorSelector
           floors={selectedEvent.indoorMap.floors}

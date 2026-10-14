@@ -1,5 +1,23 @@
 // ─── SVG Icon Configuration ─────────────────────────────────────────────
-export const SVG_ICON_PATHS: Record<string, string> = {
+
+/**
+ * Un glyph puede declararse como:
+ *  - `string`: un único path relleno (formato clásico Material).
+ *  - `{ paths, mode }`: varios subpaths, con relleno o trazo.
+ *
+ * Los glyphs en modo `stroke` están pensados para líneas limpias a 14–16px,
+ * donde un icono Material detallado se convierte en una mancha.
+ */
+export type IconGlyph =
+  | string
+  | {
+      paths: string[];
+      mode?: 'fill' | 'stroke';
+      strokeWidth?: number;
+      fillRule?: 'evenodd' | 'nonzero';
+    };
+
+export const SVG_ICON_PATHS: Record<string, IconGlyph> = {
   // Viñetas
   videocam:
     'M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z',
@@ -28,7 +46,7 @@ export const SVG_ICON_PATHS: Record<string, string> = {
     'M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5v-9.03C11.34 12.84 13 11.12 13 9V2h-2v7zm4-3v7h3v10h2V2h-5c0 2.21 1.79 4 4 4z',
   park: 'M17 12h2L12 2 5 12h2v7H5v2h14v-2h-2v-7zm-5-7.8L16.2 11H7.8L12 4.2zM9 14h6v5H9v-5z',
   'sports-soccer':
-    'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8t3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-13c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5z',
+    'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-13c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5z',
   groups:
     'M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z',
   'car-crash':
@@ -49,8 +67,111 @@ export const SVG_ICON_PATHS: Record<string, string> = {
     'M20 4H4v2h16V4zm1 10v-2l-1-5H4l-1 5v2c0 .83.67 1.5 1.5 1.5h13c.83 0 1.5-.67 1.5-1.5zm-14 3h10v4H7v-4z',
   place:
     'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z',
+  'directions-walk':
+    'M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7z',
+  'fitness-center':
+    'M20.57 14.86L22 13.43 20.57 12 17 15.57 8.43 7 12 3.43 10.57 2 9.14 3.43 7.71 2 5.57 4.14 4.14 2.71 2.71 4.14l1.43 1.43L2 7.71l1.43 1.43L2 10.57 3.43 12 7 8.43 15.57 17 12 20.57 13.43 22l1.43-1.43 1.43 1.43 2.14-2.14 1.43 1.43 1.43-1.43-1.43-1.43L22 16.29l-1.43-1.43z',
   'push-pin':
     'M16 9V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1.03 1 1.03-1v-7H19v-2c-1.66 0-3-1.34-3-3z',
+
+  // ─── Glyphs simplificados para lectura a 14–16px ──────────────────────
+  // Material a este tamaño se empasta; estos son trazos/siluetas limpias.
+  school: {
+    paths: [
+      'M12 3 1 8.5l11 5.5 11-5.5z',
+      'M5 12.2v3.3c0 1.9 3.1 3.5 7 3.5s7-1.6 7-3.5v-3.3l-7 3.5z',
+    ],
+  },
+  water: {
+    paths: [
+      'M2 7.6q2.5-2.7 5 0t5 0 5 0 5 0',
+      'M2 12.6q2.5-2.7 5 0t5 0 5 0 5 0',
+      'M2 17.6q2.5-2.7 5 0t5 0 5 0 5 0',
+    ],
+    mode: 'stroke',
+    strokeWidth: 2,
+  },
+  'water-waves': {
+    paths: [
+      'M2 7.6q2.5-2.7 5 0t5 0 5 0 5 0',
+      'M2 12.6q2.5-2.7 5 0t5 0 5 0 5 0',
+      'M2 17.6q2.5-2.7 5 0t5 0 5 0 5 0',
+    ],
+    mode: 'stroke',
+    strokeWidth: 2,
+  },
+  forest: {
+    paths: [
+      'M8 2.6 3.4 11.2h9.2z',
+      'M8 7.4 2.4 17.2h11.2z',
+      'M7 16.4h2V21H7z',
+      'M16.6 5.6 12.8 13h7.6z',
+      'M16.6 9.8 11.8 19h9.6z',
+      'M15.6 18.2h2V21h-2z',
+    ],
+  },
+  'location-city': {
+    paths: [
+      'M3 21h7.4V10.4H3z',
+      'M12.2 21H21V3h-8.8z',
+      'M4.8 12.6h1.9v1.9H4.8z',
+      'M7.7 12.6h1.9v1.9H7.7z',
+      'M14.2 6.2h2v2h-2z',
+      'M17.4 6.2h2v2h-2z',
+      'M14.2 10.4h2v2h-2z',
+      'M17.4 10.4h2v2h-2z',
+    ],
+  },
+  'shopping-cart': {
+    paths: [
+      'M4 8h16l-1.8 10.4a1.2 1.2 0 0 1-1.2 1H7a1.2 1.2 0 0 1-1.2-1z',
+      'M8.4 8a3.6 3.6 0 0 1 7.2 0h-2a1.6 1.6 0 0 0-3.2 0z',
+    ],
+  },
+  palette: {
+    paths: [
+      'M12 3a9 9 0 0 0 0 18c1.05 0 1.9-.85 1.9-1.9 0-.5-.2-.94-.51-1.27a1.8 1.8 0 0 1 1.31-3.03H16a5 5 0 0 0 5-5C21 6.1 16.97 3 12 3z',
+      'M6.9 11.3a1.45 1.45 0 1 0 0-2.9 1.45 1.45 0 0 0 0 2.9z',
+      'M10.1 7.7a1.45 1.45 0 1 0 0-2.9 1.45 1.45 0 0 0 0 2.9z',
+      'M14.5 7.7a1.45 1.45 0 1 0 0-2.9 1.45 1.45 0 0 0 0 2.9z',
+      'M17.5 11.3a1.45 1.45 0 1 0 0-2.9 1.45 1.45 0 0 0 0 2.9z',
+    ],
+    fillRule: 'evenodd',
+  },
+  castle: {
+    paths: [
+      'M4 21V8.6h2.3V6.1h2.4v2.5h2.1V6.1h2.4v2.5h2.1V6.1h2.4v2.5H20V21h-5.9v-4.4a2.1 2.1 0 0 0-4.2 0V21z',
+    ],
+  },
+  public: {
+    paths: [
+      'M12 3.1a2.1 2.1 0 1 1 0 4.2 2.1 2.1 0 0 1 0-4.2z',
+      'M9.3 8.5h5.4l1.3 5.9h-2l.5 6.5H9.5l.5-6.5H8z',
+    ],
+  },
+  'art-track': {
+    paths: [
+      'M12 3.1a2.1 2.1 0 1 1 0 4.2 2.1 2.1 0 0 1 0-4.2z',
+      'M9.3 8.5h5.4l1.3 5.9h-2l.5 6.5H9.5l.5-6.5H8z',
+    ],
+  },
+  'local-hospital': {
+    paths: ['M9.9 3h4.2v6.9H21v4.2h-6.9V21H9.9v-6.9H3V9.9h6.9z'],
+  },
+  'health-and-safety': {
+    paths: [
+      'M12 2 4 5v6.5c0 4.7 3.4 9.1 8 10.5 4.6-1.4 8-5.8 8-10.5V5zM11 7h2v3h3v2h-3v3h-2v-3H8v-2h3z',
+    ],
+    fillRule: 'evenodd',
+  },
+  'local-police': {
+    paths: [
+      'M12 2 4 5v6.2c0 4.9 3.4 9.4 8 10.6 4.6-1.2 8-5.7 8-10.6V5zM12 7.1l1.32 2.72 3 .42-2.18 2.1.52 2.98L12 13.92 9.34 15.32l.52-2.98-2.18-2.1 3-.42z',
+    ],
+    fillRule: 'evenodd',
+  },
+  'fire-extinguisher':
+    'M19.48 12.35c-1.57-4.08-7.16-6.7-5.81-11.75-.1.08-.2.15-.3.23-3.61 2.96-4.38 7.63-1.42 10.66 2.44 2.5 2.16 6.47-.4 8.68-1.32-1.14-1.85-2.76-1.59-4.31-1.02 1.11-2.34 2.28-2.28 4.29.04.81.39 1.59.97 2.15C10.74 24.38 15.82 24 18.29 20.86c2.28-2.9 2.76-5.41 1.19-8.51z',
 
   // Radial Menu Icons
   info: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z',
@@ -63,21 +184,43 @@ export const SVG_ICON_PATHS: Record<string, string> = {
  * Creates an inline SVG element for a predefined icon.
  */
 export function createSvgIcon(iconName: string, size = 15, color = '#FFFFFF'): SVGElement | null {
-  const pathData = SVG_ICON_PATHS[iconName];
-  if (!pathData) return null;
+  const glyph = SVG_ICON_PATHS[iconName];
+  if (!glyph) return null;
+
+  const spec =
+    typeof glyph === 'string'
+      ? { paths: [glyph], mode: 'fill' as const, strokeWidth: 2, fillRule: undefined }
+      : {
+          paths: glyph.paths,
+          mode: glyph.mode || ('fill' as const),
+          strokeWidth: glyph.strokeWidth ?? 2,
+          fillRule: glyph.fillRule,
+        };
 
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 24 24');
   Object.assign(svg.style, {
     width: `${size}px`,
     height: `${size}px`,
-    fill: color,
+    fill: spec.mode === 'stroke' ? 'none' : color,
     flexShrink: '0',
   });
 
-  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  path.setAttribute('d', pathData);
-  svg.appendChild(path);
+  spec.paths.forEach((d) => {
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', d);
+    if (spec.mode === 'stroke') {
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke', color);
+      path.setAttribute('stroke-width', String(spec.strokeWidth));
+      path.setAttribute('stroke-linecap', 'round');
+      path.setAttribute('stroke-linejoin', 'round');
+    } else {
+      path.setAttribute('fill', color);
+      if (spec.fillRule) path.setAttribute('fill-rule', spec.fillRule);
+    }
+    svg.appendChild(path);
+  });
 
   return svg;
 }

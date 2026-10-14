@@ -360,7 +360,7 @@ const styles = StyleSheet.create({
     height: 1,
     ...Platform.select({
       web: {
-        background: 'linear-gradient(90deg, transparent, rgba(110, 231, 183, 0.3), transparent)',
+        backgroundImage: 'linear-gradient(90deg, transparent, rgba(110, 231, 183, 0.3), transparent)',
       } as any,
     }),
   },

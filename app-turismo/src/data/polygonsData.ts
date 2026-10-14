@@ -7,6 +7,7 @@ import hospitalesData from '../../coords/hospitales.json';
 import seguridadData from '../../coords/Camaras_bomberos_pacos_etc.json';
 import estructurasData from '../../coords/estructuras_importantes.json';
 import { getPolygonCenter } from '../utils/locationUtils';
+import { isNatureAreaCategory, simplifyRing } from './natureAreas';
 
 const parseGeoJSON = (data: any, defaultCategory: TurismoEvent['category']): TurismoEvent[] => {
   if (!data || !data.features) return [];
@@ -49,6 +50,13 @@ const parseGeoJSON = (data: any, defaultCategory: TurismoEvent['category']): Tur
       const center = getPolygonCenter(event.polygon);
       event.latitude = center.latitude;
       event.longitude = center.longitude;
+      // La geometría visible de agua/humedal/parque vive en natureAreas.ts;
+      // aquí basta un contorno simplificado (selección / punto-en-polígono).
+      if (isNatureAreaCategory(defaultCategory) && event.polygon.length > 4) {
+        event.polygon = simplifyRing(
+          event.polygon.map((c) => [c.longitude, c.latitude] as [number, number]),
+        ).map(([lng, lat]) => ({ latitude: lat, longitude: lng }));
+      }
     }
 
     return event;
@@ -354,6 +362,29 @@ export const SUBMARINO_VALDIVIA_EVENT: TurismoEvent = {
   organizer: 'Municipalidad de Valdivia',
   time: 'Acceso libre',
   address: 'Ribera, Valdivia',
+};
+
+export const BOTE_FLUVIAL_SUBMARINO_EVENT: TurismoEvent = {
+  id: 'bote-fluvial-submarino',
+  title: 'Bote Fluvial Submarino',
+  description: 'Embarcación turística fluvial que recorre las aguas del Río Valdivia frente al histórico Submarino O\'Brien y la costanera.',
+  latitude: -39.816053,
+  longitude: -73.249850,
+  category: 'embarcacion',
+  organizer: 'Transporte Fluvial Valdivia',
+  time: 'Lunes a Domingo 09:00 - 20:00',
+  openingHours: 'Lu-Do 09:00-20:00',
+  address: 'Río Valdivia, Sector Submarino O\'Brien',
+  boatType: 'turismo',
+  boatSize: 'mediana',
+  boatSpeed: 7,
+  boatHeading: 350,
+  boatPassengers: 18,
+  vineta: {
+    type: 'calificacion',
+    label: 'Fluvial',
+    active: true,
+  },
 };
 
 export const MERCADO_MUNICIPAL_VALDIVIA_EVENT: TurismoEvent = {

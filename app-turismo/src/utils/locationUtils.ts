@@ -76,3 +76,27 @@ export function getZoneCentroid(geojson: any): { latitude: number; longitude: nu
   const points = ring.map(([lng, lat]: [number, number]) => ({ latitude: lat, longitude: lng }));
   return getPolygonCenter(points);
 }
+
+/**
+ * Determina si unas coordenadas [latitude, longitude] se encuentran dentro de un polígono.
+ * Utiliza el algoritmo de Ray-Casting.
+ */
+export function isPointInPolygon(
+  point: { latitude: number; longitude: number },
+  polygon: { latitude: number; longitude: number }[],
+): boolean {
+  if (!polygon || polygon.length < 3) return false;
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].longitude;
+    const yi = polygon[i].latitude;
+    const xj = polygon[j].longitude;
+    const yj = polygon[j].latitude;
+    const intersect =
+      yi > point.latitude !== yj > point.latitude &&
+      point.longitude < ((xj - xi) * (point.latitude - yi)) / (yj - yi) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+

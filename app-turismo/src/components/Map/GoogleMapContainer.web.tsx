@@ -28,6 +28,13 @@ import {
   MAX_WEATHER_ZOOM,
   MAX_RAINVIEWER_ZOOM,
 } from './types';
+import {
+  executeGoogleMapsGtaVSpawn,
+  executeGoogleMapsGtaVLogout,
+  hasCameraSpawnedInSession,
+  markCameraSpawnedInSession,
+  resetCameraSpawnInSession,
+} from './camera/cameraAnimationEngine';
 
 // The maps API key should be stored in environment variables.
 const GOOGLE_MAPS_API_KEY =
@@ -56,12 +63,42 @@ function InnerGoogleMap({
   showWeather,
   weatherType = 'precipitation',
   onSaveLocation,
+  userLocation,
+  isAuthenticated,
+  cameraAnimationsEnabled = true,
 }: MapContainerProps) {
   const status = useApiLoadingStatus();
+  const map = useMap();
+  const prevAuthRef = React.useRef<boolean | undefined>(undefined);
+  const hasSpawnedRef = React.useRef<boolean>(false);
   const [mapCenter, setMapCenter] = useState({
     lat: INITIAL_REGION.latitude,
     lng: INITIAL_REGION.longitude,
   });
+
+  // ── Motor de Animaciones de Cámara GTA V (Google Maps) ────────────────────
+  useEffect(() => {
+    if (!map) return;
+
+    if (isAuthenticated) {
+      if (!hasSpawnedRef.current && userLocation) {
+        hasSpawnedRef.current = true;
+        prevAuthRef.current = true;
+        const alreadySpawned = hasCameraSpawnedInSession();
+        executeGoogleMapsGtaVSpawn(map, userLocation, !alreadySpawned && cameraAnimationsEnabled);
+        markCameraSpawnedInSession();
+      }
+    } else {
+      if (prevAuthRef.current === true) {
+        hasSpawnedRef.current = false;
+        prevAuthRef.current = false;
+        resetCameraSpawnInSession();
+        executeGoogleMapsGtaVLogout(map, cameraAnimationsEnabled);
+      } else if (prevAuthRef.current === undefined) {
+        prevAuthRef.current = false;
+      }
+    }
+  }, [map, isAuthenticated, userLocation, cameraAnimationsEnabled]);
   const [currentBounds, setCurrentBounds] = useState<
     | {
         minLat: number;
@@ -94,8 +131,6 @@ function InnerGoogleMap({
   // Mapping our mapLayer to Google Maps MapTypeId
   const mapTypeId =
     mapLayer === 'satellite' ? 'satellite' : mapLayer === 'terrain' ? 'terrain' : 'roadmap'; // For 'streets' and 'dark'
-
-  const map = useMap();
 
   useEffect(() => {
     if (!map) return;

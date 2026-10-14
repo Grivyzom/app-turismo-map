@@ -1,0 +1,1056 @@
+{
+  "type": "FeatureCollection",
+  "generator": "overpass-valdivia",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "fitness-node-5280290592",
+      "properties": {
+        "@id": "fitness/5280290592",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.228395,
+          -39.8301555
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-5280290603",
+      "properties": {
+        "@id": "fitness/5280290603",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2275846,
+          -39.8343467
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-5287833163",
+      "properties": {
+        "@id": "fitness/5287833163",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2010409,
+          -39.8405939
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-5287949728",
+      "properties": {
+        "@id": "fitness/5287949728",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2403039,
+          -39.8291738
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-5287949748",
+      "properties": {
+        "@id": "fitness/5287949748",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2353616,
+          -39.8289872
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-5288014662",
+      "properties": {
+        "@id": "fitness/5288014662",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2001073,
+          -39.8348341
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-5288206393",
+      "properties": {
+        "@id": "fitness/5288206393",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2066499,
+          -39.8404256
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-5288218882",
+      "properties": {
+        "@id": "fitness/5288218882",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.216413,
+          -39.8482993
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-5288218896",
+      "properties": {
+        "@id": "fitness/5288218896",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2195488,
+          -39.848879
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-5288977935",
+      "properties": {
+        "@id": "fitness/5288977935",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2392216,
+          -39.8329187
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-5514885289",
+      "properties": {
+        "@id": "fitness/5514885289",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2363943,
+          -39.8442599
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-5703337358",
+      "properties": {
+        "@id": "fitness/5703337358",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2399256,
+          -39.8434701
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-7267396824",
+      "properties": {
+        "@id": "fitness/7267396824",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2402291,
+          -39.8363041
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-7314470957",
+      "properties": {
+        "@id": "fitness/7314470957",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2403295,
+          -39.8290509
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-7657362184",
+      "properties": {
+        "@id": "fitness/7657362184",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2195015,
+          -39.8455023
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-7657369885",
+      "properties": {
+        "@id": "fitness/7657369885",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.21935,
+          -39.8455658
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-8703573892",
+      "properties": {
+        "@id": "fitness/8703573892",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2232299,
+          -39.84673
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-8703573893",
+      "properties": {
+        "@id": "fitness/8703573893",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2232668,
+          -39.8467062
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-8833085318",
+      "properties": {
+        "@id": "fitness/8833085318",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2489935,
+          -39.8088979
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-8882151288",
+      "properties": {
+        "@id": "fitness/8882151288",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.222739,
+          -39.8376193
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-9217515276",
+      "properties": {
+        "@id": "fitness/9217515276",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2573933,
+          -39.8152949
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-9294357457",
+      "properties": {
+        "@id": "fitness/9294357457",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2429836,
+          -39.8092759
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-9364783189",
+      "properties": {
+        "@id": "fitness/9364783189",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2099709,
+          -39.8376007
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-10538362857",
+      "properties": {
+        "@id": "fitness/10538362857",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2319739,
+          -39.8186742
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-10815065749",
+      "properties": {
+        "@id": "fitness/10815065749",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.229394,
+          -39.8558075
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-11177904506",
+      "properties": {
+        "@id": "fitness/11177904506",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2157798,
+          -39.8071757
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-11253962509",
+      "properties": {
+        "@id": "fitness/11253962509",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2354927,
+          -39.8199428
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-11331612134",
+      "properties": {
+        "@id": "fitness/11331612134",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2515089,
+          -39.8325824
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-12164786371",
+      "properties": {
+        "@id": "fitness/12164786371",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2245895,
+          -39.8247695
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-12291257047",
+      "properties": {
+        "@id": "fitness/12291257047",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2367665,
+          -39.8155006
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-12463788546",
+      "properties": {
+        "@id": "fitness/12463788546",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2184228,
+          -39.8263112
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-12509667634",
+      "properties": {
+        "@id": "fitness/12509667634",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2112336,
+          -39.8331658
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-12873580023",
+      "properties": {
+        "@id": "fitness/12873580023",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2219434,
+          -39.8501016
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-12926953962",
+      "properties": {
+        "@id": "fitness/12926953962",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2074324,
+          -39.8377709
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-12968677208",
+      "properties": {
+        "@id": "fitness/12968677208",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2370494,
+          -39.8504597
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-12972933769",
+      "properties": {
+        "@id": "fitness/12972933769",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2475043,
+          -39.8210343
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-12998522192",
+      "properties": {
+        "@id": "fitness/12998522192",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2119091,
+          -39.8311075
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-12999652032",
+      "properties": {
+        "@id": "fitness/12999652032",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2056837,
+          -39.8310817
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-13032044574",
+      "properties": {
+        "@id": "fitness/13032044574",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2525443,
+          -39.8517244
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-13076313342",
+      "properties": {
+        "@id": "fitness/13076313342",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2492744,
+          -39.8527515
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-13076579758",
+      "properties": {
+        "@id": "fitness/13076579758",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2480649,
+          -39.8535201
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-13299454067",
+      "properties": {
+        "@id": "fitness/13299454067",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2533851,
+          -39.8497522
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-13683593076",
+      "properties": {
+        "@id": "fitness/13683593076",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2575264,
+          -39.8152354
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-13728590079",
+      "properties": {
+        "@id": "fitness/13728590079",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.227779,
+          -39.8365126
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-13900539051",
+      "properties": {
+        "@id": "fitness/13900539051",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2169717,
+          -39.807115
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-14170158723",
+      "properties": {
+        "@id": "fitness/14170158723",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2406052,
+          -39.8538724
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-node-14173456805",
+      "properties": {
+        "@id": "fitness/14173456805",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2496626,
+          -39.854855
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-way-544432940",
+      "properties": {
+        "@id": "fitness/544432940",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2084397,
+          -39.8027173
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-way-544450151",
+      "properties": {
+        "@id": "fitness/544450151",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2094681,
+          -39.8077721
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "fitness-way-547310304",
+      "properties": {
+        "@id": "fitness/547310304",
+        "name": "Máquinas de Ejercicio",
+        "description": "Punto activo con máquinas de ejercicio al aire libre y calistenia.",
+        "leisure": "fitness_station",
+        "sport": "fitness",
+        "operator": "Municipalidad de Valdivia",
+        "opening_hours": "Acceso libre 24/7",
+        "addr:street": "Espacio público, Valdivia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.2220145,
+          -39.8462114
+        ]
+      }
+    }
+  ]
+}

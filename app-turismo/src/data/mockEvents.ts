@@ -7,8 +7,12 @@ import {
   FERIA_FLUVIAL_EVENT,
   PENDULO_VALDIVIA_EVENT,
   SUBMARINO_VALDIVIA_EVENT,
+  BOTE_FLUVIAL_SUBMARINO_EVENT,
   MERCADO_MUNICIPAL_VALDIVIA_EVENT,
 } from './polygonsData';
+import { FITNESS_EVENTS } from './fitnessData';
+import { MOBILIARIO_EVENTS } from './mobiliarioData';
+import { PARQUE_SPOTS_EVENTS } from './parquesData';
 
 export type CategoryFilter =
   | 'todos'
@@ -52,10 +56,15 @@ export type CategoryFilter =
   | 'accidente'
   | 'calle_cortada'
   | 'edificio'
+  | 'maquina_ejercicio'
+  | 'ejercicio'
   | 'banca'
-  | 'basurero'
+  | 'silla'
   | 'bebedero'
-  | 'bano';
+  | 'bano'
+  | 'basurero'
+  | 'papelera'
+  | 'sendero';
 
 const COMERCIAL_EVENTS: TurismoEvent[] = [
   {
@@ -155,7 +164,11 @@ export const INITIAL_EVENTS: TurismoEvent[] = [
   FERIA_FLUVIAL_EVENT,
   PENDULO_VALDIVIA_EVENT,
   SUBMARINO_VALDIVIA_EVENT,
+  BOTE_FLUVIAL_SUBMARINO_EVENT,
   MERCADO_MUNICIPAL_VALDIVIA_EVENT,
+  ...FITNESS_EVENTS,
+  ...MOBILIARIO_EVENTS,
+  ...PARQUE_SPOTS_EVENTS,
 ];
 
 export const WS_SIMULATION_POOL: Omit<TurismoEvent, 'id' | 'isRealTime'>[] = [];
@@ -205,10 +218,15 @@ export const CATEGORY_ICONS: Record<
   accidente: { name: 'warning', family: 'MaterialIcons' },
   calle_cortada: { name: 'block', family: 'MaterialIcons' },
   edificio: { name: 'business', family: 'MaterialIcons' },
+  maquina_ejercicio: { name: 'fitness-center', family: 'MaterialIcons' },
+  ejercicio: { name: 'fitness-center', family: 'MaterialIcons' },
   banca: { name: 'chair', family: 'MaterialIcons' },
-  basurero: { name: 'delete', family: 'MaterialIcons' },
+  silla: { name: 'chair', family: 'MaterialIcons' },
   bebedero: { name: 'water-drop', family: 'MaterialIcons' },
   bano: { name: 'wc', family: 'MaterialIcons' },
+  basurero: { name: 'delete', family: 'MaterialIcons' },
+  papelera: { name: 'delete', family: 'MaterialIcons' },
+  sendero: { name: 'directions-walk', family: 'MaterialIcons' },
 };
 
 export const MAP_LAYER_OPTIONS: {

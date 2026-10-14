@@ -17,7 +17,20 @@ const MapLibreContainer = lazyWithRetry(() =>
   import('./MapLibreContainer.web').then((m) => ({ default: m.MapLibreContainer })),
 );
 
+const DeckGL3DContainer = lazyWithRetry(() =>
+  import('./DeckGL3DContainer.web').then((m) => ({ default: m.DeckGL3DContainer })),
+);
+
 export function MapContainer(props: MapContainerProps) {
+  // Capa Google 3D Tiles (Malla Topográfica Real con deck.gl)
+  if (props.mapLayer === 'google3d') {
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        <DeckGL3DContainer {...props} />
+      </Suspense>
+    );
+  }
+
   if (MAP_CONFIG.provider === 'google') {
     return (
       <Suspense fallback={<LoadingFallback />}>
@@ -26,7 +39,7 @@ export function MapContainer(props: MapContainerProps) {
     );
   }
 
-  // Fallback a MapLibre (OpenFreeMap, ESRI, OpenTopoMap)
+  // Fallback a MapLibre (OpenFreeMap, ESRI, OpenTopoMap, 3D Extrusions)
   return (
     <Suspense fallback={<LoadingFallback />}>
       <MapLibreContainer {...props} />

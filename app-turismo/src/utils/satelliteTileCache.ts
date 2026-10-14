@@ -264,6 +264,10 @@ export class SatelliteTileCache {
         }
 
         const data = await response.arrayBuffer();
+        if (data.byteLength === 2521) {
+          // ESRI retorna exactamente 2521 bytes ("Map data not yet available") cuando el zoom excede la cobertura nativa
+          throw new Error(`ESRI tile not available at zoom ${z}`);
+        }
         this.cache.set(key, data);
 
         return { data };

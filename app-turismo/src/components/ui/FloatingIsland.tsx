@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
     height: 1,
     ...Platform.select({
       web: {
-        background: 'linear-gradient(90deg, transparent, rgba(110, 231, 183, 0.3), transparent)',
+        backgroundImage: 'linear-gradient(90deg, transparent, rgba(110, 231, 183, 0.3), transparent)',
       } as any,
     }),
   },
@@ -564,7 +564,10 @@ const styles = StyleSheet.create({
     flex: 1,
     ...Platform.select({
       web: {
-        animation: 'fadeIn 0.3s ease-out forwards',
+        animationKeyframes: 'fadeIn',
+        animationDuration: '0.3s',
+        animationTimingFunction: 'ease-out',
+        animationFillMode: 'forwards',
         height: '100%',
         overflowY: 'auto',
         overscrollBehavior: 'contain',

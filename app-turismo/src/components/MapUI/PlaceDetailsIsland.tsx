@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, Platfor
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { TurismoEvent } from '../Map/types';
-import { BP_DESKTOP } from '../../../app/(home)/index';
 
 interface PlaceDetailsIslandProps {
   selectedEvent: TurismoEvent | null;
@@ -42,8 +41,8 @@ export function PlaceDetailsIsland({ selectedEvent, slideAnim, onClose, isDeskto
       // @ts-ignore
       onPointerDown={(e) => e.stopPropagation()}
     >
-      <BlurView intensity={Platform.OS === 'ios' ? 70 : 100} tint="dark" style={StyleSheet.absoluteFillObject} />
-      <View style={StyleSheet.absoluteFillObject} style={[{ backgroundColor: 'rgba(15, 23, 42, 0.7)' }, StyleSheet.absoluteFillObject]} />
+      <BlurView intensity={Platform.OS === 'ios' ? 70 : 100} tint="dark" style={StyleSheet.absoluteFill} />
+      <View style={[{ backgroundColor: 'rgba(15, 23, 42, 0.7)' }, StyleSheet.absoluteFill]} />
 
       <View style={styles.header}>
         <View style={styles.headerTitleRow}>

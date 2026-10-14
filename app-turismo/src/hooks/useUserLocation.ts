@@ -342,6 +342,18 @@ export function useUserLocation() {
           }
         };
 
+        // Solicitar permisos de sensores de movimiento si el navegador lo requiere (e.g. iOS Safari)
+        if (
+          typeof window !== 'undefined' &&
+          typeof (window as any).DeviceOrientationEvent?.requestPermission === 'function'
+        ) {
+          try {
+            await (window as any).DeviceOrientationEvent.requestPermission();
+          } catch (err) {
+            console.warn('Permiso de sensores de orientación no concedido o cancelado:', err);
+          }
+        }
+
         // Escuchar tanto absoluto como estándar
         if (typeof window !== 'undefined' && 'ondeviceorientationabsolute' in window) {
           (window as any).addEventListener('deviceorientationabsolute', handleOrientation, true);
@@ -429,7 +441,7 @@ export function useUserLocation() {
         });
       }
     } catch (error) {
-      console.error('Error tracking location & sensors:', error);
+      console.warn('Error tracking location & sensors:', error);
       setLocationError('Ocurrió un error al rastrear la ubicación');
       setIsLoadingLocation(false);
     }
@@ -448,7 +460,9 @@ export function useUserLocation() {
       // Limpieza de subscripciones
       if (positionSub.current) {
         if (Platform.OS === 'web') {
-          navigator.geolocation.clearWatch(positionSub.current);
+          if (typeof navigator !== 'undefined' && navigator.geolocation) {
+            navigator.geolocation.clearWatch(positionSub.current);
+          }
         } else {
           positionSub.current.remove();
         }

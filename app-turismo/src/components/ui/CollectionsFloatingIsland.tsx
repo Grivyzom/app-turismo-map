@@ -23,6 +23,7 @@ import {
   BackendCollection,
   BackendSavedLocation,
 } from '../../utils/collectionsApi';
+import { Collection, CollectionItem } from '../../types/collections';
 
 interface CollectionsFloatingIslandProps {
   visible: boolean;
@@ -100,7 +101,7 @@ export const CollectionsFloatingIsland = React.memo(function CollectionsFloating
         <Pressable style={styles.islandContainer} onPress={(e) => e.stopPropagation()}>
           <View style={styles.emptyStateContainer}>
             <MaterialIcons name="lock-outline" size={48} color={COLORS.textMuted} />
-            <Text style={styles.emptyStateText}>Inicia sesión para ver tus colecciones</Text>
+            <Text style={styles.emptyText}>Inicia sesión para ver tus colecciones</Text>
           </View>
         </Pressable>
       </Pressable>
@@ -201,7 +202,7 @@ const LocationItem = React.memo(function LocationItem({
         <Text style={styles.locationTitle} numberOfLines={1}>
           {location.title}
         </Text>
-        {location.notes && (
+        {!!location.notes && (
           <Text style={styles.locationDesc} numberOfLines={2}>
             {location.notes}
           </Text>
@@ -242,7 +243,7 @@ const CollectionTab = React.memo(function CollectionTab({
   if (collection.id === 'all') {
     return (
       <TouchableOpacity onPress={onPress} style={[styles.tab, isActive && styles.tabActive]}>
-        {collection.icon && (
+        {!!collection.icon && (
           <MaterialIcons
             name={collection.icon as any}
             size={14}
@@ -259,16 +260,17 @@ const CollectionTab = React.memo(function CollectionTab({
 
   return (
     <View
+      // @ts-ignore
       onMouseEnter={() => Platform.OS === 'web' && setShowActions(true)}
+      // @ts-ignore
       onMouseLeave={() => Platform.OS === 'web' && setShowActions(false)}
-      //@ts-ignore
       style={[styles.tabWrapper, isDragging && styles.tabWrapperDragging]}
     >
       <TouchableOpacity onPress={onPress} style={[styles.tab, isActive && styles.tabActive]}>
-        {collection.color && (
+        {!!collection.color && (
           <View style={[styles.tabColorBadge, { backgroundColor: collection.color }]} />
         )}
-        {collection.icon && (
+        {!!collection.icon && (
           <MaterialIcons
             name={collection.icon as any}
             size={14}
@@ -320,7 +322,7 @@ const CollectionItemRow = React.memo(function CollectionItemRow({
         <Text style={styles.itemTitle} numberOfLines={1}>
           {item.title}
         </Text>
-        {item.description && (
+        {!!item.description && (
           <Text style={styles.itemDesc} numberOfLines={1}>
             {item.description}
           </Text>
@@ -615,167 +617,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-
-  overlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  islandContainer: {
-    width: '90%',
-    height: '90%',
-    maxWidth: 1200,
-    borderRadius: 24,
-    backgroundColor: COLORS.bg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    overflow: 'hidden',
-    ...Platform.select({
-      web: {
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
-      } as any,
-    }),
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderColor: COLORS.border,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
-  closeBtn: {
-    padding: 8,
-  },
-  tabsContainer: {
-    flexGrow: 0,
-    borderBottomWidth: 1,
-    borderColor: COLORS.border,
-  },
-  tabsContent: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 8,
-  },
-  tab: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  tabActive: {
-    backgroundColor: COLORS.accentBg,
-    borderColor: COLORS.accent,
-  },
-  tabText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.textMuted,
-  },
-  tabTextActive: {
-    color: COLORS.accent,
-  },
-  tabNewCollection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    backgroundColor: COLORS.accentBg,
-    borderWidth: 1,
-    borderColor: COLORS.accent,
-  },
-  tabNewText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.accent,
-    marginLeft: 4,
-  },
-  contentWrapper: {
-    flex: 1,
-    flexDirection: 'row',
-    overflow: 'hidden',
-  },
-  mapSection: {
-    flex: 1.5,
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  mapPinsContainer: {
-    ...StyleSheet.absoluteFill,
-    pointerEvents: 'box-none',
-  },
-  mapPin: {
-    position: 'absolute',
-    width: 32,
-    height: 32,
-    marginLeft: -16,
-    marginTop: -40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  mapPinInner: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: COLORS.bg,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  mapPinTooltip: {
-    position: 'absolute',
-    top: -32,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    minWidth: 80,
-    maxWidth: 150,
-  },
-  mapPinTooltipText: {
-    fontSize: 11,
-    color: COLORS.text,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  listSection: {
-    flex: 1,
-    borderLeftWidth: 1,
-    borderColor: COLORS.border,
-    overflow: 'hidden',
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  emptyText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: COLORS.textMuted,
-    textAlign: 'center',
-  },
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -819,30 +660,5 @@ const styles = StyleSheet.create({
   },
   itemAction: {
     padding: 8,
-  },
-  footer: {
-    flexDirection: 'row',
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderColor: COLORS.border,
-  },
-  actionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    gap: 6,
-  },
-  actionText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.textMuted,
   },
 });

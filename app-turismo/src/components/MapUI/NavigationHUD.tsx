@@ -6,21 +6,44 @@ import {
   StyleSheet,
   Platform,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { OsrmRoute, formatDistance, formatDuration } from '../../utils/osrmService';
+import {
+  OsrmRoute,
+  TransportMode,
+  formatDistance,
+  formatDuration,
+  getManeuverIcon,
+} from '../../utils/osrmService';
 
 interface NavigationHUDProps {
   route: OsrmRoute;
   destinationName: string;
   destinationColor: string;
+  transportMode?: TransportMode;
+  onChangeTransportMode?: (mode: TransportMode) => void;
+  isLoadingMode?: boolean;
   onCancel: () => void;
 }
+
+const NAV_MODES: Array<{
+  id: TransportMode;
+  label: string;
+  icon: keyof typeof MaterialIcons.glyphMap;
+}> = [
+  { id: 'foot', label: 'A pie', icon: 'directions-walk' },
+  { id: 'bike', label: 'Bicicleta', icon: 'pedal-bike' },
+  { id: 'car', label: 'Auto', icon: 'directions-car' },
+];
 
 export const NavigationHUD: React.FC<NavigationHUDProps> = ({
   route,
   destinationName,
   destinationColor,
+  transportMode = 'foot',
+  onChangeTransportMode,
+  isLoadingMode = false,
   onCancel,
 }) => {
   const [expanded, setExpanded] = useState(false);
@@ -31,18 +54,56 @@ export const NavigationHUD: React.FC<NavigationHUDProps> = ({
   return (
     <View style={styles.container} pointerEvents="box-none">
       <View style={[styles.card, { borderColor: destinationColor + '55' }]}>
-        {/* Header */}
+        {/* Header con destino y badge de precisión */}
         <View style={styles.header}>
           <View style={[styles.dot, { backgroundColor: destinationColor }]} />
-          <Text style={styles.destName} numberOfLines={1}>
-            {destinationName}
-          </Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.destName} numberOfLines={1}>
+              {destinationName}
+            </Text>
+            <View style={styles.badgeRow}>
+              <Text style={styles.badgeText}>
+                {route.label ?? 'Mejor Ruta'}
+                {route.confidence ? ` · ${route.confidence}% precisión` : ''}
+              </Text>
+            </View>
+          </View>
           <TouchableOpacity onPress={onCancel} style={styles.closeBtn} hitSlop={8}>
             <MaterialIcons name="close" size={16} color="#9CA3AF" />
           </TouchableOpacity>
         </View>
 
-        {/* Métricas */}
+        {/* Selector de Modo de Transporte Activo */}
+        {onChangeTransportMode && (
+          <View style={styles.modeSelectorRow}>
+            {NAV_MODES.map((m) => {
+              const isSelected = transportMode === m.id;
+              return (
+                <TouchableOpacity
+                  key={m.id}
+                  style={[styles.modeChip, isSelected && styles.modeChipActive]}
+                  onPress={() => onChangeTransportMode(m.id)}
+                  disabled={isLoadingMode}
+                  activeOpacity={0.8}
+                >
+                  <MaterialIcons
+                    name={m.icon}
+                    size={14}
+                    color={isSelected ? '#0B0F19' : '#9CA3AF'}
+                  />
+                  <Text style={[styles.modeChipText, isSelected && styles.modeChipTextActive]}>
+                    {m.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+            {isLoadingMode && (
+              <ActivityIndicator size="small" color="#00E676" style={{ marginLeft: 4 }} />
+            )}
+          </View>
+        )}
+
+        {/* Métricas de tiempo y distancia */}
         <View style={styles.metrics}>
           <View style={styles.metricItem}>
             <MaterialIcons name="straighten" size={14} color="#34D399" />
@@ -55,29 +116,56 @@ export const NavigationHUD: React.FC<NavigationHUDProps> = ({
           </View>
           <View style={styles.separator} />
           <View style={styles.metricItem}>
-            <MaterialIcons name="directions-walk" size={14} color="#A78BFA" />
-            <Text style={styles.metricValue}>A pie</Text>
+            <MaterialIcons
+              name={
+                transportMode === 'car'
+                  ? 'directions-car'
+                  : transportMode === 'bike'
+                    ? 'pedal-bike'
+                    : 'directions-walk'
+              }
+              size={14}
+              color="#A78BFA"
+            />
+            <Text style={styles.metricValue}>
+              {transportMode === 'car'
+                ? 'En auto'
+                : transportMode === 'bike'
+                  ? 'Ciclovía'
+                  : 'A pie'}
+            </Text>
           </View>
         </View>
 
-        {/* Primer paso */}
+        {/* Primer paso / Maniobra inmediata */}
         {firstStep && (
           <View style={styles.stepBox}>
-            <MaterialIcons name="navigation" size={14} color="#F59E0B" />
-            <Text style={styles.stepText} numberOfLines={2}>
-              {firstStep.instruction}
-            </Text>
+            <MaterialIcons
+              name={(firstStep.iconName as any) || 'navigation'}
+              size={18}
+              color="#F59E0B"
+            />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.stepText} numberOfLines={2}>
+                {firstStep.instruction}
+              </Text>
+              {firstStep.streetName ? (
+                <Text style={styles.stepStreet} numberOfLines={1}>
+                  vía {firstStep.streetName}
+                </Text>
+              ) : null}
+            </View>
             <Text style={styles.stepDist}>{formatDistance(firstStep.distance)}</Text>
           </View>
         )}
 
-        {/* Expandir pasos */}
+        {/* Expandir pasos detallados */}
         <TouchableOpacity
           style={styles.expandBtn}
           onPress={() => setExpanded((v) => !v)}
         >
           <Text style={styles.expandBtnText}>
-            {expanded ? 'Ocultar pasos' : `Ver todos los pasos (${route.steps.length})`}
+            {expanded ? 'Ocultar pasos' : `Ver recorrido paso a paso (${route.steps.length})`}
           </Text>
           <MaterialIcons
             name={expanded ? 'expand-less' : 'expand-more'}
@@ -90,7 +178,13 @@ export const NavigationHUD: React.FC<NavigationHUDProps> = ({
           <ScrollView style={styles.stepsList} showsVerticalScrollIndicator={false}>
             {route.steps.map((step, i) => (
               <View key={i} style={styles.stepRow}>
-                <View style={[styles.stepDot, step.maneuverType === 'arrive' && styles.stepDotArrival]} />
+                <View style={styles.stepIconBox}>
+                  <MaterialIcons
+                    name={(step.iconName as any) || 'straight'}
+                    size={14}
+                    color={step.maneuverType === 'arrive' ? '#EF4444' : '#34D399'}
+                  />
+                </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.stepRowText}>{step.instruction}</Text>
                   {step.distance > 0 && (
@@ -102,10 +196,10 @@ export const NavigationHUD: React.FC<NavigationHUDProps> = ({
           </ScrollView>
         )}
 
-        {/* Llegada */}
+        {/* Llegada al destino */}
         {arrivalStep && !expanded && (
           <View style={styles.arrivalRow}>
-            <MaterialIcons name="flag" size={12} color="#EF4444" />
+            <MaterialIcons name="flag" size={13} color="#EF4444" />
             <Text style={styles.arrivalText}>{arrivalStep.instruction}</Text>
           </View>
         )}
@@ -158,13 +252,55 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   destName: {
-    flex: 1,
     color: '#F9FAFB',
     fontSize: 14,
     fontWeight: '700',
   },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  badgeText: {
+    color: '#00E676',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
   closeBtn: {
     padding: 2,
+  },
+  modeSelectorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  modeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    ...Platform.select({
+      web: { cursor: 'pointer' } as any,
+    }),
+  },
+  modeChipActive: {
+    backgroundColor: '#00E676',
+    borderColor: '#00E676',
+  },
+  modeChipText: {
+    color: '#9CA3AF',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  modeChipTextActive: {
+    color: '#0B0F19',
+    fontWeight: '800',
   },
   metrics: {
     flexDirection: 'row',
@@ -203,11 +339,15 @@ const styles = StyleSheet.create({
     borderLeftColor: '#F59E0B',
   },
   stepText: {
-    flex: 1,
     color: '#FDE68A',
     fontSize: 12,
     fontWeight: '600',
     lineHeight: 16,
+  },
+  stepStreet: {
+    color: '#9CA3AF',
+    fontSize: 10,
+    marginTop: 2,
   },
   stepDist: {
     color: '#9CA3AF',
@@ -238,6 +378,16 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 8,
     marginBottom: 10,
+  },
+  stepIconBox: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+    flexShrink: 0,
   },
   stepDot: {
     width: 6,

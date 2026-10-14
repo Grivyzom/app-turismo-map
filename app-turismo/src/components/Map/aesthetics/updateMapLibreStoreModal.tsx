@@ -1,5 +1,6 @@
 import React from 'react';
 import { createRoot, Root } from 'react-dom/client';
+
 import { MiniModal } from '../Markers/MiniModal';
 import { AuthorityModal } from '../Markers/AuthorityModal';
 import { UniversityModal } from '../Markers/UniversityModal';

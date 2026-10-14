@@ -1,7 +1,22 @@
 require('dotenv').config();
 
+const clerkPublishableKey =
+  process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ||
+  process.env.PUBLIC_CLERK_PUBLISHABLE_KEY ||
+  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ||
+  process.env.CLERK_PUBLISHABLE_KEY ||
+  process.env.VITE_CLERK_PUBLISHABLE_KEY ||
+  '';
+
+if (clerkPublishableKey && !process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY) {
+  process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY = clerkPublishableKey;
+}
+
 module.exports = {
   expo: {
+    extra: {
+      clerkPublishableKey,
+    },
     name: 'app-turismo',
     slug: 'app-turismo',
     version: '1.0.0',
@@ -48,6 +63,8 @@ module.exports = {
     },
     plugins: [
       'expo-router',
+      'expo-secure-store',
+      '@clerk/expo',
       [
         '@react-native-google-signin/google-signin',
         {
