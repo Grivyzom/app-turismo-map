@@ -63,6 +63,7 @@ import {
 } from './camera/cameraAnimationEngine';
 import { isNoModalCategory } from './design/pinDesignSystem';
 import { NatureAreasLayer } from './NatureAreasLayer';
+import MapLibreDomMap from './MapLibreDomMap';
 import { NATURE_AREA_CATEGORIES, isNatureAreaCategory } from '../../data/natureAreas';
 
 // ─── UserMarkerAnimated ──────────────────────────────────────────────────────
@@ -1570,7 +1571,7 @@ function MapContainerInner({
   );
 }
 
-export const MapContainer = React.memo(MapContainerInner, (prev, next) => {
+const GoogleNativeMapContainer = React.memo(MapContainerInner, (prev, next) => {
   // Si el mapa estaba congelado y sigue congelado, evitar completamente el renderizado
   if (prev.isFrozen && next.isFrozen) {
     return true;
@@ -1607,6 +1608,45 @@ export const MapContainer = React.memo(MapContainerInner, (prev, next) => {
     prev.onRateRoute === next.onRateRoute
   );
 });
+
+// MapLibre en un WebView (Expo DOM component): reutiliza el mapa web y sus pines.
+// Mientras la pestaña está congelada no se reenvían props al WebView.
+const OpenSourceMapContainer = React.memo(
+  function OpenSourceMapContainer(props: MapContainerProps) {
+    return (
+      <MapLibreDomMap
+        {...props}
+        dom={{
+          style: { flex: 1 },
+          scrollEnabled: false,
+          bounces: false,
+        }}
+      />
+    );
+  },
+  (prev, next) => {
+    if (prev.isFrozen && next.isFrozen) return true;
+    const keys = new Set([...Object.keys(prev), ...Object.keys(next)]) as Set<
+      keyof MapContainerProps
+    >;
+    for (const key of keys) {
+      if (prev[key] !== next[key]) return false;
+    }
+    return true;
+  },
+);
+
+/**
+ * Por defecto el móvil usa MapLibre + OpenStreetMap (igual que la web).
+ * Con MAP_CONFIG.provider === 'google' vuelve al mapa nativo de react-native-maps.
+ */
+export function MapContainer(props: MapContainerProps) {
+  return MAP_CONFIG.provider === 'google' ? (
+    <GoogleNativeMapContainer {...props} />
+  ) : (
+    <OpenSourceMapContainer {...props} />
+  );
+}
 const styles = StyleSheet.create({
   container: {
     flex: 1,

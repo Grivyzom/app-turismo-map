@@ -300,6 +300,9 @@ export interface MapContainerProps {
   // Disclosure progresiva: building 3D clickeado revela sus pines anidados
   activeBuildingId?: number | null;
   onBuildingSelect?: (id: number | null) => void;
+
+  /** Distancia desde arriba para los botones 2D/3D y brújula (MapLibre). Por defecto 80. */
+  controlsTopOffset?: number;
 }
 
 export interface Cluster {

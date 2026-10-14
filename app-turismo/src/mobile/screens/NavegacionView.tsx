@@ -110,6 +110,7 @@ export function NavegacionView({ active }: { active: ActiveRoute }) {
         centerTrigger={centerTrigger}
         isFrozen={tab !== 'rutas'}
         mapDisplayMode="turismo"
+        controlsTopOffset={insets.top + 110}
       />
 
       {/* Instrucción */}
