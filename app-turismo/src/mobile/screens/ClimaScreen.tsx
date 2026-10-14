@@ -1,6 +1,7 @@
 import React from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 import { useMobileApp } from '../MobileAppContext';
 import { Screen } from '../components/Screen';
@@ -96,7 +97,7 @@ export function ClimaScreen() {
       {/* Métricas */}
       <View style={styles.metrics}>
         <Metric
-          icon="flag-outline"
+          icon="wind"
           title="Viento"
           value={`${weather.windSpeed}`}
           sub={`km/h · ${weather.windDirLabel}`}
@@ -263,7 +264,7 @@ function Metric({
   value,
   sub,
 }: {
-  icon: IoniconName;
+  icon: IoniconName | 'wind';
   title: string;
   value: string;
   sub: string;
@@ -271,7 +272,11 @@ function Metric({
   const colors = useColors();
   return (
     <Card style={{ flex: 1, paddingHorizontal: 12 }}>
-      <Ionicons name={icon} size={18} color={colors.text} />
+      {icon === 'wind' ? (
+        <MaterialCommunityIcons name="weather-windy" size={20} color={colors.text} />
+      ) : (
+        <Ionicons name={icon} size={18} color={colors.text} />
+      )}
       <T variant="caption" color={colors.textSecondary} style={{ marginTop: 8 }}>
         {title}
       </T>
