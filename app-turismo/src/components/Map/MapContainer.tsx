@@ -62,6 +62,8 @@ import {
   resetCameraSpawnInSession,
 } from './camera/cameraAnimationEngine';
 import { isNoModalCategory } from './design/pinDesignSystem';
+import { NatureAreasLayer } from './NatureAreasLayer';
+import { NATURE_AREA_CATEGORIES, isNatureAreaCategory } from '../../data/natureAreas';
 
 // ─── UserMarkerAnimated ──────────────────────────────────────────────────────
 const UserMarkerAnimated = React.memo(
@@ -818,6 +820,24 @@ function MapContainerInner({
 
   const clusteredItems = useSuperclusterEvents(events, currentZoom, currentBounds);
 
+  // Categorías naturales activas por filtros; string para que la capa memoizada
+  // no se re-renderice si el set no cambia.
+  const natureCategoriesKey = React.useMemo(() => {
+    const present = new Set<string>();
+    for (const e of events) {
+      if (isNatureAreaCategory(e.category)) present.add(e.category);
+    }
+    return NATURE_AREA_CATEGORIES.filter((c) => present.has(c)).join(',');
+  }, [events]);
+
+  const handlePressNatureArea = useCallback(
+    (id: string) => {
+      const event = events.find((e) => e.id === id);
+      if (event) handleSelectEvent(event);
+    },
+    [events, handleSelectEvent],
+  );
+
   const handleClusterPress = useCallback(
     (cluster: Cluster) => {
       const maxPossibleZoom = MAX_ZOOM_PER_LAYER[mapLayer] || 18;
@@ -1097,22 +1117,15 @@ function MapContainerInner({
           </Marker>
         )}
 
-        {events
-          .filter(
-            (e) => e.polygon && e.polygon.length > 0 && ['agua', 'humedal'].includes(e.category),
-          )
-          .map((event) => (
-            <Polygon
-              key={`poly-${event.id}`}
-              coordinates={event.polygon!}
-              fillColor={`${getCategoryColor(event.category, event.musicStyle)}${
-                event.category === 'humedal' ? '60' : '40'
-              }`}
-              strokeColor={event.category === 'humedal' ? getCategoryColor(event.category) : 'transparent'}
-              strokeWidth={event.category === 'humedal' ? 1.5 : 0}
-              onPress={() => handleSelectEvent(event)}
-            />
-          ))}
+        {/* Contexto natural (agua/humedal/parque): capa de fondo memoizada */}
+        <NatureAreasLayer
+          categoriesKey={natureCategoriesKey}
+          zoom={currentZoom}
+          bounds={currentBounds}
+          highlightId={selectedEvent?.id ?? localLoboMarinoId}
+          mapLayer={mapLayer}
+          onPressArea={handlePressNatureArea}
+        />
 
         {clusteredItems.map((item) => {
           if ('isCluster' in item && item.isCluster) {
@@ -1132,7 +1145,7 @@ function MapContainerInner({
 
             return (
               <React.Fragment key={event.id}>
-                {isSelected && (
+                {isSelected && !isNatureAreaCategory(event.category) && (
                   <Polygon
                     coordinates={event.polygon}
                     fillColor={`${getCategoryColor(event.category, event.musicStyle)}40`}
