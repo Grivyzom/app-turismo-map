@@ -37,6 +37,21 @@ export function getBeforeBridgesOrBuildingLayerId(map: any): string | undefined 
   return getBeforeRoadsOrLabelsLayerId(map);
 }
 
+// Las áreas naturales (agua/humedal/parque) son fondo: van por debajo de
+// túneles, calles, puentes y edificios para que la red vial siga leyéndose
+// encima del tinte. Estilos liberty/CARTO comparten estos prefijos.
+const ROAD_LIKE_LAYER = /^(tunnel|road|highway|transportation|bridge|aeroway|building)/;
+
+export function getBeforeRoadsLayerId(map: any): string | undefined {
+  const style = map.getStyle();
+  if (!style || !style.layers) return undefined;
+  const roadLayer = style.layers.find(
+    (l: any) => typeof l.id === 'string' && ROAD_LIKE_LAYER.test(l.id),
+  );
+  if (roadLayer) return roadLayer.id;
+  return getBeforeBridgesOrBuildingLayerId(map);
+}
+
 export function updateMarkerDomRefs(markerObj: any) {
   const { pinEl, flatEl } = markerObj;
   if (!pinEl) return;

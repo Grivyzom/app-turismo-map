@@ -52,8 +52,21 @@ import { CAMERA_CONSTRAINTS, applyCameraGate, resetNorthPitch } from './utils/ca
 import {
   getBeforeBridgesOrBuildingLayerId,
   getBeforeRoadsOrLabelsLayerId,
+  getBeforeRoadsLayerId,
   updateMarkerDomRefs,
 } from './utils/mapHelpers';
+import {
+  NATURE_AREAS_GEOJSON,
+  NATURE_AREA_CATEGORIES,
+  isNatureAreaCategory,
+} from '../../data/natureAreas';
+import {
+  getNatureAreaPalette,
+  NATURE_AREA_MIN_ZOOM,
+  NATURE_AREA_FADE_ZOOM,
+  NATURE_AREA_FADE_FACTOR,
+  NATURE_AREA_OUTLINE_WIDTH,
+} from './design/natureAreaStyle';
 import { renderBoatFlatMarker, renderBoatMarker } from './markers/render/renderBoatMarkers';
 import { renderFlatMarker } from './markers/render/renderFlatMarker';
 import { renderLoboMarinoMarker } from './markers/render/renderLoboMarinoMarker';
@@ -236,6 +249,11 @@ export function MapLibreContainer({
   const syncCyclewaysRef = useRef<() => void>(() => {});
   const syncClustersRef = useRef<() => void>(() => {});
   const syncEventPolygonsRef = useRef<() => void>(() => {});
+  // Último array `events` subido a 'event-polygons-source': evita re-subir
+  // el GeoJSON en cada pan/zoom/selección cuando los datos no cambiaron.
+  const polygonEventsUploadedRef = useRef<TurismoEvent[] | null>(null);
+  // Firma (tema + resaltado + categorías) aplicada a la capa natural.
+  const natureAreasKeyRef = useRef<string>('');
   const sync3DBuildingsRef = useRef<() => void>(() => {});
   const lastZonePatternPitchTRef = useRef<number>(-1);
   const activeParkIdRef = useRef<string | null>(null);
@@ -1168,18 +1186,17 @@ export function MapLibreContainer({
       }
 
       // ── Comprobar si el clic cayó sobre un parque o zona de reserva ─────────────
-      const polyLayers = [
-        'event-polygons-parque-pattern',
-        'event-polygons-fill',
-        'event-polygons-humedal-pattern',
-        'event-polygons-pattern-fallback',
-      ].filter((l) => map.getLayer(l));
+      const polyLayers = ['event-polygons-fill', 'nature-areas-fill'].filter((l) =>
+        map.getLayer(l),
+      );
 
       let hitPolygonEvent: TurismoEvent | null = null;
       if (polyLayers.length > 0) {
         const polyHits = map.queryRenderedFeatures(e.point, { layers: polyLayers });
-        if (polyHits && polyHits.length > 0) {
-          const fid = polyHits[0].properties?.id;
+        // Agua/humedales sin nombre son sólo contexto visual: no abren nada.
+        const hit = polyHits?.find((f) => f.properties?.interactive !== false);
+        if (hit) {
+          const fid = hit.properties?.id;
           hitPolygonEvent = eventsRef.current.find((ev) => ev.id === fid) ?? null;
         }
       }
@@ -1310,290 +1327,209 @@ export function MapLibreContainer({
     activeParkId,
   );
 
+  // Categorías naturales activas según los filtros (agua/humedal/parque).
+  // Sólo cambia cuando cambian los filtros, no al hacer pan/zoom.
+  const visibleNatureCategories = useMemo(() => {
+    const present = new Set<string>();
+    for (const e of events) {
+      if (isNatureAreaCategory(e.category)) present.add(e.category);
+    }
+    return NATURE_AREA_CATEGORIES.filter((c) => present.has(c));
+  }, [events]);
+
+  // Capa de contexto natural: fuente estática (se sube una sola vez por
+  // estilo) + 2 capas planas. Selección, tema y filtros se resuelven con
+  // setPaintProperty/setFilter, que no re-tilean nada.
+  const syncNatureAreas = (map: MapLibreMap) => {
+    const palette = getNatureAreaPalette(mapLayerRef.current);
+    const highlightId = activeParkIdRef.current ?? selectedEventRef.current?.id ?? '';
+    const isHighlighted = ['==', ['get', 'id'], highlightId];
+    const restOpacity = [
+      'match',
+      ['get', 'category'],
+      'agua',
+      palette.restOpacity.agua,
+      'humedal',
+      palette.restOpacity.humedal,
+      palette.restOpacity.parque,
+    ];
+    const fillColor = [
+      'match',
+      ['get', 'category'],
+      'agua',
+      palette.color.agua,
+      'humedal',
+      palette.color.humedal,
+      palette.color.parque,
+    ];
+    // Fade-in a escala de barrio y atenuación a escala de calle; el área
+    // resaltada se mantiene visible a cualquier zoom.
+    const fillOpacity = [
+      'interpolate',
+      ['linear'],
+      ['zoom'],
+      NATURE_AREA_MIN_ZOOM - 0.5,
+      ['case', isHighlighted, palette.selectedOpacity, 0],
+      NATURE_AREA_MIN_ZOOM + 0.5,
+      ['case', isHighlighted, palette.selectedOpacity, restOpacity],
+      NATURE_AREA_FADE_ZOOM - 1,
+      ['case', isHighlighted, palette.selectedOpacity, restOpacity],
+      NATURE_AREA_FADE_ZOOM + 1,
+      ['case', isHighlighted, palette.selectedOpacity, ['*', restOpacity, NATURE_AREA_FADE_FACTOR]],
+    ];
+    const categoryFilter = ['in', ['get', 'category'], ['literal', visibleNatureCategories]];
+    const outlineFilter = ['==', ['get', 'id'], highlightId];
+
+    if (!map.getSource('nature-areas-source')) {
+      map.addSource('nature-areas-source', {
+        type: 'geojson',
+        data: NATURE_AREAS_GEOJSON as any,
+        // Simplificación por tile algo más agresiva que el default (0.375):
+        // son tintes de fondo, no necesitan precisión sub-píxel.
+        tolerance: 0.75,
+      });
+      const beforeId = getBeforeRoadsLayerId(map);
+      map.addLayer(
+        {
+          id: 'nature-areas-fill',
+          type: 'fill',
+          source: 'nature-areas-source',
+          filter: categoryFilter as any,
+          paint: {
+            'fill-color': fillColor as any,
+            'fill-opacity': fillOpacity as any,
+            'fill-antialias': false,
+          },
+        },
+        beforeId,
+      );
+      map.addLayer(
+        {
+          id: 'nature-areas-outline',
+          type: 'line',
+          source: 'nature-areas-source',
+          filter: outlineFilter as any,
+          layout: { 'line-join': 'round' },
+          paint: {
+            'line-color': fillColor as any,
+            'line-width': NATURE_AREA_OUTLINE_WIDTH,
+            'line-opacity': 0.9,
+          },
+        },
+        beforeId,
+      );
+
+      // Cursor de mano sólo sobre áreas que abren información al tocarlas.
+      if (!(map as any)._nature_bound) {
+        (map as any)._nature_bound = true;
+        map.on('mousemove', 'nature-areas-fill', (e) => {
+          const interactive = e.features?.some((f) => f.properties?.interactive === true);
+          map.getCanvas().style.cursor = interactive ? 'pointer' : '';
+        });
+        map.on('mouseleave', 'nature-areas-fill', () => {
+          map.getCanvas().style.cursor = '';
+        });
+      }
+      natureAreasKeyRef.current = '';
+    }
+
+    const key = `${mapLayerRef.current}|${highlightId}|${visibleNatureCategories.join(',')}`;
+    if (key === natureAreasKeyRef.current) return;
+    natureAreasKeyRef.current = key;
+
+    map.setFilter('nature-areas-fill', categoryFilter as any);
+    map.setFilter('nature-areas-outline', outlineFilter as any);
+    map.setPaintProperty('nature-areas-fill', 'fill-color', fillColor);
+    map.setPaintProperty('nature-areas-fill', 'fill-opacity', fillOpacity);
+    map.setPaintProperty('nature-areas-outline', 'line-color', fillColor);
+  };
+
   const syncEventPolygons = () => {
     const map = mapRef.current;
     if (!map || typeof map.isStyleLoaded !== 'function' || !map.isStyleLoaded()) return;
 
-    if (!map.hasImage('humedal-pattern')) {
-      const isDark = mapLayerRef.current === 'dark';
-      const hWater = isDark ? 'rgba(59,130,246,0.3)' : 'rgba(37,99,235,0.4)';
-      const hReed = isDark ? 'rgba(52,211,153,0.4)' : 'rgba(5,150,105,0.5)';
-      const svgString = `<svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-        <path d="M5 32 Q 10 29 15 32 T 25 32" stroke="${hWater}" fill="none" stroke-width="1.5" stroke-linecap="round"/>
-        <path d="M18 36 Q 23 33 28 36 T 38 36" stroke="${hWater}" fill="none" stroke-width="1.5" stroke-linecap="round"/>
-        <path d="M15 32 Q 13 20 8 15" stroke="${hReed}" fill="none" stroke-width="1.5" stroke-linecap="round"/>
-        <path d="M15 32 L 15 10" stroke="${hReed}" fill="none" stroke-width="1.5" stroke-linecap="round"/>
-        <path d="M15 32 Q 17 20 22 15" stroke="${hReed}" fill="none" stroke-width="1.5" stroke-linecap="round"/>
-        <rect x="13.5" y="12" width="3" height="8" rx="1.5" fill="${hReed}" />
-      </svg>`;
-      const img = new Image(40, 40);
-      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
-      img.onload = () => {
-        if (
-          mapRef.current &&
-          typeof mapRef.current.hasImage === 'function' &&
-          !mapRef.current.hasImage('humedal-pattern')
-        ) {
-          mapRef.current.addImage('humedal-pattern', img);
-          syncEventPolygons();
-        }
-      };
-    }
+    syncNatureAreas(map);
 
-    if (!map.hasImage('parque-pattern')) {
-      const isDark = mapLayerRef.current === 'dark';
-      const pTree = isDark ? 'rgba(52,211,153,0.3)' : 'rgba(16,185,129,0.4)';
-      const pTrunk = isDark ? 'rgba(16,185,129,0.4)' : 'rgba(6,78,59,0.5)';
-      const svgStringParque = `<svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-        <path d="M 10 15 L 15 25 L 5 25 Z" fill="${pTree}"/>
-        <rect x="9" y="25" width="2" height="4" fill="${pTrunk}"/>
-        <path d="M 30 5 L 34 13 L 26 13 Z" fill="${pTree}"/>
-        <rect x="29.5" y="13" width="1" height="3" fill="${pTrunk}"/>
-        <path d="M 22 28 L 26 36 L 18 36 Z" fill="${pTree}"/>
-        <rect x="21.5" y="36" width="1.5" height="3" fill="${pTrunk}"/>
-      </svg>`;
-      const imgParque = new Image(40, 40);
-      imgParque.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStringParque);
-      imgParque.onload = () => {
-        if (
-          mapRef.current &&
-          typeof mapRef.current.hasImage === 'function' &&
-          !mapRef.current.hasImage('parque-pattern')
-        ) {
-          mapRef.current.addImage('parque-pattern', imgParque);
-          syncEventPolygons();
-        }
-      };
-    }
+    const highlightId = activeParkIdRef.current ?? selectedEventRef.current?.id ?? '';
+    const selectedId = selectedEventRef.current?.id ?? '';
 
-    if (!map.hasImage('agua-pattern')) {
-      const isDark = mapLayerRef.current === 'dark';
-      const aWave = isDark ? 'rgba(96,165,250,0.4)' : 'rgba(37,99,235,0.4)';
-      const svgStringAgua = `<svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-        <path d="M 0 10 Q 10 5, 20 10 T 40 10" stroke="${aWave}" fill="none" stroke-width="1.5" stroke-linecap="round"/>
-        <path d="M -10 20 Q 0 15, 10 20 T 30 20 T 50 20" stroke="${aWave}" fill="none" stroke-width="1.5" stroke-linecap="round"/>
-        <path d="M 0 30 Q 10 35, 20 30 T 40 30" stroke="${aWave}" fill="none" stroke-width="1.5" stroke-linecap="round"/>
-      </svg>`;
-      const imgAgua = new Image(40, 40);
-      imgAgua.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStringAgua);
-      imgAgua.onload = () => {
-        if (
-          mapRef.current &&
-          typeof mapRef.current.hasImage === 'function' &&
-          !mapRef.current.hasImage('agua-pattern')
-        ) {
-          mapRef.current.addImage('agua-pattern', imgAgua);
-          syncEventPolygons();
-        }
-      };
-    }
-
-    const polyEvents = events.filter((e) => e.polygon && e.polygon.length > 0);
-    const featureCollection = {
+    // Polígonos de eventos (edificios, universidades, …). Las áreas
+    // naturales viven en su propia capa estática (syncNatureAreas).
+    const buildPolygonEventsCollection = () => ({
       type: 'FeatureCollection',
-      features: polyEvents.map((e) => ({
-        type: 'Feature',
-        properties: {
-          id: e.id,
-          category: e.category,
-          color: getCategoryColor(e.category, e.musicStyle),
-        },
-        geometry: {
-          type: 'Polygon',
-          coordinates: [e.polygon!.map((c) => [c.longitude, c.latitude])],
-        },
-      })),
-    };
+      features: events
+        .filter((e) => e.polygon && e.polygon.length > 0 && !isNatureAreaCategory(e.category))
+        .map((e) => ({
+          type: 'Feature',
+          properties: {
+            id: e.id,
+            category: e.category,
+            color: getCategoryColor(e.category, e.musicStyle),
+          },
+          geometry: {
+            type: 'Polygon',
+            coordinates: [e.polygon!.map((c) => [c.longitude, c.latitude])],
+          },
+        })),
+    });
 
-    if (map.getSource('event-polygons-source')) {
-      (map.getSource('event-polygons-source') as maplibregl.GeoJSONSource).setData(
-        featureCollection as any,
-      );
-      if (map.getLayer('event-polygons-fill')) {
-        map.setPaintProperty('event-polygons-fill', 'fill-opacity', [
-          'match',
-          ['get', 'category'],
-          ['agua', 'humedal', 'parque', 'naturaleza'],
-          0,
-          ['case', ['==', ['get', 'id'], selectedEventRef.current?.id ?? ''], 0.35, 0],
-        ]);
-        map.setPaintProperty('event-polygons-outline', 'line-opacity', [
-          'case',
-          ['==', ['get', 'id'], activeParkIdRef.current ?? selectedEventRef.current?.id ?? ''],
-          0.85,
-          0,
-        ]);
-        map.setPaintProperty('event-polygons-outline', 'line-width', [
-          'case',
-          ['==', ['get', 'id'], activeParkIdRef.current ?? selectedEventRef.current?.id ?? ''],
-          2.5,
-          1,
-        ]);
+    const fillOpacity = ['case', ['==', ['get', 'id'], selectedId], 0.35, 0.01];
+    const outlineOpacity = ['case', ['==', ['get', 'id'], highlightId], 0.85, 0];
+    const outlineWidth = ['case', ['==', ['get', 'id'], highlightId], 2.5, 1];
+
+    const source = map.getSource('event-polygons-source') as maplibregl.GeoJSONSource | undefined;
+    if (source) {
+      if (polygonEventsUploadedRef.current !== events) {
+        polygonEventsUploadedRef.current = events;
+        source.setData(buildPolygonEventsCollection() as any);
       }
-    } else {
-      map.addSource('event-polygons-source', { type: 'geojson', data: featureCollection as any });
-
-      // Bajo puentes y bajo 'building-3d': MapLibre pinta por orden de capas
-      // (painter's algorithm), no por profundidad real, así que un fill 2D
-      // insertado por encima de un puente o de la extrusión de un edificio
-      // siempre se ve, sin importar la geometría real de esas estructuras.
-      const beforeId = getBeforeBridgesOrBuildingLayerId(map);
-
-      // Capa base de relleno
-      map.addLayer(
-        {
-          id: 'event-polygons-fill',
-          type: 'fill',
-          source: 'event-polygons-source',
-          paint: {
-            'fill-color': ['get', 'color'],
-            'fill-opacity': [
-              'match',
-              ['get', 'category'],
-              ['agua', 'humedal', 'parque', 'naturaleza'],
-              0,
-              ['case', ['==', ['get', 'id'], selectedEventRef.current?.id ?? ''], 0.35, 0.01],
-            ],
-          },
-        },
-        beforeId,
-      );
-
-      // Capa específica de patrón para humedales
-      map.addLayer(
-        {
-          id: 'event-polygons-humedal-pattern',
-          type: 'fill',
-          source: 'event-polygons-source',
-          filter: ['==', ['get', 'category'], 'humedal'],
-          paint: {
-            'fill-pattern': 'humedal-pattern',
-            'fill-opacity': 0.9,
-          },
-        },
-        beforeId,
-      );
-
-      // Capa específica de patrón para parques
-      map.addLayer(
-        {
-          id: 'event-polygons-parque-pattern',
-          type: 'fill',
-          source: 'event-polygons-source',
-          filter: ['in', ['get', 'category'], ['literal', ['parque', 'naturaleza']]],
-          paint: {
-            'fill-pattern': 'parque-pattern',
-            'fill-opacity': 0.8,
-          },
-        },
-        beforeId,
-      );
-
-      // Capa específica de patrón para agua
-      map.addLayer(
-        {
-          id: 'event-polygons-agua-pattern',
-          type: 'fill',
-          source: 'event-polygons-source',
-          filter: ['==', ['get', 'category'], 'agua'],
-          paint: {
-            'fill-pattern': 'agua-pattern',
-            'fill-opacity': 0.9,
-          },
-        },
-        beforeId,
-      );
-
-      // Respaldo plano: reemplaza visualmente al fill-pattern cuando el pitch
-      // es alto (ver updateAesthetics/patternPitchT) para evitar el efecto
-      // "cierre" del patrón tileado en perspectiva. Opacidad 0 en reposo.
-      map.addLayer(
-        {
-          id: 'event-polygons-pattern-fallback',
-          type: 'fill',
-          source: 'event-polygons-source',
-          filter: ['in', ['get', 'category'], ['literal', ['agua', 'humedal', 'parque', 'naturaleza']]],
-          paint: {
-            'fill-color': ['get', 'color'],
-            'fill-opacity': 0,
-          },
-        },
-        beforeId,
-      );
-
-      // Borde exterior (solo para eventos seleccionados que no sean agua/humedal)
-      map.addLayer(
-        {
-          id: 'event-polygons-outline',
-          type: 'line',
-          source: 'event-polygons-source',
-          paint: {
-            'line-color': ['get', 'color'],
-            'line-width': [
-              'case',
-              ['==', ['get', 'id'], activeParkIdRef.current ?? selectedEventRef.current?.id ?? ''],
-              2.5,
-              1,
-            ],
-            'line-opacity': [
-              'case',
-              ['==', ['get', 'id'], activeParkIdRef.current ?? selectedEventRef.current?.id ?? ''],
-              0.85,
-              0,
-            ],
-          },
-        },
-        beforeId,
-      );
-
-      const interactivePolyLayers = [
-        'event-polygons-fill',
-        'event-polygons-parque-pattern',
-        'event-polygons-humedal-pattern',
-        'event-polygons-pattern-fallback',
-      ];
-      interactivePolyLayers.forEach((layerId) => {
-        if (map.getLayer(layerId) && !(map as any)[`_poly_bound_${layerId}`]) {
-          (map as any)[`_poly_bound_${layerId}`] = true;
-          map.on('click', layerId, (e) => {
-            if ((e.originalEvent as any)._turismoHandled) return;
-            if (isClickInsideModalOrInput(e)) return;
-            if (!e.features?.length) return;
-            if (isRoutingActiveRef.current && onMapClickForRoutingRef.current) {
-              (e.originalEvent as any)._turismoHandled = true;
-              onMapClickForRoutingRef.current({
-                latitude: e.lngLat.lat,
-                longitude: e.lngLat.lng,
-              });
-              return;
-            }
-            (e.originalEvent as any)._turismoHandled = true;
-            const featureId = e.features[0].properties?.id;
-            if (featureId && onSelectEventRef.current) {
-              const event = eventsRef.current.find((ev) => ev.id === featureId);
-              if (event) {
-                const catLower = event.category?.toLowerCase() || '';
-                if (
-                  catLower === 'parque' ||
-                  catLower === 'reserva' ||
-                  catLower === 'reservas' ||
-                  catLower === 'naturaleza'
-                ) {
-                  activeParkIdRef.current = event.id;
-                }
-                onSelectEventRef.current(event);
-              }
-            }
-          });
-          map.on('mouseenter', layerId, () => {
-            map.getCanvas().style.cursor = 'pointer';
-          });
-          map.on('mouseleave', layerId, () => {
-            map.getCanvas().style.cursor = '';
-          });
-        }
-      });
+      if (map.getLayer('event-polygons-fill')) {
+        map.setPaintProperty('event-polygons-fill', 'fill-opacity', fillOpacity);
+        map.setPaintProperty('event-polygons-outline', 'line-opacity', outlineOpacity);
+        map.setPaintProperty('event-polygons-outline', 'line-width', outlineWidth);
+      }
+      return;
     }
+
+    polygonEventsUploadedRef.current = events;
+    map.addSource('event-polygons-source', {
+      type: 'geojson',
+      data: buildPolygonEventsCollection() as any,
+    });
+
+    // Bajo puentes y bajo 'building-3d': MapLibre pinta por orden de capas
+    // (painter's algorithm), no por profundidad real, así que un fill 2D
+    // insertado por encima de un puente o de la extrusión de un edificio
+    // siempre se ve, sin importar la geometría real de esas estructuras.
+    const beforeId = getBeforeBridgesOrBuildingLayerId(map);
+
+    map.addLayer(
+      {
+        id: 'event-polygons-fill',
+        type: 'fill',
+        source: 'event-polygons-source',
+        paint: {
+          'fill-color': ['get', 'color'],
+          'fill-opacity': fillOpacity as any,
+        },
+      },
+      beforeId,
+    );
+
+    // Borde exterior (sólo para el evento seleccionado)
+    map.addLayer(
+      {
+        id: 'event-polygons-outline',
+        type: 'line',
+        source: 'event-polygons-source',
+        paint: {
+          'line-color': ['get', 'color'],
+          'line-width': outlineWidth as any,
+          'line-opacity': outlineOpacity as any,
+        },
+      },
+      beforeId,
+    );
   };
 
   syncEventPolygonsRef.current = syncEventPolygons;

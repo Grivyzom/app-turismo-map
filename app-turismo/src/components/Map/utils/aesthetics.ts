@@ -57,7 +57,7 @@ export function createAestheticsUpdater(
     const z = map.getZoom();
     const pitch = map.getPitch();
 
-    // Los fill-pattern SVG (humedal/parque/agua/reserva) se tilean en
+    // Los fill-pattern SVG (reservas) se tilean en
     // espacio de textura del tile: con pitch alto la proyección en
     // perspectiva desalinea las costuras del patrón entre tiles
     // ("efecto cierre/zipper"). MapLibre no tiene corrección de
@@ -82,11 +82,7 @@ export function createAestheticsUpdater(
           } catch {}
         }
       };
-      setFade('event-polygons-humedal-pattern', 0.9);
-      setFade('event-polygons-parque-pattern', 0.8);
-      setFade('event-polygons-agua-pattern', 0.9);
       setFade('zones-reserva-pattern', 0.8);
-      setFallback('event-polygons-pattern-fallback', 0.4);
       setFallback('zones-reserva-flat-fallback', 0.35);
     }
 

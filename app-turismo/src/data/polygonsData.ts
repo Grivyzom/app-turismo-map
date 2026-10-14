@@ -7,6 +7,7 @@ import hospitalesData from '../../coords/hospitales.json';
 import seguridadData from '../../coords/Camaras_bomberos_pacos_etc.json';
 import estructurasData from '../../coords/estructuras_importantes.json';
 import { getPolygonCenter } from '../utils/locationUtils';
+import { isNatureAreaCategory, simplifyRing } from './natureAreas';
 
 const parseGeoJSON = (data: any, defaultCategory: TurismoEvent['category']): TurismoEvent[] => {
   if (!data || !data.features) return [];
@@ -49,6 +50,13 @@ const parseGeoJSON = (data: any, defaultCategory: TurismoEvent['category']): Tur
       const center = getPolygonCenter(event.polygon);
       event.latitude = center.latitude;
       event.longitude = center.longitude;
+      // La geometría visible de agua/humedal/parque vive en natureAreas.ts;
+      // aquí basta un contorno simplificado (selección / punto-en-polígono).
+      if (isNatureAreaCategory(defaultCategory) && event.polygon.length > 4) {
+        event.polygon = simplifyRing(
+          event.polygon.map((c) => [c.longitude, c.latitude] as [number, number]),
+        ).map(([lng, lat]) => ({ latitude: lat, longitude: lng }));
+      }
     }
 
     return event;
