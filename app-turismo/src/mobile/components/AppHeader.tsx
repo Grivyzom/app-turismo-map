@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
+import React from 'react';
+import { StyleSheet, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 
@@ -9,128 +9,24 @@ import { MobileRadii } from '../theme';
 
 import { Avatar, Card, T, Tap, useColors } from './ui';
 
-type PrecisionState = 'searching' | 'high' | 'medium' | 'low' | 'denied' | 'manual';
+const BAR_HEIGHT = 56;
+const BADGE_COLOR = '#FF4D4F';
 
-const STATE_COLOR: Record<PrecisionState, string | null> = {
-  searching: null,
-  high: '#2E9E5B',
-  medium: '#E0A126',
-  low: '#D9822B',
-  denied: '#D64545',
-  manual: null,
-};
-
-const STATE_ICON: Record<PrecisionState, IoniconName> = {
-  searching: 'locate-outline',
-  high: 'locate',
-  medium: 'locate',
-  low: 'locate-outline',
-  denied: 'location-outline',
-  manual: 'pin-outline',
-};
-
-const STATE_LABEL: Record<PrecisionState, string> = {
-  searching: 'Buscando tu ubicación',
-  high: 'Precisión alta',
-  medium: 'Precisión media',
-  low: 'Precisión baja',
-  denied: 'Ubicación no disponible',
-  manual: 'Sector elegido a mano',
-};
-
-/** Botón circular con icono de estado, punto de color y animación mientras busca señal. */
-function StatusButton({
-  icon,
-  dotColor,
-  badge,
-  pulsing,
-  slashed,
-  onPress,
-  accessibilityLabel,
-}: {
-  icon: IoniconName;
-  dotColor?: string | null;
-  badge?: boolean;
-  pulsing?: boolean;
-  slashed?: boolean;
-  onPress: () => void;
-  accessibilityLabel: string;
-}) {
-  const colors = useColors();
-  const pulse = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    if (!pulsing) {
-      pulse.setValue(1);
-      return;
-    }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, {
-          toValue: 0.35,
-          duration: 700,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulse, {
-          toValue: 1,
-          duration: 700,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [pulsing, pulse]);
-
-  return (
-    <Tap
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      hitSlop={6}
-      style={[styles.statusBtn, { backgroundColor: colors.surfaceMuted }]}
-    >
-      <Animated.View style={{ opacity: pulse }}>
-        <Ionicons name={icon} size={20} color={slashed ? colors.textSecondary : colors.text} />
-      </Animated.View>
-      {dotColor ? (
-        <View style={[styles.dot, { backgroundColor: dotColor, borderColor: colors.surfaceMuted }]} />
-      ) : null}
-      {badge ? (
-        <View style={[styles.dot, { backgroundColor: colors.text, borderColor: colors.surfaceMuted }]} />
-      ) : null}
-    </Tap>
-  );
+/** "Sector Collico" → "Collico": la etiqueta superior ya dice "Sector". */
+function placeName(sectorName: string) {
+  return sectorName.replace(/^sector\s+/i, '') || sectorName;
 }
 
-/** Barra superior compartida: [perfil] — [sector] — [precisión] [avisos]. */
+/**
+ * Barra superior compartida (56px): [perfil + sector] ········ [avisos].
+ * El control de GPS vive en el mapa (ver GpsButton), no aquí.
+ *
+ * Nota: el layout de cada botón va en un View interno porque NativeWind puede
+ * descartar el `style` del Pressable en Android.
+ */
 export function AppHeader({ hasNotifications = true }: { hasNotifications?: boolean }) {
-  const {
-    prefs,
-    sectorName,
-    setSectorPickerOpen,
-    setTab,
-    recenter,
-    hasGps,
-    gpsAccuracy,
-    gpsLoading,
-    gpsError,
-    usingSectorOverride,
-  } = useMobileApp();
+  const { prefs, sectorName, setSectorPickerOpen, setTab } = useMobileApp();
   const colors = useColors();
-
-  let state: PrecisionState;
-  if (usingSectorOverride) state = 'manual';
-  else if (prefs.locationUse === 'nunca' || (gpsError && !hasGps)) state = 'denied';
-  else if (!hasGps || (gpsLoading && gpsAccuracy === null)) state = 'searching';
-  else if (gpsAccuracy === null || gpsAccuracy <= 30) state = 'high';
-  else if (gpsAccuracy <= 100) state = 'medium';
-  else state = 'low';
-
-  const meters = state === 'high' || state === 'medium' || state === 'low' ? gpsAccuracy : null;
-  const precisionLabel = `${STATE_LABEL[state]}${meters !== null ? ` (±${Math.round(meters)} m)` : ''}. Toca para recentrar`;
 
   const notifOff = !Object.entries(prefs.notifications).some(
     ([key, value]) => key !== 'quietFrom' && value === true,
@@ -140,53 +36,61 @@ export function AppHeader({ hasNotifications = true }: { hasNotifications?: bool
     : hasNotifications
       ? 'notifications'
       : 'notifications-outline';
+  const showBadge = hasNotifications && !notifOff;
 
   return (
     <Card style={styles.bar}>
-      <Pressable
-        onPress={() => setTab('perfil')}
-        accessibilityRole="button"
-        accessibilityLabel="Abrir mi perfil"
-        hitSlop={6}
-      >
-        <Avatar name={prefs.nick || 'Visitante'} uri={prefs.photoUri} />
-      </Pressable>
+      <View style={styles.left}>
+        <Tap
+          onPress={() => setTab('perfil')}
+          accessibilityRole="button"
+          accessibilityLabel="Abrir mi perfil"
+          hitSlop={6}
+        >
+          <Avatar name={prefs.nick || 'Visitante'} uri={prefs.photoUri} size={40} />
+        </Tap>
+
+        <Tap
+          onPress={() => setSectorPickerOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel={`Sector ${placeName(sectorName)}. Cambiar sector`}
+          style={styles.sectorTap}
+        >
+          <View style={styles.sector}>
+            <View style={styles.row}>
+              <Ionicons name="location-outline" size={12} color={colors.textSecondary} />
+              <T variant="caption" color={colors.textSecondary} style={styles.sectorLabel}>
+                Sector
+              </T>
+            </View>
+            <View style={styles.row}>
+              <T variant="small" weight="600" numberOfLines={1} style={styles.sectorName}>
+                {placeName(sectorName)}
+              </T>
+              <Ionicons name="chevron-down" size={14} color={colors.text} />
+            </View>
+          </View>
+        </Tap>
+      </View>
 
       <Tap
-        onPress={() => setSectorPickerOpen(true)}
+        onPress={() => router.push('/notifications')}
         accessibilityRole="button"
-        accessibilityLabel={`Sector ${sectorName}. Cambiar sector`}
-        style={[styles.sector, { backgroundColor: colors.surfaceMuted }]}
+        accessibilityLabel={
+          notifOff ? 'Avisos desactivados' : showBadge ? 'Avisos, hay novedades' : 'Avisos'
+        }
       >
-        <Ionicons name="location-outline" size={18} color={colors.text} />
-        <View style={{ flex: 1, marginLeft: 6 }}>
-          <T variant="caption" color={colors.textSecondary}>
-            Sector
-          </T>
-          <T variant="small" weight="600" numberOfLines={1}>
-            {sectorName}
-          </T>
+        <View style={styles.iconBtn}>
+          <View>
+            <Ionicons
+              name={notifIcon}
+              size={22}
+              color={notifOff ? colors.textSecondary : colors.text}
+            />
+            {showBadge ? <View style={[styles.badge, { borderColor: colors.surface }]} /> : null}
+          </View>
         </View>
-        <Ionicons name="chevron-down" size={14} color={colors.textSecondary} />
       </Tap>
-
-      <View style={styles.actions}>
-        <StatusButton
-          icon={STATE_ICON[state]}
-          dotColor={STATE_COLOR[state]}
-          pulsing={state === 'searching'}
-          slashed={state === 'denied'}
-          onPress={recenter}
-          accessibilityLabel={precisionLabel}
-        />
-        <StatusButton
-          icon={notifIcon}
-          badge={hasNotifications && !notifOff}
-          slashed={notifOff}
-          onPress={() => router.push('/notifications')}
-          accessibilityLabel={notifOff ? 'Avisos desactivados' : 'Avisos'}
-        />
-      </View>
     </Card>
   );
 }
@@ -195,34 +99,39 @@ const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
+    justifyContent: 'space-between',
+    height: BAR_HEIGHT,
+    paddingVertical: 0,
+    paddingLeft: 8,
+    paddingRight: 6,
     borderRadius: MobileRadii.pill,
   },
+  left: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  sectorTap: { flexShrink: 1, minWidth: 0 },
   sector: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
     minHeight: 44,
-    paddingHorizontal: 12,
+    justifyContent: 'center',
+    paddingHorizontal: 6,
     borderRadius: MobileRadii.pill,
   },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: 8, marginLeft: 4 },
-  statusBtn: {
+  row: { flexDirection: 'row', alignItems: 'center' },
+  sectorLabel: { marginLeft: 3 },
+  sectorName: { flexShrink: 1, marginRight: 2 },
+  iconBtn: {
     width: 44,
     height: 44,
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dot: {
+  badge: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    borderWidth: 1.5,
+    top: -2,
+    right: -3,
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    borderWidth: 2,
+    backgroundColor: BADGE_COLOR,
   },
 });
