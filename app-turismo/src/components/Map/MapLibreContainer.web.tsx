@@ -44,6 +44,9 @@ import {
 } from './utils/markerHelpers';
 import { detectSurfaceType, detectSurfaceTypeForBoat } from './utils/surfaceDetection';
 import { createSvgIcon } from './utils/svgIcons';
+import { applyHillshade } from './utils/hillshade';
+import { attachPerformanceWatchdog } from './utils/performanceWatchdog';
+import { CAMERA_CONSTRAINTS, applyCameraGate, resetNorthPitch } from './utils/cameraConstraints';
 import {
   getBeforeBridgesOrBuildingLayerId,
   getBeforeRoadsOrLabelsLayerId,
@@ -153,6 +156,9 @@ export function MapLibreContainer({
   const [radarPath, setRadarPath] = useState<string | null>(null);
   const [internalFloor, setInternalFloor] = useState<number | null>(null);
   const [is3DActive, setIs3DActive] = useState<boolean>(false);
+  const [lightweightMode, setLightweightMode] = useState<boolean>(false);
+  const [compassVisible, setCompassVisible] = useState<boolean>(false);
+  const compassNeedleRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (selectedEvent?.indoorMap) {
@@ -419,6 +425,7 @@ export function MapLibreContainer({
           m.keyboard.enable();
           m.doubleClickZoom.enable();
           m.touchZoomRotate.enable();
+          applyCameraGate(m);
           m.getCanvas().style.pointerEvents = 'auto';
           m.getCanvasContainer().style.pointerEvents = 'auto';
         }
@@ -432,6 +439,7 @@ export function MapLibreContainer({
       map.keyboard.enable();
       map.doubleClickZoom.enable();
       map.touchZoomRotate.enable();
+      applyCameraGate(map);
       map.getCanvas().style.pointerEvents = 'auto';
       map.getCanvasContainer().style.pointerEvents = 'auto';
     }
@@ -560,8 +568,8 @@ export function MapLibreContainer({
     // Determinar estilo inicial
     const initialLayer = mapLayerRef.current;
     const initialMaxZoom = MAX_ZOOM_PER_LAYER[initialLayer] || 18;
-    const initialPitch = initialLayer === '3d' ? 58 : 0;
-    const initialBearing = initialLayer === '3d' ? 25 : 0;
+    const initialPitch = initialLayer === '3d' ? CAMERA_CONSTRAINTS.pitch3D : 0;
+    const initialBearing = initialLayer === '3d' ? CAMERA_CONSTRAINTS.bearing3D : 0;
     // Satélite siempre usa el protocolo cacheado para Ultra HD automático
     const initialStyle =
       initialLayer === 'satellite'
@@ -576,7 +584,7 @@ export function MapLibreContainer({
       pitch: initialPitch,
       bearing: initialBearing,
       maxZoom: initialMaxZoom,
-      maxPitch: 70,
+      maxPitch: CAMERA_CONSTRAINTS.maxPitch,
       attributionControl: false,
       transformRequest: (url: string) => {
         const cartoKey =
@@ -1024,6 +1032,42 @@ export function MapLibreContainer({
     // Close tooltips when user starts changing pitch (3D tilt)
     map.on('pitchstart', closeHoverTooltips);
 
+    // Watchdog: degrada a 2D liviano si el dispositivo no sostiene el framerate
+    const detachWatchdog = attachPerformanceWatchdog(map, (reason) => {
+      console.info('[perf] modo liviano 2D activado:', reason);
+      setIs3DActive(false);
+      setLightweightMode(true);
+    });
+
+    // Gate de cámara: 2D norte-arriba bajo minZoomForPitchAndRotate
+    applyCameraGate(map);
+    let lastGateZoom = map.getZoom();
+    map.on('zoomend', () => {
+      applyCameraGate(map);
+      const z = map.getZoom();
+      const crossedDown =
+        lastGateZoom >= CAMERA_CONSTRAINTS.resetBelowZoom && z < CAMERA_CONSTRAINTS.resetBelowZoom;
+      lastGateZoom = z;
+      if (crossedDown && (map.getPitch() !== 0 || map.getBearing() !== 0)) {
+        resetNorthPitch(map, CAMERA_CONSTRAINTS.resetDurationMs);
+      }
+    });
+
+    // Brújula reactiva: visible sólo con bearing/pitch no triviales
+    const syncCompass = () => {
+      const bearing = map.getBearing();
+      const visible =
+        Math.abs(bearing) > CAMERA_CONSTRAINTS.compassBearingThresholdDeg ||
+        map.getPitch() > CAMERA_CONSTRAINTS.compassPitchThresholdDeg;
+      if (compassNeedleRef.current) {
+        compassNeedleRef.current.style.transform = `rotate(${-bearing}deg)`;
+      }
+      setCompassVisible((prev) => (prev !== visible ? visible : prev));
+    };
+    map.on('rotate', syncCompass);
+    map.on('pitch', syncCompass);
+    syncCompass();
+
     map.on('zoomstart', () => {
       isZoomingRef.current = true;
       if (onMapMoveRef.current) {
@@ -1042,6 +1086,7 @@ export function MapLibreContainer({
         applyDarkTheme(map);
       }
       applyRiverStyling(map, mapLayerRef.current === 'dark');
+      applyHillshade(map, mapLayerRef.current, mapLayerRef.current === 'dark');
       if (syncUserLocationRef.current) {
         syncUserLocationRef.current();
       }
@@ -1274,6 +1319,7 @@ export function MapLibreContainer({
     });
 
     return () => {
+      detachWatchdog();
       // Cleanup all markers
       Object.values(markersRef.current).forEach(({ pinMarker, flatMarker }) => {
         pinMarker.remove();
@@ -1619,12 +1665,6 @@ export function MapLibreContainer({
           });
         }
       });
-    }
-
-    // Garantizar que la onda del usuario (user-wave-layer) siempre quede
-    // por encima de los polígonos irregulares después de sincronizarlos.
-    if (map.getLayer('user-wave-layer')) {
-      try { map.moveLayer('user-wave-layer'); } catch {}
     }
   };
 
@@ -2386,61 +2426,11 @@ export function MapLibreContainer({
 
       latestUserLocationRef.current = loc;
 
-      // 1. Accuracy circle layer handling (only if map style is loaded)
-      if (map.isStyleLoaded() && loc.accuracy) {
-        const accuracyMeters = Math.max(1, loc.accuracy);
-        userAccuracyRef.current = { accuracyMeters, latitude: loc.latitude };
-        const radius = getAccuracyRadiusAtZoom(accuracyMeters, loc.latitude, map.getZoom());
-        const accuracyData: GeoJSON.FeatureCollection = {
-          type: 'FeatureCollection',
-          features: [
-            {
-              type: 'Feature',
-              geometry: {
-                type: 'Point',
-                coordinates: [loc.longitude, loc.latitude],
-              },
-              properties: {},
-            },
-          ],
-        };
-
-        if (!map.getSource('user-accuracy')) {
-          map.addSource('user-accuracy', {
-            type: 'geojson',
-            data: accuracyData,
-          });
-          map.addLayer({
-            id: 'user-wave-layer',
-            type: 'circle',
-            source: 'user-accuracy',
-            paint: {
-              'circle-radius': WAVE_MIN_RADIUS_PX,
-              'circle-color': 'transparent',
-              'circle-opacity': 0,
-              'circle-stroke-width': WAVE_STROKE_WIDTH,
-              'circle-stroke-color': getUserWaveColor(mapLayerRef.current),
-              'circle-stroke-opacity': 0,
-              'circle-pitch-alignment': 'map',
-            },
-          });
-          // Mover la onda ENCIMA de las capas de polígonos (mapa + zonas irregulares).
-          // Sin esto, syncEventPolygons insertaría sus fills con beforeId y quedaría
-          // por encima de la onda, tapándola. undefined = cima del stack GL.
-          try { map.moveLayer('user-wave-layer'); } catch {}
-        } else {
-          const source = map.getSource('user-accuracy') as maplibregl.GeoJSONSource;
-          if (source.setData) {
-            source.setData(accuracyData);
-          }
-        }
-      } else if (!loc.accuracy || !map.isStyleLoaded()) {
-        userAccuracyRef.current = null;
-        if (map.isStyleLoaded()) {
-          if (map.getLayer('user-wave-layer')) map.removeLayer('user-wave-layer');
-          if (map.getSource('user-accuracy')) map.removeSource('user-accuracy');
-        }
-      }
+      // 1. Precisión del GPS: la onda es un elemento CSS dentro del marker
+      // (compositor, 0 repintados de WebGL); acá sólo se guarda el dato.
+      userAccuracyRef.current = loc.accuracy
+        ? { accuracyMeters: Math.max(1, loc.accuracy), latitude: loc.latitude }
+        : null;
 
       // 2. DOM marker rendering
       if (!userMarkerRef.current) {
@@ -2450,6 +2440,14 @@ export function MapLibreContainer({
         const coneEl = document.createElement('div');
         coneEl.className = 'user-cone';
         el.appendChild(coneEl);
+
+        const waveEl = document.createElement('div');
+        waveEl.className = 'user-wave';
+        waveEl.innerHTML =
+          '<svg viewBox="-50 -50 100 100" width="100" height="100"><circle r="49" fill="none" stroke="currentColor" stroke-width="' +
+          WAVE_STROKE_WIDTH +
+          '" vector-effect="non-scaling-stroke"/></svg>';
+        el.appendChild(waveEl);
 
         const styleId = 'user-marker-styles';
         if (!document.getElementById(styleId)) {
@@ -2465,6 +2463,30 @@ export function MapLibreContainer({
               box-shadow: 0 0 10px rgba(0,0,0,0.3);
               position: relative;
               z-index: 2000;
+            }
+            .user-wave {
+              position: absolute;
+              top: 50%;
+              left: 50%;
+              width: 100px;
+              height: 100px;
+              margin: -50px 0 0 -50px;
+              color: var(--wave-color, #60A5FA);
+              pointer-events: none;
+              z-index: -1;
+              opacity: 0;
+              display: none;
+              animation: user-wave-pulse var(--wave-period, 1700ms) linear infinite;
+              will-change: transform, opacity;
+            }
+            .user-wave svg { display: block; }
+            @keyframes user-wave-pulse {
+              0%   { transform: scale(var(--wave-s0, 0.12)); opacity: 0.85;
+                     animation-timing-function: cubic-bezier(0.215, 0.61, 0.355, 1); }
+              100% { transform: scale(var(--wave-s1, 1)); opacity: 0; }
+            }
+            @media (prefers-reduced-motion: reduce) {
+              .user-wave { animation: none; opacity: 0.35; transform: scale(var(--wave-s1, 1)); }
             }
             .user-cone {
               position: absolute;
@@ -2509,57 +2531,42 @@ export function MapLibreContainer({
       }
     };
 
-    window.addEventListener('high-frequency-user-location', handleHighFreqLocation);
+    // Escala de la onda según precisión (metros) y zoom actual.
+    const syncUserWave = () => {
+      const userEl = userMarkerRef.current?.el;
+      const wave = userEl?.querySelector('.user-wave') as HTMLDivElement | null;
+      if (!userEl || !wave) return;
+      const acc = userAccuracyRef.current;
+      if (!acc) {
+        wave.style.display = 'none';
+        return;
+      }
+      const maxR = getAccuracyRadiusAtZoom(acc.accuracyMeters, acc.latitude, map.getZoom());
+      userEl.style.setProperty('--wave-s0', String(WAVE_MIN_RADIUS_PX / 50));
+      userEl.style.setProperty('--wave-s1', String(Math.max(maxR, WAVE_MIN_RADIUS_PX * 2) / 50));
+      userEl.style.setProperty('--wave-period', `${WAVE_PERIOD_MS}ms`);
+      userEl.style.setProperty('--wave-color', getUserWaveColor(mapLayerRef.current));
+      wave.style.display = 'block';
+    };
+    const originalHandler = handleHighFreqLocation;
+    const handler = (e: Event) => {
+      originalHandler(e);
+      syncUserWave();
+    };
+    map.on('zoom', syncUserWave);
+
+    window.addEventListener('high-frequency-user-location', handler);
 
     // Initial marker rendering if location is already loaded
     if (userLocation) {
-      handleHighFreqLocation(
-        new CustomEvent('high-frequency-user-location', { detail: userLocation }),
-      );
+      handler(new CustomEvent('high-frequency-user-location', { detail: userLocation }));
     }
 
     return () => {
-      window.removeEventListener('high-frequency-user-location', handleHighFreqLocation);
+      map.off('zoom', syncUserWave);
+      window.removeEventListener('high-frequency-user-location', handler);
     };
   }, [userLocation]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    const startTs = performance.now();
-    let rafId: number;
-
-    const tick = () => {
-      if (
-        map.isStyleLoaded() &&
-        userAccuracyRef.current &&
-        map.getLayer('user-wave-layer') &&
-        document.visibilityState !== 'hidden'
-      ) {
-        const t = ((performance.now() - startTs) % WAVE_PERIOD_MS) / WAVE_PERIOD_MS;
-        const eased = 1 - Math.pow(1 - t, 3);
-        const maxRadius = getAccuracyRadiusAtZoom(
-          userAccuracyRef.current.accuracyMeters,
-          userAccuracyRef.current.latitude,
-          map.getZoom(),
-        );
-        const radius = WAVE_MIN_RADIUS_PX + Math.max(0, maxRadius - WAVE_MIN_RADIUS_PX) * eased;
-
-        map.setPaintProperty('user-wave-layer', 'circle-radius', radius);
-        map.setPaintProperty('user-wave-layer', 'circle-stroke-opacity', (1 - t) * 0.85);
-        map.setPaintProperty(
-          'user-wave-layer',
-          'circle-stroke-color',
-          getUserWaveColor(mapLayerRef.current),
-        );
-      }
-      rafId = requestAnimationFrame(tick);
-    };
-
-    rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
-  }, []);
 
   useEffect(() => {
     syncUserLocationRef.current = sync;
@@ -3356,7 +3363,7 @@ export function MapLibreContainer({
 
     // Si la capa seleccionada es '3d', animar automáticamente cámara a perspectiva 3D
     if (mapLayer === '3d') {
-      map.easeTo({ pitch: 58, bearing: 25, duration: 1000 });
+      map.easeTo({ pitch: CAMERA_CONSTRAINTS.pitch3D, bearing: CAMERA_CONSTRAINTS.bearing3D, duration: 1000 });
       setIs3DActive(true);
     }
 
@@ -3606,7 +3613,7 @@ export function MapLibreContainer({
           gap: '8px',
         }}
       >
-        <button
+        {!lightweightMode && <button
           onClick={() => {
             const map = mapRef.current;
             if (!map) return;
@@ -3615,7 +3622,7 @@ export function MapLibreContainer({
               map.easeTo({ pitch: 0, duration: 800 });
               setIs3DActive(false);
             } else {
-              map.easeTo({ pitch: 58, bearing: 25, duration: 1000 });
+              map.easeTo({ pitch: CAMERA_CONSTRAINTS.pitch3D, bearing: CAMERA_CONSTRAINTS.bearing3D, duration: 1000 });
               setIs3DActive(true);
             }
           }}
@@ -3639,7 +3646,39 @@ export function MapLibreContainer({
           }}
         >
           {is3DActive ? '2D' : '3D'}
-        </button>
+        </button>}
+        {compassVisible && (
+          <button
+            onClick={() => resetNorthPitch(mapRef.current)}
+            title="Restablecer norte"
+            aria-label="Restablecer norte"
+            style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '14px',
+              background: 'rgba(15, 23, 42, 0.85)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backdropFilter: 'blur(8px)',
+              marginLeft: '-3px',
+            }}
+          >
+            <div ref={compassNeedleRef} style={{
+                width: '22px',
+                height: '22px',
+                transform: `rotate(${-(mapRef.current?.getBearing() ?? 0)}deg)`,
+              }}>
+              <svg viewBox="0 0 24 24" width="22" height="22">
+                <polygon points="12,2 16,12 8,12" fill="#F87171" />
+                <polygon points="12,22 16,12 8,12" fill="#E2E8F0" />
+              </svg>
+            </div>
+          </button>
+        )}
       </div>
 
       {selectedEvent?.indoorMap && internalFloor !== null && (
