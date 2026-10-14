@@ -7,7 +7,7 @@ import { useMobileApp } from '../MobileAppContext';
 import type { IoniconName } from '../data/categories';
 import { MobileRadii } from '../theme';
 
-import { Avatar, Card, T, useColors } from './ui';
+import { Avatar, Card, T, Tap, useColors } from './ui';
 
 type PrecisionState = 'searching' | 'high' | 'medium' | 'low' | 'denied' | 'manual';
 
@@ -85,15 +85,12 @@ function StatusButton({
   }, [pulsing, pulse]);
 
   return (
-    <Pressable
+    <Tap
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       hitSlop={6}
-      style={({ pressed }) => [
-        styles.statusBtn,
-        { backgroundColor: colors.surfaceMuted, opacity: pressed ? 0.7 : 1 },
-      ]}
+      style={[styles.statusBtn, { backgroundColor: colors.surfaceMuted }]}
     >
       <Animated.View style={{ opacity: pulse }}>
         <Ionicons name={icon} size={20} color={slashed ? colors.textSecondary : colors.text} />
@@ -104,7 +101,7 @@ function StatusButton({
       {badge ? (
         <View style={[styles.dot, { backgroundColor: colors.text, borderColor: colors.surfaceMuted }]} />
       ) : null}
-    </Pressable>
+    </Tap>
   );
 }
 
@@ -155,14 +152,11 @@ export function AppHeader({ hasNotifications = true }: { hasNotifications?: bool
         <Avatar name={prefs.nick || 'Visitante'} uri={prefs.photoUri} />
       </Pressable>
 
-      <Pressable
+      <Tap
         onPress={() => setSectorPickerOpen(true)}
         accessibilityRole="button"
         accessibilityLabel={`Sector ${sectorName}. Cambiar sector`}
-        style={({ pressed }) => [
-          styles.sector,
-          { backgroundColor: colors.surfaceMuted, opacity: pressed ? 0.7 : 1 },
-        ]}
+        style={[styles.sector, { backgroundColor: colors.surfaceMuted }]}
       >
         <Ionicons name="location-outline" size={18} color={colors.text} />
         <View style={{ flex: 1, marginLeft: 6 }}>
@@ -174,7 +168,7 @@ export function AppHeader({ hasNotifications = true }: { hasNotifications?: bool
           </T>
         </View>
         <Ionicons name="chevron-down" size={14} color={colors.textSecondary} />
-      </Pressable>
+      </Tap>
 
       <View style={styles.actions}>
         <StatusButton

@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Image,
   Pressable,
+  PressableProps,
   StyleProp,
   StyleSheet,
   Switch,
@@ -58,6 +59,35 @@ export function T({ variant = 'body', weight = '400', color, align, style, ...re
         },
         style,
       ]}
+    />
+  );
+}
+
+/**
+ * Pressable con feedback de opacidad. NativeWind (css-interop) descarta los
+ * `style={({ pressed }) => ...}` en Android, así que el estado se lleva a mano
+ * y el estilo siempre se pasa como objeto/array estático.
+ */
+export function Tap({
+  style,
+  pressedOpacity = 0.7,
+  onPressIn,
+  onPressOut,
+  ...rest
+}: Omit<PressableProps, 'style'> & { style?: StyleProp<ViewStyle>; pressedOpacity?: number }) {
+  const [pressed, setPressed] = useState(false);
+  return (
+    <Pressable
+      {...rest}
+      onPressIn={(e) => {
+        setPressed(true);
+        onPressIn?.(e);
+      }}
+      onPressOut={(e) => {
+        setPressed(false);
+        onPressOut?.(e);
+      }}
+      style={[style, pressed ? { opacity: pressedOpacity } : null]}
     />
   );
 }
@@ -131,12 +161,12 @@ export function IconButton({
 }) {
   const colors = useColors();
   return (
-    <Pressable
+    <Tap
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       hitSlop={6}
-      style={({ pressed }) => [
+      style={[
         {
           width: size,
           height: size,
@@ -144,14 +174,13 @@ export function IconButton({
           alignItems: 'center',
           justifyContent: 'center',
           backgroundColor: filled ? colors.accent : colors.surfaceMuted,
-          opacity: pressed ? 0.7 : 1,
         },
         style,
       ]}
     >
       <Ionicons name={icon} size={size * 0.45} color={filled ? colors.onAccent : colors.text} />
       {badge ? <View style={[styles.badgeDot, { backgroundColor: colors.text }]} /> : null}
-    </Pressable>
+    </Tap>
   );
 }
 
@@ -172,23 +201,16 @@ export function PillButton({
   const colors = useColors();
   const fg = active ? colors.onAccent : colors.text;
   return (
-    <Pressable
+    <Tap
       onPress={onPress}
       accessibilityRole="button"
-      style={({ pressed }) => [
-        styles.pill,
-        {
-          backgroundColor: active ? colors.accent : colors.surfaceMuted,
-          opacity: pressed ? 0.7 : 1,
-        },
-        style,
-      ]}
+      style={[styles.pill, { backgroundColor: active ? colors.accent : colors.surfaceMuted }, style]}
     >
       {icon ? <Ionicons name={icon} size={15} color={fg} style={{ marginRight: 6 }} /> : null}
       <T variant="small" weight="500" color={fg} numberOfLines={1}>
         {label}
       </T>
-    </Pressable>
+    </Tap>
   );
 }
 
@@ -205,20 +227,21 @@ export function PrimaryButton({
 }) {
   const colors = useColors();
   return (
-    <Pressable
+    <Tap
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
-      style={({ pressed }) => [
+      pressedOpacity={0.8}
+      style={[
         styles.primary,
-        { backgroundColor: colors.accent, opacity: disabled ? 0.4 : pressed ? 0.8 : 1 },
+        { backgroundColor: colors.accent, opacity: disabled ? 0.4 : 1 },
         style,
       ]}
     >
       <T weight="600" color={colors.onAccent} numberOfLines={1}>
         {label}
       </T>
-    </Pressable>
+    </Tap>
   );
 }
 
@@ -233,24 +256,19 @@ export function OutlineButton({
 }) {
   const colors = useColors();
   return (
-    <Pressable
+    <Tap
       onPress={onPress}
       accessibilityRole="button"
-      style={({ pressed }) => [
+      style={[
         styles.primary,
-        {
-          backgroundColor: colors.surface,
-          borderWidth: 1.5,
-          borderColor: colors.borderStrong,
-          opacity: pressed ? 0.7 : 1,
-        },
+        { backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.borderStrong },
         style,
       ]}
     >
       <T weight="600" numberOfLines={1}>
         {label}
       </T>
-    </Pressable>
+    </Tap>
   );
 }
 
