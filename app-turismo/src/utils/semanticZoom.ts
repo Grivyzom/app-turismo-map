@@ -288,3 +288,33 @@ export function assignRenderStyles(
   }
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Reemplazo de clusters numéricos: un micro-dot por evento, en su coordenada real
+// ---------------------------------------------------------------------------
+
+export interface MicrodotSource {
+  id: string;
+  latitude: number;
+  longitude: number;
+}
+
+/** Paint compartido de la capa de micro-dots (radio interpolado por zoom, borde 1px). */
+export const MICRODOT_PAINT = {
+  'circle-color': ['get', 'color'],
+  'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 2.5, 14.5, 3.5, 16, 3],
+  'circle-stroke-width': 1,
+  'circle-stroke-color': '#FFFFFF',
+  'circle-pitch-alignment': 'map',
+} as const;
+
+export function microdotFeatures<T extends MicrodotSource>(
+  events: T[],
+  colorOf: (e: T) => string
+) {
+  return events.map((e) => ({
+    type: 'Feature' as const,
+    geometry: { type: 'Point' as const, coordinates: [e.longitude, e.latitude] },
+    properties: { id: e.id, color: colorOf(e) },
+  }));
+}
