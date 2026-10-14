@@ -8,6 +8,7 @@ import type { MapLayer, TurismoEvent } from '../../components/Map/types';
 import { useUserLocationContext } from '../../context/UserLocationContext';
 import { useWalkPreview } from '../../hooks/useWalkPreview';
 import { useMobileApp } from '../MobileAppContext';
+import { GpsButton } from '../components/GpsButton';
 import { Card, Chip, IconButton, PrimaryButton, T, Tag, Thumb, useColors } from '../components/ui';
 import {
   categoryIcon,
@@ -61,6 +62,7 @@ export function MapaScreen() {
   const [layer, setLayer] = useState<MapLayer>('light');
   const [centerTrigger, setCenterTrigger] = useState(0);
   const [zoom, setZoom] = useState(15);
+  const [peekHeight, setPeekHeight] = useState(0);
 
   // Llegadas desde Inicio / Guía: aplicar filtro y lugar pedidos
   const [seenFocus, setSeenFocus] = useState(0);
@@ -177,9 +179,16 @@ export function MapaScreen() {
         </ScrollView>
       </View>
 
-      {/* Controles laterales */}
+      {/* Controles laterales: capas arriba, GPS flotante abajo (justo sobre el sheet) */}
       <View
-        style={[styles.side, { bottom: insets.bottom + TAB_BAR_HEIGHT + (selected ? 250 : 40) }]}
+        style={[
+          styles.side,
+          {
+            bottom:
+              insets.bottom + TAB_BAR_HEIGHT + (selected && peekHeight ? 22 + peekHeight + 12 : 40),
+          },
+        ]}
+        pointerEvents="box-none"
       >
         <IconButton
           icon="layers-outline"
@@ -187,17 +196,15 @@ export function MapaScreen() {
           style={[{ backgroundColor: colors.surface }, cardShadow]}
           accessibilityLabel="Cambiar capa del mapa"
         />
-        <IconButton
-          icon="locate-outline"
-          onPress={() => setCenterTrigger((n) => n + 1)}
-          style={[{ backgroundColor: colors.surface }, cardShadow]}
-          accessibilityLabel="Centrar en mi ubicación"
-        />
+        <GpsButton onPress={() => setCenterTrigger((n) => n + 1)} />
       </View>
 
       {/* Peek card del lugar */}
       {selected ? (
-        <View style={[styles.peekWrap, { bottom: insets.bottom + TAB_BAR_HEIGHT + 22 }]}>
+        <View
+          style={[styles.peekWrap, { bottom: insets.bottom + TAB_BAR_HEIGHT + 22 }]}
+          onLayout={(e) => setPeekHeight(e.nativeEvent.layout.height)}
+        >
           <Card style={styles.peek}>
             <View style={[styles.grabber, { backgroundColor: colors.borderStrong }]} />
             <View style={{ flexDirection: 'row', gap: 12 }}>
@@ -259,7 +266,7 @@ const styles = StyleSheet.create({
     borderRadius: MobileRadii.pill,
   },
   searchInput: { flex: 1, minWidth: 0, paddingVertical: 10 },
-  side: { position: 'absolute', right: MobileSpacing.screen, gap: 10 },
+  side: { position: 'absolute', right: MobileSpacing.screen, alignItems: 'center', gap: 12 },
   peekWrap: { position: 'absolute', left: MobileSpacing.screen, right: MobileSpacing.screen },
   peek: { paddingTop: 8 },
   grabber: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, marginBottom: 10 },
