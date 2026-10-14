@@ -38,6 +38,8 @@ export interface ToolsFilterPanelProps {
   onOpenSectors: () => void;
   cameraAnimationsEnabled: boolean;
   onToggleCameraAnimations: () => void;
+  showSecurityCameras?: boolean;
+  onToggleSecurityCameras?: () => void;
   isRoutingAvailable?: boolean;
   isPartner?: boolean;
   isRoutingActive?: boolean;
@@ -263,6 +265,8 @@ export const ToolsFilterPanel: React.FC<ToolsFilterPanelProps> = ({
   onOpenSectors,
   cameraAnimationsEnabled,
   onToggleCameraAnimations,
+  showSecurityCameras = false,
+  onToggleSecurityCameras,
   isRoutingAvailable = true,
   isPartner = false,
   isRoutingActive = false,
@@ -696,6 +700,35 @@ export const ToolsFilterPanel: React.FC<ToolsFilterPanelProps> = ({
                   <View style={[styles.ledDot, showSectors && styles.ledDotActive]} />
                 </TouchableOpacity>
 
+                {/* Cámaras de seguridad (capa opcional) */}
+                {onToggleSecurityCameras && (
+                  <TouchableOpacity
+                    style={[styles.toolPill, showSecurityCameras && styles.toolPillActive]}
+                    onPress={onToggleSecurityCameras}
+                    activeOpacity={0.7}
+                    accessibilityRole="switch"
+                    accessibilityState={{ checked: showSecurityCameras }}
+                    accessibilityLabel="Mostrar cámaras de seguridad"
+                  >
+                    <View style={styles.toolPillLeft}>
+                      <MaterialIcons
+                        name="videocam"
+                        size={15}
+                        color={showSecurityCameras ? C.accent : C.textMuted}
+                      />
+                      <Text
+                        style={[
+                          styles.toolPillText,
+                          showSecurityCameras && styles.toolPillTextActive,
+                        ]}
+                      >
+                        Cámaras
+                      </Text>
+                    </View>
+                    <View style={[styles.ledDot, showSecurityCameras && styles.ledDotActive]} />
+                  </TouchableOpacity>
+                )}
+
                 {/* Cámara GTA */}
                 <TouchableOpacity
                   style={[styles.toolPill, cameraAnimationsEnabled && styles.toolPillActive]}
@@ -704,7 +737,7 @@ export const ToolsFilterPanel: React.FC<ToolsFilterPanelProps> = ({
                 >
                   <View style={styles.toolPillLeft}>
                     <MaterialIcons
-                      name="videocam"
+                      name="movie-filter"
                       size={15}
                       color={cameraAnimationsEnabled ? C.accent : C.textMuted}
                     />

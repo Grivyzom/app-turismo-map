@@ -311,6 +311,11 @@ export const MAP_MARKER_CSS = `
           will-change: transform;
           animation: pinRadarSweep 3.6s linear infinite;
         }
+        /* Cámaras en reposo: sin barrido (display:none ⇒ ni se compone la
+           animación). Gira sólo bajo el cursor o con foco de teclado. */
+        .camara-radar-idle { display: none; }
+        [data-hovered="true"] .camara-radar-idle,
+        :focus-visible .camara-radar-idle { display: block; }
 
         /* Latido vital (salud): doble pulso tipo ECG */
         @keyframes pinVital {

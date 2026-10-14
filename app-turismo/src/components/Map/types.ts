@@ -126,6 +126,12 @@ export interface TurismoEvent {
   floor_level?: number; // Para filtros dinámicos en Malls/Edificios (Piso 1, Piso 2, etc.)
   // Viñeta (Badge) properties
   vineta?: Vineta;
+  // Pin sintético que agrupa cámaras de seguridad muy próximas en pantalla
+  cameraGroup?: {
+    count: number;
+    /** [[minLng, minLat], [maxLng, maxLat]] de las cámaras agrupadas */
+    bounds: [[number, number], [number, number]];
+  };
   // Smart Notification Properties
   isSmartNotification?: boolean;
   recommendationType?: string;

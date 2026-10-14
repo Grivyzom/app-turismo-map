@@ -241,10 +241,10 @@ export function createAestheticsUpdater(
           markerObj.event!.longitude,
           markerObj.event!.latitude,
         ]);
-        // Para cámaras, su lente/óptica está elevada (~16px) respecto al ancla terrestre.
-        // Si testeamos el ancla (tentativeElevation = 0), colisiona falsamente con el
-        // footprint del edificio detrás de ella.
-        const queryElevation = isCamara ? 16 : tentativeElevation;
+        // Las cámaras no se elevan, pero su óptica se dibuja sobre el ancla: se
+        // testea el centro de la lente (~10-12px arriba). Testear el ancla misma
+        // colisiona falsamente con el footprint del edificio detrás de ella.
+        const queryElevation = isCamara ? 11 : tentativeElevation;
         const queryY = groundPoint.y - queryElevation;
         const hits = map.queryRenderedFeatures(
           [groundPoint.x, queryY],
@@ -413,19 +413,6 @@ export function createAestheticsUpdater(
             } else {
               stem.style.height = '0px';
               stem.style.opacity = '0';
-            }
-          }
-
-          // Stem de cámara — llena el gap entre lente (elevada) y el suelo
-          const stemCamara = domRefs.stemCamara;
-          if (stemCamara) {
-            if (pitch > 0 && isVisible && elevation > 0) {
-              // Mismo elevation que el pinWrapper para conectar exacto
-              stemCamara.style.height = `${elevation + 12}px`;
-              stemCamara.style.opacity = `${Math.min(0.85, (pitch / 60) * 0.9)}`;
-            } else {
-              stemCamara.style.height = '0px';
-              stemCamara.style.opacity = '0';
             }
           }
         }

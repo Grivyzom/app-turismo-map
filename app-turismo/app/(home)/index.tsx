@@ -348,6 +348,8 @@ export default function HomeScreen() {
     cycleways,
     cameraAnimationsEnabled,
     toggleCameraAnimations,
+    showSecurityCameras,
+    toggleSecurityCameras,
 
     // Routing Mode (Geo-Router)
     isRoutingActive,
@@ -1723,6 +1725,15 @@ export default function HomeScreen() {
               !cameraAnimationsEnabled
                 ? '🎬 Efectos de cámara GTA V activados'
                 : 'Efectos de cámara desactivados',
+            );
+          }}
+          showSecurityCameras={showSecurityCameras}
+          onToggleSecurityCameras={() => {
+            toggleSecurityCameras();
+            showNotification(
+              !showSecurityCameras
+                ? 'Cámaras de seguridad visibles (acércate para verlas)'
+                : 'Cámaras de seguridad ocultas',
             );
           }}
           isRoutingAvailable={true}

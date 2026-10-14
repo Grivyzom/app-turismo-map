@@ -47,7 +47,6 @@ export function updateMarkerDomRefs(markerObj: any) {
     // la rotación de silueta que el cuerpo lleva en su transform inline.
     body: pinEl.querySelector('.pin-body'),
     stem: pinEl.querySelector('.marker-3d-stem'),
-    stemCamara: pinEl.querySelector('.marker-3d-stem-camara'),
     lensContainer: pinEl.querySelector('.marker-camara-lens-container'),
     icon: pinEl.querySelector('.marker-3d-icon'),
     flatContainer: flatEl ? flatEl.querySelector('.marker-flat-container') : null,
