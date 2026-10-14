@@ -14,7 +14,9 @@ import {
 import { getSatelliteStyle, CARTO_API_KEY } from '../../config/mapStyles.web';
 import { SatelliteTileCache } from '../../utils/satelliteTileCache';
 import { TrafficTileCache, TRAFFIC_PROTOCOL } from '../../utils/trafficTileCache';
-import { useSuperclusterEvents, getClusterDominantColor } from '../../utils/clusterUtils';
+import { useSuperclusterEvents } from '../../utils/clusterUtils';
+import { MICRODOT_PAINT, microdotFeatures } from '../../utils/semanticZoom';
+import { pickTopPriority, pinHitBox, WALK_LINE_DASHARRAY } from '../../utils/contextualRanking';
 import { radialMenuRegistry } from '../../utils/radialMenuRegistry';
 import { getLatestRadarPath } from '../../utils/weatherUtils';
 import { useRainEffect } from '../../utils/useRainEffect';
@@ -128,6 +130,7 @@ export function MapLibreContainer({
   isMagicWandActive = false,
   onMagicWandSelect,
   navRouteGeojson,
+  walkPreviewGeojson,
   isAuthenticated,
   cameraAnimationsEnabled = true,
   isRoutingActive = false,
@@ -754,86 +757,40 @@ export function MapLibreContainer({
         });
 
         // Circle background layer - pitch-aligned to map surface
+        // Micro-dots semánticos (sin clusters numéricos): un punto por evento en su coordenada real.
         map.addLayer(
           {
             id: 'cluster-circles',
             type: 'circle',
             source: 'clusters-source',
-            paint: {
-              'circle-color': ['get', 'color'],
-              'circle-radius': ['get', 'radius'],
-              'circle-stroke-width': 2,
-              'circle-stroke-color': 'rgba(255, 255, 255, 0.85)',
-              'circle-pitch-alignment': 'map',
-              'circle-opacity': 1,
-              'circle-stroke-opacity': 1,
-            },
-          },
-          buildingBeforeId,
-        );
-
-        // Text label layer - also pitch-aligned to map surface
-        map.addLayer(
-          {
-            id: 'cluster-labels',
-            type: 'symbol',
-            source: 'clusters-source',
-            layout: {
-              'text-field': ['get', 'count'],
-              'text-size': ['get', 'fontSize'],
-              'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-              'text-allow-overlap': false,
-              'text-ignore-placement': false,
-              'text-pitch-alignment': 'map',
-              'text-rotation-alignment': 'map',
-            },
-            paint: {
-              'text-color': '#ffffff',
-              'text-halo-color': 'rgba(0,0,0,0.2)',
-              'text-halo-width': 1,
-            },
+            paint: MICRODOT_PAINT as any,
           },
           buildingBeforeId,
         );
       }
 
-      // Click handler for cluster circles
-      map.on('click', 'cluster-circles', (e) => {
+      // Micro-dots tocables: caja de 52x52px (hit target expandido) y gana el de mayor priority_rank.
+      map.on('click', (e) => {
         if ((e.originalEvent as any)._turismoHandled) return;
-        if (isClickInsideModalOrInput(e)) return;
-        if (isRoutingActiveRef.current && onMapClickForRoutingRef.current) {
+        if (!map.getLayer('cluster-circles')) return;
+        const hit = pickTopPriority(
+          map.queryRenderedFeatures(pinHitBox(e.point.x, e.point.y), { layers: ['cluster-circles'] }),
+        );
+        const hitId = hit?.properties?.id;
+        if (!hitId || isClickInsideModalOrInput(e)) return;
+        if (isRoutingActiveRef.current && onMapClickForRoutingRef.current) return;
+        const event = eventsRef.current.find((ev) => ev.id === hitId);
+        if (event && onSelectEventRef.current) {
           (e.originalEvent as any)._turismoHandled = true;
-          onMapClickForRoutingRef.current({
-            latitude: e.lngLat.lat,
-            longitude: e.lngLat.lng,
-          });
-          return;
+          onSelectEventRef.current(event);
         }
-        if (!e.features || e.features.length === 0) return;
-        const feature = e.features[0];
-        const props = feature.properties;
-        if (!props) return;
-
-        const centroidLng = props.centroidLng as number;
-        const centroidLat = props.centroidLat as number;
-        const maxPossibleZoom = MAX_ZOOM_PER_LAYER[mapLayerRef.current] || 18;
-        const nextZoom = Math.min(map.getZoom() + 3, maxPossibleZoom - 1);
-        if (onZoomChangeRef.current) {
-          onZoomChangeRef.current(nextZoom);
-        }
-        map.easeTo({
-          center: [centroidLng, centroidLat],
-          zoom: nextZoom,
-          duration: 600,
-        });
       });
-
-      // Cursor feedback for clusters
-      map.on('mouseenter', 'cluster-circles', () => {
-        map.getCanvas().style.cursor = 'pointer';
-      });
-      map.on('mouseleave', 'cluster-circles', () => {
-        map.getCanvas().style.cursor = '';
+      map.on('mousemove', (e) => {
+        if (!map.getLayer('cluster-circles')) return;
+        const over = map.queryRenderedFeatures(pinHitBox(e.point.x, e.point.y), {
+          layers: ['cluster-circles'],
+        }).length;
+        map.getCanvas().style.cursor = over ? 'pointer' : '';
       });
 
       if (sync3DBuildingsRef.current) {
@@ -1116,42 +1073,13 @@ export function MapLibreContainer({
           data: { type: 'FeatureCollection', features: [] },
         });
         const reloadBuildingBeforeId = map.getLayer('building-3d') ? 'building-3d' : undefined;
+        // Micro-dots semánticos (sin clusters numéricos): un punto por evento en su coordenada real.
         map.addLayer(
           {
             id: 'cluster-circles',
             type: 'circle',
             source: 'clusters-source',
-            paint: {
-              'circle-color': '#0B0F19',
-              'circle-radius': ['get', 'radius'],
-              'circle-stroke-width': 3,
-              'circle-stroke-color': ['get', 'color'],
-              'circle-pitch-alignment': 'map',
-              'circle-opacity': 1,
-              'circle-stroke-opacity': 1,
-            },
-          },
-          reloadBuildingBeforeId,
-        );
-        map.addLayer(
-          {
-            id: 'cluster-labels',
-            type: 'symbol',
-            source: 'clusters-source',
-            layout: {
-              'text-field': ['get', 'count'],
-              'text-size': ['get', 'fontSize'],
-              'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-              'text-allow-overlap': false,
-              'text-ignore-placement': false,
-              'text-pitch-alignment': 'map',
-              'text-rotation-alignment': 'map',
-            },
-            paint: {
-              'text-color': '#ffffff',
-              'text-halo-color': 'rgba(0,0,0,0.6)',
-              'text-halo-width': 1,
-            },
+            paint: MICRODOT_PAINT as any,
           },
           reloadBuildingBeforeId,
         );
@@ -1756,39 +1684,10 @@ export function MapLibreContainer({
     ) as Cluster[];
 
     // ── Update native cluster layers ──
-    const clusterFeatures = clusterItems.map((cluster) => {
-      const count = cluster.events.length;
-      const dominantColor = getClusterDominantColor(cluster.events);
-      const badgeRadius = Math.min(22, Math.max(16, 16 + Math.log2(count) * 2));
-      const fontSize = badgeRadius < 18 ? 12 : badgeRadius < 20 ? 13 : 14;
-
-      // Compute true centroid for click zoom target
-      let cLat = 0,
-        cLng = 0;
-      for (const ev of cluster.events) {
-        cLat += ev.latitude;
-        cLng += ev.longitude;
-      }
-      cLat /= cluster.events.length;
-      cLng /= cluster.events.length;
-
-      return {
-        type: 'Feature' as const,
-        geometry: {
-          type: 'Point' as const,
-          coordinates: [cluster.longitude, cluster.latitude],
-        },
-        properties: {
-          id: cluster.id,
-          count: String(count),
-          color: dominantColor,
-          radius: badgeRadius,
-          fontSize,
-          centroidLng: cLng,
-          centroidLat: cLat,
-        },
-      };
-    });
+    const clusterFeatures = microdotFeatures(
+      clusterItems.flatMap((c) => c.events),
+      (ev) => getCategoryColor(ev.category, ev.musicStyle),
+    );
 
     if (map.getSource('clusters-source')) {
       (map.getSource('clusters-source') as any).setData({
@@ -2831,6 +2730,38 @@ export function MapLibreContainer({
     } catch {}
   }, [showMobiliario]);
 
+
+  // ── Walk preview: línea punteada usuario → pin (sin fitBounds) ────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const SOURCE = 'walk-preview';
+    const LAYER = 'walk-preview-line';
+    const data: GeoJSON.FeatureCollection = {
+      type: 'FeatureCollection',
+      features: walkPreviewGeojson
+        ? [{ type: 'Feature', geometry: walkPreviewGeojson, properties: {} }]
+        : [],
+    };
+    const apply = () => {
+      if (!map.getSource(SOURCE)) {
+        map.addSource(SOURCE, { type: 'geojson', data });
+      } else {
+        (map.getSource(SOURCE) as maplibregl.GeoJSONSource).setData(data);
+      }
+      if (!map.getLayer(LAYER)) {
+        map.addLayer({
+          id: LAYER,
+          type: 'line',
+          source: SOURCE,
+          layout: { 'line-cap': 'butt', 'line-join': 'round' },
+          paint: { 'line-color': '#1D4ED8', 'line-width': 3.5, 'line-dasharray': WALK_LINE_DASHARRAY },
+        });
+      }
+    };
+    if (map.isStyleLoaded()) apply();
+    else map.once('idle', apply);
+  }, [walkPreviewGeojson]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── OSRM Navigation Route Layer ───────────────────────────────────────────
   useEffect(() => {
