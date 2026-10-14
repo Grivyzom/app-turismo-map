@@ -204,7 +204,11 @@ export function PillButton({
     <Tap
       onPress={onPress}
       accessibilityRole="button"
-      style={[styles.pill, { backgroundColor: active ? colors.accent : colors.surfaceMuted }, style]}
+      style={[
+        styles.pill,
+        { backgroundColor: active ? colors.accent : colors.surfaceMuted },
+        style,
+      ]}
     >
       {icon ? <Ionicons name={icon} size={15} color={fg} style={{ marginRight: 6 }} /> : null}
       <T variant="small" weight="500" color={fg} numberOfLines={1}>
@@ -470,6 +474,92 @@ export function ToggleRow({
   );
 }
 
+/** Encabezado de pantallas secundarias (Clima, Avisos): volver + título + acción opcional. */
+export function OverlayHeader({
+  caption,
+  title,
+  onBack,
+  action,
+}: {
+  caption?: string;
+  title: string;
+  onBack: () => void;
+  action?: React.ReactNode;
+}) {
+  const colors = useColors();
+  return (
+    <Card style={styles.overlayHeader}>
+      <IconButton icon="chevron-back" onPress={onBack} accessibilityLabel="Volver" />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        {caption ? (
+          <T variant="caption" color={colors.textSecondary}>
+            {caption}
+          </T>
+        ) : null}
+        <T weight="700" numberOfLines={1} accessibilityRole="header">
+          {title}
+        </T>
+      </View>
+      {action}
+    </Card>
+  );
+}
+
+/** Estado vacío o de error dentro de una tarjeta: ícono en círculo, título, texto y acción. */
+export function EmptyState({
+  icon,
+  title,
+  message,
+  actionLabel,
+  onAction,
+}: {
+  icon: IoniconName;
+  title: string;
+  message?: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  const colors = useColors();
+  return (
+    <Card style={styles.empty}>
+      <View style={[styles.emptyIcon, { backgroundColor: colors.surfaceMuted }]}>
+        <Ionicons name={icon} size={26} color={colors.textSecondary} />
+      </View>
+      <T variant="title" weight="600" align="center">
+        {title}
+      </T>
+      {message ? (
+        <T variant="small" color={colors.textSecondary} align="center">
+          {message}
+        </T>
+      ) : null}
+      {actionLabel && onAction ? (
+        <PillButton label={actionLabel} onPress={onAction} style={{ marginTop: 6 }} />
+      ) : null}
+    </Card>
+  );
+}
+
+/** Punto rojo de "hay novedades" que se superpone a un ícono (colocar dentro de un View relativo). */
+export function BadgeDot({ size = 11 }: { size?: number }) {
+  const colors = useColors();
+  return (
+    <View
+      style={{
+        position: 'absolute',
+        top: -2,
+        right: -3,
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        borderWidth: 2,
+        borderColor: colors.surface,
+        backgroundColor: colors.badge,
+      }}
+    />
+  );
+}
+
 export function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
     <T variant="small" weight="600" style={{ marginTop: 14, marginBottom: 6 }}>
@@ -550,6 +640,27 @@ const styles = StyleSheet.create({
     minHeight: 38,
     borderRadius: MobileRadii.pill,
     borderWidth: 1,
+  },
+  overlayHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 8,
+    borderRadius: MobileRadii.pill,
+  },
+  empty: {
+    alignItems: 'center',
+    paddingVertical: 36,
+    paddingHorizontal: 24,
+    gap: 8,
+  },
+  emptyIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
   },
   toggleRow: {
     flexDirection: 'row',

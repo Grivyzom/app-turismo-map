@@ -5,9 +5,10 @@ import { StatusBar } from 'expo-status-bar';
 import { AuthModal } from '../components/Auth/AuthModal';
 
 import { MobileAppProvider, MobileTab, useMobileApp } from './MobileAppContext';
-import { OptionSheet } from './components/OptionSheet';
+import { Option, OptionSheet } from './components/OptionSheet';
 import { TabBar } from './components/TabBar';
 import { useColors } from './components/ui';
+import { AvisosScreen } from './screens/AvisosScreen';
 import { ClimaScreen } from './screens/ClimaScreen';
 import { GuiaScreen } from './screens/GuiaScreen';
 import { InicioScreen } from './screens/InicioScreen';
@@ -23,6 +24,8 @@ const SCREENS: Record<MobileTab, React.ComponentType> = {
   perfil: PerfilScreen,
 };
 
+const GPS_KEY = '__gps__';
+
 function Shell() {
   const {
     tab,
@@ -34,6 +37,7 @@ function Shell() {
     sectors,
     sectorName,
     setSectorOverride,
+    usingSectorOverride,
     hasGps,
   } = useMobileApp();
   const colors = useColors();
@@ -62,13 +66,24 @@ function Shell() {
     return () => sub.remove();
   }, [overlay, tab, sectorPickerOpen, setOverlay, setTab, setSectorPickerOpen]);
 
-  const sectorOptions = [
+  const sectorOptions: Option<string>[] = [
     ...(hasGps
-      ? [{ key: '__gps__', label: 'Mi ubicación actual', hint: 'Detectar sector por GPS' }]
+      ? [
+          {
+            key: GPS_KEY,
+            label: 'Mi ubicación actual',
+            hint: usingSectorOverride ? 'Detectar sector por GPS' : `Estás en ${sectorName}`,
+            icon: 'navigate' as const,
+          },
+        ]
       : []),
     ...sectors.map((s) => ({ key: String(s.id), label: s.name })),
   ];
-  const currentSectorKey = String(sectors.find((s) => s.name === sectorName)?.id ?? '');
+  // Con GPS activo y sin sector manual, la opción vigente es "Mi ubicación actual"
+  const currentSectorKey =
+    hasGps && !usingSectorOverride
+      ? GPS_KEY
+      : String(sectors.find((s) => s.name === sectorName)?.id ?? '');
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -87,9 +102,9 @@ function Shell() {
         );
       })}
 
-      {overlay === 'clima' ? (
+      {overlay ? (
         <View style={StyleSheet.absoluteFill}>
-          <ClimaScreen />
+          {overlay === 'clima' ? <ClimaScreen /> : <AvisosScreen />}
         </View>
       ) : null}
 
@@ -98,10 +113,10 @@ function Shell() {
       <OptionSheet
         visible={sectorPickerOpen}
         title="Elegir sector"
-        options={sectorOptions.length ? sectorOptions : [{ key: '__gps__', label: 'Valdivia' }]}
-        value={currentSectorKey || null}
+        options={sectorOptions.length ? sectorOptions : [{ key: GPS_KEY, label: 'Valdivia' }]}
+        value={currentSectorKey || (sectorOptions.length ? null : GPS_KEY)}
         onSelect={(key) => {
-          if (key === '__gps__') return setSectorOverride(null);
+          if (key === GPS_KEY) return setSectorOverride(null);
           setSectorOverride(sectors.find((s) => String(s.id) === key) ?? null);
         }}
         onClose={() => setSectorPickerOpen(false)}

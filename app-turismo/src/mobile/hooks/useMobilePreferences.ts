@@ -84,6 +84,12 @@ const STORAGE_KEY = 'app-turismo.mobile-preferences-v1';
 
 export const TEXT_SCALE: Record<TextSize, number> = { sm: 0.9, md: 1, lg: 1.15 };
 
+/** true si el usuario apagó todas las categorías de avisos en Perfil. */
+export function notificationsMuted(prefs: MobilePreferences) {
+  const { nearbyEvents, weatherAndCity, routeChanges, businessBenefits } = prefs.notifications;
+  return !(nearbyEvents || weatherAndCity || routeChanges || businessBenefits);
+}
+
 function mergeWithDefaults(raw: Partial<MobilePreferences>): MobilePreferences {
   return {
     ...DEFAULT_MOBILE_PREFERENCES,

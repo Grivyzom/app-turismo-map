@@ -21,6 +21,10 @@ export const MobileColors = {
   accent: '#141414',
   onAccent: '#FFFFFF',
   danger: '#C62828',
+  /** Punto de "hay novedades" (mismo rojo que el badge de la web). */
+  badge: '#FF4D4F',
+  /** Oscurecimiento detrás de hojas y modales; se aplica con un fundido, nunca de golpe. */
+  scrim: 'rgba(20,20,20,0.42)',
   mapLand: '#E4E4E4',
   mapRoad: '#CDD3D4',
 } as const;
@@ -36,6 +40,12 @@ export const MobileSpacing = {
   screen: 16,
   gap: 12,
   cardPadding: 16,
+} as const;
+
+/** Duraciones de las transiciones (ms): entrar un poco más lento que salir. */
+export const MobileMotion = {
+  enter: 260,
+  exit: 200,
 } as const;
 
 /** Escala de texto; se multiplica por la preferencia de accesibilidad "Tamaño del texto". */
