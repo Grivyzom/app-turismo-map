@@ -10,6 +10,14 @@ export const AMBIENT_MIN_ZOOM = 12.5;
 export const AMBIENT_MAX_MARKERS = 70;
 
 /**
+ * Interruptor global de edificios 3D. En false la capa nativa 'building-3d'
+ * se mantiene en el estilo (otras capas la usan como ancla de orden) pero
+ * queda oculta, y el footprint 2D 'building' se ve a todo zoom.
+ * Todo el código de LOD sigue ahí: poner en true para reactivarlo.
+ */
+export const ENABLE_BUILDINGS_3D = false;
+
+/**
  * LOD de edificios 3D: 'building-3d' es una capa nativa del estilo que
  * extruye TODO edificio visible sin importar distancia a cámara — con
  * ciudades densas y pitch alto eso es el mayor costo de fill-rate del mapa

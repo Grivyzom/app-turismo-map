@@ -1,6 +1,7 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { applyBuildingMaterialColors } from '../../../utils/mapWebUtils';
 import {
+  ENABLE_BUILDINGS_3D,
   BUILDING_3D_MAX_RADIUS_METERS,
   BUILDING_3D_MIN_PITCH,
   BUILDING_3D_FULL_PITCH,
@@ -23,6 +24,21 @@ export function createBuildingLOD({ map, getMap, getLayerMode }: BuildingLODOpti
   const sync3DBuildings = () => {
     const currentMap = getMap() || map;
     if (!currentMap || typeof currentMap.isStyleLoaded !== 'function' || !currentMap.isStyleLoaded()) return;
+
+    if (!ENABLE_BUILDINGS_3D) {
+      // Capa oculta pero presente: otras capas la usan como ancla de orden.
+      if (currentMap.getLayer('building-3d')) {
+        try { currentMap.setLayoutProperty('building-3d', 'visibility', 'none'); } catch {}
+      }
+      if (currentMap.getLayer('building')) {
+        try { currentMap.setLayerZoomRange('building', 0, 24); } catch {}
+      }
+      return;
+    }
+
+    if (currentMap.getLayer('building-3d')) {
+      try { currentMap.setLayoutProperty('building-3d', 'visibility', 'visible'); } catch {}
+    }
 
     // El estilo 'liberty' ya incluye 'building-3d' de forma nativa.
     // Ajustar el zoom del footprint 2D para no superponerse con la extrusión 3D.
@@ -74,6 +90,7 @@ export function createBuildingLOD({ map, getMap, getLayerMode }: BuildingLODOpti
   // cámara, no en un solo salto al terminar el gesto.
   let lastBuildingLodT = -1;
   const updateBuildingLOD = () => {
+    if (!ENABLE_BUILDINGS_3D) return;
     const currentMap = getMap() || map;
     if (
       !currentMap ||
