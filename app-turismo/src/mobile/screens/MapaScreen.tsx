@@ -126,6 +126,7 @@ export function MapaScreen() {
         walkPreviewGeojson={selected ? (walk.route?.geojson ?? null) : null}
         isFrozen={tab !== 'mapa'}
         mapDisplayMode="turismo"
+        controlsTopOffset={insets.top + 130}
       />
 
       {/* Búsqueda + filtros */}

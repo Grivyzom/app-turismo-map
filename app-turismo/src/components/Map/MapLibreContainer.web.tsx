@@ -156,6 +156,7 @@ export function MapLibreContainer({
   onMapClickForRouting,
   isRouteFinished = false,
   mapDisplayMode = 'turismo',
+  controlsTopOffset = 80,
 }: MapContainerProps) {
   const mapNodeRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -3530,7 +3531,7 @@ export function MapLibreContainer({
       <div
         style={{
           position: 'absolute',
-          top: 80,
+          top: controlsTopOffset,
           right: 14,
           zIndex: 10,
           display: 'flex',
