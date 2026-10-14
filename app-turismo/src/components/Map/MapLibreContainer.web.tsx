@@ -16,7 +16,7 @@ import { SatelliteTileCache } from '../../utils/satelliteTileCache';
 import { TrafficTileCache, TRAFFIC_PROTOCOL } from '../../utils/trafficTileCache';
 import { useSuperclusterEvents } from '../../utils/clusterUtils';
 import { MICRODOT_PAINT, microdotFeatures } from '../../utils/semanticZoom';
-import { pickTopPriority, pinHitBox } from '../../utils/contextualRanking';
+import { pickTopPriority, pinHitBox, WALK_LINE_DASHARRAY } from '../../utils/contextualRanking';
 import { radialMenuRegistry } from '../../utils/radialMenuRegistry';
 import { getLatestRadarPath } from '../../utils/weatherUtils';
 import { useRainEffect } from '../../utils/useRainEffect';
@@ -130,6 +130,7 @@ export function MapLibreContainer({
   isMagicWandActive = false,
   onMagicWandSelect,
   navRouteGeojson,
+  walkPreviewGeojson,
   isAuthenticated,
   cameraAnimationsEnabled = true,
   isRoutingActive = false,
@@ -2729,6 +2730,38 @@ export function MapLibreContainer({
     } catch {}
   }, [showMobiliario]);
 
+
+  // ── Walk preview: línea punteada usuario → pin (sin fitBounds) ────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const SOURCE = 'walk-preview';
+    const LAYER = 'walk-preview-line';
+    const data: GeoJSON.FeatureCollection = {
+      type: 'FeatureCollection',
+      features: walkPreviewGeojson
+        ? [{ type: 'Feature', geometry: walkPreviewGeojson, properties: {} }]
+        : [],
+    };
+    const apply = () => {
+      if (!map.getSource(SOURCE)) {
+        map.addSource(SOURCE, { type: 'geojson', data });
+      } else {
+        (map.getSource(SOURCE) as maplibregl.GeoJSONSource).setData(data);
+      }
+      if (!map.getLayer(LAYER)) {
+        map.addLayer({
+          id: LAYER,
+          type: 'line',
+          source: SOURCE,
+          layout: { 'line-cap': 'butt', 'line-join': 'round' },
+          paint: { 'line-color': '#1D4ED8', 'line-width': 3.5, 'line-dasharray': WALK_LINE_DASHARRAY },
+        });
+      }
+    };
+    if (map.isStyleLoaded()) apply();
+    else map.once('idle', apply);
+  }, [walkPreviewGeojson]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── OSRM Navigation Route Layer ───────────────────────────────────────────
   useEffect(() => {

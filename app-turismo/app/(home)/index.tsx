@@ -74,6 +74,8 @@ import { useHomeScreenState } from '../../src/hooks/useHomeScreenState';
 import { styles, NAVBAR_CLEARANCE } from '../../src/styles/homeScreenStyles';
 import { NavigationHUD } from '../../src/components/MapUI/NavigationHUD';
 import { fetchOsrmRoute, OsrmRoute, TransportMode } from '../../src/utils/osrmService';
+import { PeekCard } from '../../src/components/MapUI/PeekCard';
+import { useWalkPreview } from '../../src/hooks/useWalkPreview';
 
 // --- Lazy-loaded screens ---
 const UserProfileScreen = lazyWithRetry(() => import('../../src/screens/UserProfileScreen'));
@@ -571,6 +573,13 @@ export default function HomeScreen() {
     [navDestinationCoords, handleNavigateTo],
   );
 
+  // ── Peek Card (etapa 2) + línea punteada de caminata ───────────────────
+  const [peekExpanded, setPeekExpanded] = useState(false);
+  useEffect(() => {
+    setPeekExpanded(false);
+  }, [selectedEvent?.id]);
+  const walkPreview = useWalkPreview(userLocation, selectedEvent);
+
   const handleCancelNav = useCallback(() => {
     setNavRoute(null);
     setNavDestinationCoords(null);
@@ -1048,6 +1057,7 @@ export default function HomeScreen() {
           onRateRoute={rateRoute}
           activeNestedZone={activeNestedZone}
           navRouteGeojson={isRoutingActive ? (draftRouteGeojson ?? null) : (navRoute?.geojson ?? null)}
+          walkPreviewGeojson={!navRoute && selectedEvent ? (walkPreview.route?.geojson ?? null) : null}
           userLocation={userLocation}
           isAuthenticated={isAuthenticated}
           cameraAnimationsEnabled={cameraAnimationsEnabled}
@@ -1740,7 +1750,20 @@ export default function HomeScreen() {
         />
       )}
 
-      {showMainUI && selectedEvent && !hasFloatingMinimodal && !isNoModalCategory(selectedEvent.category) && (
+      {showMainUI && selectedEvent && !isDesktop && !peekExpanded && !navRoute && !hasFloatingMinimodal && !isNoModalCategory(selectedEvent.category) && (
+        <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }} pointerEvents="box-none">
+          <PeekCard
+            event={selectedEvent}
+            walkLabel={walkPreview.label}
+            walkLoading={walkPreview.loading}
+            onClose={closeEventPanel}
+            onDirections={() => handleNavigateTo(selectedEvent.latitude, selectedEvent.longitude, 'foot')}
+            onExpand={() => setPeekExpanded(true)}
+          />
+        </View>
+      )}
+
+      {showMainUI && selectedEvent && (isDesktop || peekExpanded || !!navRoute) && !hasFloatingMinimodal && !isNoModalCategory(selectedEvent.category) && (
         <View style={styles.sidePanelOverlay} pointerEvents="box-none">
           {/* Tap-to-dismiss backdrop */}
           <Pressable style={styles.sidePanelBackdrop} onPress={closeEventPanel} />

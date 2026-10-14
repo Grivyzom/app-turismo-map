@@ -280,6 +280,8 @@ export interface MapContainerProps {
 
   // OSRM Navigation
   navRouteGeojson?: GeoJSON.LineString | null;
+  /** Línea punteada de caminata usuario → pin seleccionado (Peek Card abierta). */
+  walkPreviewGeojson?: GeoJSON.LineString | null;
 
   // Motor de Animaciones de Cámara (Efecto GTA V)
   isAuthenticated?: boolean;
