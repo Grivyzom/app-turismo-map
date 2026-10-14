@@ -20,19 +20,41 @@ interface BuildingLODOptions {
  * con altura procedural según el pitch. Registra sus propios listeners en
  * el mapa; `dispose()` los remueve y cancela el rAF pendiente.
  */
+/** Capas de extrusión propias de la app que NO son edificios del estilo base. */
+const NON_BUILDING_EXTRUSION_IDS = new Set(['relief-extrusion']);
+
 export function createBuildingLOD({ map, getMap, getLayerMode }: BuildingLODOptions) {
+  /**
+   * Con ENABLE_BUILDINGS_3D en false oculta TODA capa fill-extrusion del
+   * estilo base (el id varía según el estilo: 'building-3d', 'building-3d-*',
+   * etc.) y deja el footprint 2D 'building' visible a todo zoom. Las capas
+   * quedan en el estilo porque otras capas las usan como ancla de orden.
+   */
+  const hideBuildingExtrusions = () => {
+    const currentMap = getMap() || map;
+    const layers = currentMap?.getStyle?.()?.layers;
+    if (!layers) return;
+    for (const layer of layers) {
+      if (layer.type !== 'fill-extrusion' || NON_BUILDING_EXTRUSION_IDS.has(layer.id)) continue;
+      try {
+        if (currentMap.getLayoutProperty(layer.id, 'visibility') !== 'none') {
+          currentMap.setLayoutProperty(layer.id, 'visibility', 'none');
+        }
+      } catch {}
+    }
+    // Solo si cambia: setLayerZoomRange dispara 'styledata' y esto corre en ese evento.
+    const footprint = currentMap.getLayer('building');
+    if (footprint && footprint.maxzoom !== 24) {
+      try { currentMap.setLayerZoomRange('building', 0, 24); } catch {}
+    }
+  };
+
   const sync3DBuildings = () => {
     const currentMap = getMap() || map;
     if (!currentMap || typeof currentMap.isStyleLoaded !== 'function' || !currentMap.isStyleLoaded()) return;
 
     if (!ENABLE_BUILDINGS_3D) {
-      // Capa oculta pero presente: otras capas la usan como ancla de orden.
-      if (currentMap.getLayer('building-3d')) {
-        try { currentMap.setLayoutProperty('building-3d', 'visibility', 'none'); } catch {}
-      }
-      if (currentMap.getLayer('building')) {
-        try { currentMap.setLayerZoomRange('building', 0, 24); } catch {}
-      }
+      hideBuildingExtrusions();
       return;
     }
 
@@ -179,11 +201,14 @@ export function createBuildingLOD({ map, getMap, getLayerMode }: BuildingLODOpti
   map.on('pitch', throttledUpdateBuildingLOD);
   map.on('moveend', updateBuildingLOD);
   map.on('zoomend', updateBuildingLOD);
+  // Otro código puede (re)agregar o re-mostrar capas al cambiar de estilo/tema.
+  if (!ENABLE_BUILDINGS_3D) map.on('styledata', hideBuildingExtrusions);
 
   const dispose = () => {
     map.off('pitch', throttledUpdateBuildingLOD);
     map.off('moveend', updateBuildingLOD);
     map.off('zoomend', updateBuildingLOD);
+    map.off('styledata', hideBuildingExtrusions);
     if (buildingLodRafId !== null) cancelAnimationFrame(buildingLodRafId);
   };
 
