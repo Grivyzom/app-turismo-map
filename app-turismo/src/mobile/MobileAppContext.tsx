@@ -48,6 +48,10 @@ interface MobileAppContextValue {
   // Ubicación y sector
   origin: Coordinate;
   hasGps: boolean;
+  gpsAccuracy: number | null;
+  gpsLoading: boolean;
+  gpsError: string | null;
+  usingSectorOverride: boolean;
   recenter: () => void;
   sectors: Sector[];
   sectorName: string;
@@ -78,7 +82,8 @@ const MobileAppContext = createContext<MobileAppContextValue | undefined>(undefi
 
 export function MobileAppProvider({ children }: { children: React.ReactNode }) {
   const { token } = useAuth();
-  const { userLocation, retryLocation } = useUserLocationContext();
+  const { userLocation, retryLocation, locationError, isLoadingLocation } =
+    useUserLocationContext();
   const { prefs, update: updatePrefs, reset: resetPrefs } = useMobilePreferences();
 
   const [tab, setTab] = useState<MobileTab>('inicio');
@@ -194,6 +199,10 @@ export function MobileAppProvider({ children }: { children: React.ReactNode }) {
     textScale: TEXT_SCALE[prefs.textSize],
     origin,
     hasGps: gps !== null,
+    gpsAccuracy: userLocation?.accuracy ?? null,
+    gpsLoading: isLoadingLocation,
+    gpsError: locationError,
+    usingSectorOverride: sectorOverride !== null,
     recenter,
     sectors,
     sectorName,

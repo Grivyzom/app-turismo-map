@@ -1,9 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 import { useMobileApp } from '../MobileAppContext';
 import { AppHeader } from '../components/AppHeader';
+import { MarqueeText } from '../components/MarqueeText';
 import { QuestionInput } from '../components/QuestionInput';
 import { Screen } from '../components/Screen';
 import { Card, IconButton, PillButton, SectionHeader, T, Thumb, useColors } from '../components/ui';
@@ -121,19 +123,14 @@ export function InicioScreen() {
               />
               <View>
                 <T weight="700">{weather ? `${weather.temp}°` : '--°'}</T>
-                <T
-                  variant="caption"
-                  color={colors.textSecondary}
-                  numberOfLines={1}
-                  style={{ maxWidth: 76 }}
-                >
+                <MarqueeText width={76} variant="caption" color={colors.textSecondary}>
                   {weather?.condition ?? 'Cargando'}
-                </T>
+                </MarqueeText>
               </View>
             </View>
             <View style={[styles.weatherDivider, { backgroundColor: colors.border }]} />
             <View style={styles.weatherCell}>
-              <Ionicons name="flag-outline" size={16} color={colors.text} />
+              <MaterialCommunityIcons name="weather-windy" size={18} color={colors.text} />
               <View>
                 <T weight="700">{weather ? weather.windSpeed : '--'}</T>
                 <T variant="caption" color={colors.textSecondary}>
