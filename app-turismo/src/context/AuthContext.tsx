@@ -58,40 +58,8 @@ function useProtectedRoute(
     if (!isNavigationReady) return;
     if (user.isLoading) return;
 
-    // Si estamos en la ruta de negocios
-    if (segments[0] === 'business') {
-      const inBusinessAuth =
-        segments[1] === 'ingresar' || segments[1] === 'register' || segments[1] === 'login';
-
-      if (!user.isAuthenticated) {
-        if (!inBusinessAuth) {
-          router.replace('/business/ingresar');
-        }
-      } else {
-        // Logueado
-        if (
-          user.userType !== 'partner_owner' &&
-          user.userType !== 'partner_worker' &&
-          user.userType !== 'admin'
-        ) {
-          // Si el usuario no tiene rol de empresa pero intenta acceder a una ruta de negocios,
-          // lo redirigimos a la pantalla de login de negocios.
-          if (!inBusinessAuth) {
-            router.replace('/business/ingresar');
-          }
-        } else if (inBusinessAuth) {
-          // Ya logueado como empresa, no mostrar login
-          router.replace('/business/dashboard');
-        }
-      }
-      return;
-    }
-
-    // Si estamos en la ruta de administración, ignoramos el flujo de redirección de usuario normal
-    if (segments[0] === 'admin') {
-      return;
-    }
-
+    // El portal empresarial (/business) y el panel admin (/dev) son apps separadas
+    // servidas por nginx; esta app solo gestiona las rutas del turista.
     const inAuthGroup =
       segments[0] === 'login' || segments[0] === 'registro' || segments[0] === 'ingresar';
     const isGuestAllowedRoute = !segments[0] || segments[0] === 'index' || segments[0] === '(home)';
@@ -117,12 +85,7 @@ function useProtectedRoute(
         user.openAuthModal?.(mode);
       }
     } else if (user.isAuthenticated && segments[0] === 'index') {
-      // Redirigir según el rol del usuario únicamente si está en la pantalla index
-      if (user.userType === 'partner_owner' || user.userType === 'partner_worker') {
-        router.replace('/business');
-      } else {
-        router.replace('/(home)');
-      }
+      router.replace('/(home)');
     }
   }, [user.isAuthenticated, user.isLoading, user.userType, segments, rootNavigationState?.key, user.openAuthModal]);
 }

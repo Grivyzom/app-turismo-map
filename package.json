@@ -6,6 +6,7 @@
     "dev": "./dev.sh",
     "dev:app": "cd app-turismo && NODE_OPTIONS=\"--max-old-space-size=4096\" pnpm web",
     "dev:admin": "cd admin && npm run dev",
+    "dev:business": "cd business && npm run dev",
     "services:up": "docker compose up -d",
     "services:down": "docker compose down",
     "services:logs": "docker compose logs -f"
