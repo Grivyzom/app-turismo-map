@@ -1,19 +1,25 @@
-import React, { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { MobileRadii, MobileSpacing } from '../theme';
+import type { IoniconName } from '../data/categories';
+import { MobileRadii } from '../theme';
 
+import { BottomSheet } from './BottomSheet';
 import { T, useColors } from './ui';
 
 export interface Option<K extends string> {
   key: K;
   label: string;
   hint?: string;
+  icon?: IoniconName;
 }
 
-/** Hoja inferior con una lista de opciones (reemplaza a los <select> del wireframe). */
+/**
+ * Hoja inferior con una lista de opciones (reemplaza a los <select> del wireframe).
+ * La opción vigente queda sombreada, en negrita y con check relleno, y la lista
+ * se desplaza hasta ella al abrir.
+ */
 export function OptionSheet<K extends string>({
   visible,
   title,
@@ -30,34 +36,45 @@ export function OptionSheet<K extends string>({
   onClose: () => void;
 }) {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Cerrar" />
-      <View
-        style={[
-          styles.sheet,
-          { backgroundColor: colors.surface, paddingBottom: insets.bottom + 16 },
-        ]}
-      >
-        <View style={[styles.grabber, { backgroundColor: colors.borderStrong }]} />
-        <T variant="title" weight="700" style={{ marginBottom: 8 }}>
-          {title}
-        </T>
-        <ScrollView style={{ maxHeight: 420 }}>
-          {options.map((o) => {
-            const active = o.key === value;
-            return (
-              <Pressable
-                key={o.key}
-                onPress={() => {
-                  onSelect(o.key);
-                  onClose();
-                }}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: active }}
-                style={[styles.option, { borderBottomColor: colors.border }]}
+    <BottomSheet visible={visible} onClose={onClose} title={title}>
+      <ScrollView ref={scrollRef} style={{ maxHeight: 420 }} contentContainerStyle={styles.list}>
+        {options.map((o) => {
+          const active = o.key === value;
+          return (
+            <Pressable
+              key={o.key}
+              onPress={() => {
+                onSelect(o.key);
+                onClose();
+              }}
+              onLayout={
+                active
+                  ? (e) =>
+                      scrollRef.current?.scrollTo({
+                        y: Math.max(0, e.nativeEvent.layout.y - 120),
+                        animated: false,
+                      })
+                  : undefined
+              }
+              accessibilityRole="radio"
+              accessibilityState={{ selected: active }}
+            >
+              <View
+                style={[
+                  styles.option,
+                  active && { backgroundColor: colors.surfaceMuted, borderColor: colors.border },
+                ]}
               >
+                {o.icon ? (
+                  <Ionicons
+                    name={o.icon}
+                    size={18}
+                    color={active ? colors.text : colors.textSecondary}
+                    style={{ marginRight: 10 }}
+                  />
+                ) : null}
                 <View style={{ flex: 1 }}>
                   <T weight={active ? '700' : '400'}>{o.label}</T>
                   {o.hint ? (
@@ -66,13 +83,17 @@ export function OptionSheet<K extends string>({
                     </T>
                   ) : null}
                 </View>
-                {active ? <Ionicons name="checkmark" size={20} color={colors.text} /> : null}
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      </View>
-    </Modal>
+                <Ionicons
+                  name={active ? 'checkmark-circle' : 'ellipse-outline'}
+                  size={22}
+                  color={active ? colors.accent : colors.borderStrong}
+                />
+              </View>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    </BottomSheet>
   );
 }
 
@@ -120,19 +141,16 @@ export function SelectField<K extends string>({
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
-  sheet: {
-    borderTopLeftRadius: MobileRadii.card,
-    borderTopRightRadius: MobileRadii.card,
-    paddingHorizontal: MobileSpacing.screen + 4,
-    paddingTop: 10,
-  },
-  grabber: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, marginBottom: 12 },
+  list: { gap: 2 },
   option: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    minHeight: 52,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: MobileRadii.inner,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'transparent',
   },
   field: {
     flexDirection: 'row',

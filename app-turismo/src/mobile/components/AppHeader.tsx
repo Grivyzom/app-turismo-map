@@ -1,16 +1,15 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { router } from 'expo-router';
 
 import { useMobileApp } from '../MobileAppContext';
 import type { IoniconName } from '../data/categories';
+import { notificationsMuted } from '../hooks/useMobilePreferences';
 import { MobileRadii } from '../theme';
 
-import { Avatar, Card, T, Tap, useColors } from './ui';
+import { Avatar, BadgeDot, Card, T, Tap, useColors } from './ui';
 
 const BAR_HEIGHT = 56;
-const BADGE_COLOR = '#FF4D4F';
 
 /** "Sector Collico" → "Collico": la etiqueta superior ya dice "Sector". */
 function placeName(sectorName: string) {
@@ -24,19 +23,20 @@ function placeName(sectorName: string) {
  * Nota: el layout de cada botón va en un View interno porque NativeWind puede
  * descartar el `style` del Pressable en Android.
  */
-export function AppHeader({ hasNotifications = true }: { hasNotifications?: boolean }) {
-  const { prefs, sectorName, setSectorPickerOpen, setTab } = useMobileApp();
+export function AppHeader() {
+  const { prefs, sectorName, setSectorPickerOpen, setTab, setOverlay, notifications } =
+    useMobileApp();
   const colors = useColors();
 
-  const notifOff = !Object.entries(prefs.notifications).some(
-    ([key, value]) => key !== 'quietFrom' && value === true,
-  );
+  // El punto rojo solo aparece cuando hay avisos sin leer (como en la web)
+  const notifOff = notificationsMuted(prefs);
+  const unread = notifications.unreadCount;
+  const showBadge = unread > 0 && !notifOff;
   const notifIcon: IoniconName = notifOff
     ? 'notifications-off-outline'
-    : hasNotifications
+    : showBadge
       ? 'notifications'
       : 'notifications-outline';
-  const showBadge = hasNotifications && !notifOff;
 
   return (
     <Card style={styles.bar}>
@@ -74,10 +74,14 @@ export function AppHeader({ hasNotifications = true }: { hasNotifications?: bool
       </View>
 
       <Tap
-        onPress={() => router.push('/notifications')}
+        onPress={() => setOverlay('avisos')}
         accessibilityRole="button"
         accessibilityLabel={
-          notifOff ? 'Avisos desactivados' : showBadge ? 'Avisos, hay novedades' : 'Avisos'
+          notifOff
+            ? 'Avisos desactivados'
+            : showBadge
+              ? `Avisos, ${unread} sin leer`
+              : 'Avisos, no hay novedades'
         }
       >
         <View style={styles.iconBtn}>
@@ -87,7 +91,7 @@ export function AppHeader({ hasNotifications = true }: { hasNotifications?: bool
               size={22}
               color={notifOff ? colors.textSecondary : colors.text}
             />
-            {showBadge ? <View style={[styles.badge, { borderColor: colors.surface }]} /> : null}
+            {showBadge ? <BadgeDot /> : null}
           </View>
         </View>
       </Tap>
@@ -123,15 +127,5 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  badge: {
-    position: 'absolute',
-    top: -2,
-    right: -3,
-    width: 11,
-    height: 11,
-    borderRadius: 6,
-    borderWidth: 2,
-    backgroundColor: BADGE_COLOR,
   },
 });

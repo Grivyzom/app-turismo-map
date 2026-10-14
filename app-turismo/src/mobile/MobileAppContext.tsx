@@ -5,6 +5,7 @@ import { useUserLocationContext } from '../context/UserLocationContext';
 
 import { buildRecommendedRoute, RecommendedRoute } from './data/routes';
 import { QuickCategory } from './data/categories';
+import { useMobileNotifications } from './hooks/useMobileNotifications';
 import { MobilePreferences, TEXT_SCALE, useMobilePreferences } from './hooks/useMobilePreferences';
 import { MobileWeather, useMobileWeather } from './hooks/useMobileWeather';
 import {
@@ -17,7 +18,7 @@ import {
 } from './hooks/usePlacesData';
 
 export type MobileTab = 'inicio' | 'mapa' | 'guia' | 'rutas' | 'perfil';
-export type MobileOverlay = 'clima' | null;
+export type MobileOverlay = 'clima' | 'avisos' | null;
 
 export interface ActiveRoute {
   route: RecommendedRoute;
@@ -68,6 +69,7 @@ interface MobileAppContextValue {
   restrooms: PlaceWithDistance[];
   loadingPlaces: boolean;
   recommendedRoute: RecommendedRoute | null;
+  notifications: ReturnType<typeof useMobileNotifications>;
 
   // Ruta en curso
   activeRoute: ActiveRoute | null;
@@ -120,6 +122,7 @@ export function MobileAppProvider({ children }: { children: React.ReactNode }) {
     error: weatherError,
     refresh: refreshWeather,
   } = useMobileWeather(origin.latitude, origin.longitude);
+  const notifications = useMobileNotifications(token);
 
   const sectorName = useMemo(() => {
     if (sectorOverride) return sectorOverride.name;
@@ -219,6 +222,7 @@ export function MobileAppProvider({ children }: { children: React.ReactNode }) {
     restrooms,
     loadingPlaces: loading,
     recommendedRoute,
+    notifications,
     activeRoute,
     startRoute,
     advanceRoute,

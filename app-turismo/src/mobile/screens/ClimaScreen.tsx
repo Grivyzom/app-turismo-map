@@ -5,9 +5,8 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 import { useMobileApp } from '../MobileAppContext';
 import { Screen } from '../components/Screen';
-import { Card, IconButton, PillButton, SectionHeader, T, useColors } from '../components/ui';
+import { Card, OverlayHeader, PillButton, SectionHeader, T, useColors } from '../components/ui';
 import type { IoniconName } from '../data/categories';
-import { MobileRadii } from '../theme';
 
 /** "Clima en Sector": detalle actual, próximas horas, próximos días, sol y UV. */
 export function ClimaScreen() {
@@ -23,22 +22,12 @@ export function ClimaScreen() {
   const colors = useColors();
 
   const header = (
-    <Card style={styles.header}>
-      <IconButton
-        icon="chevron-back"
-        onPress={() => setOverlay(null)}
-        accessibilityLabel="Volver"
-      />
-      <View style={{ flex: 1 }}>
-        <T variant="caption" color={colors.textSecondary}>
-          Clima en Sector
-        </T>
-        <T weight="700" numberOfLines={1}>
-          {sectorName}
-        </T>
-      </View>
-      <PillButton label="Cambiar" onPress={() => setSectorPickerOpen(true)} />
-    </Card>
+    <OverlayHeader
+      caption="Clima en Sector"
+      title={sectorName}
+      onBack={() => setOverlay(null)}
+      action={<PillButton label="Cambiar" onPress={() => setSectorPickerOpen(true)} />}
+    />
   );
 
   if (!weather) {
@@ -291,13 +280,6 @@ function Metric({
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    padding: 8,
-    borderRadius: MobileRadii.pill,
-  },
   bigIcon: {
     width: 56,
     height: 56,
