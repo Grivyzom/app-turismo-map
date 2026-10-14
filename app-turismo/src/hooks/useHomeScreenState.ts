@@ -53,6 +53,7 @@ import { isUtilityCategory } from '../components/Map/design/pinDesignSystem';
 const MODE_CATEGORIES: Record<MapDisplayMode, CategoryFilter[]> = {
   mapa: [
     'hospital',
+    'clinica',
     'universidad',
     'bombero',
     'carabinero',
@@ -287,6 +288,46 @@ const ROUTER_CATEGORY_PIN_FILTERS: Record<string, (event: TurismoEvent) => boole
   },
 };
 
+/**
+ * Visibilidad de una categoría según filtros y modo, sin datos propios del evento.
+ * Lo usa la capa OSM (visibleOsmCategories); filteredEvents aplica además las
+ * reglas por evento (parkId de utilidades, búsqueda).
+ */
+function isCategoryVisible(
+  category: string,
+  selectedCategories: CategoryFilter[],
+  mapDisplayMode: MapDisplayMode,
+  showSecurityCameras: boolean,
+): boolean {
+  if (selectedCategories.includes('ninguno')) return false;
+  if (category === 'camara' && !showSecurityCameras) return false;
+  if (isUtilityCategory(category) && mapDisplayMode !== 'turismo') return false;
+  const isEmergencyCategory = ['choque', 'incendio', 'accidente', 'calle_cortada'].includes(
+    category,
+  );
+  if (selectedCategories.includes('todos') || selectedCategories.length === 0) {
+    return (
+      isEmergencyCategory || MODE_CATEGORIES[mapDisplayMode].includes(category as CategoryFilter)
+    );
+  }
+  return (
+    (selectedCategories.includes('emergencia') && isEmergencyCategory) ||
+    selectedCategories.includes(category as CategoryFilter) ||
+    selectedCategories.some((cat) => CATEGORY_ALIASES[cat]?.includes(category))
+  );
+}
+
+const ALL_OSM_CATEGORIES: CategoryFilter[] = [
+  'parque', 'agua', 'humedal', 'universidad', 'hospital', 'clinica',
+  'bombero', 'carabinero', 'camara', 'escultura', 'torreon', 'estatua',
+  'arte',
+  // 'edificio' queda a proposito FUERA de todos los MODE_CATEGORIES: los buildings
+  // se pintan como capa de poligonos/extrusion 3D en un plan posterior, no como pin
+  // puntual, asi que nunca deben aparecer en visibleOsmCategories. No es un bug.
+  'edificio',
+  'banca', 'basurero', 'bebedero', 'bano',
+];
+
 type MapPinchoState = {
   latitude: number;
   longitude: number;
@@ -347,6 +388,7 @@ export function useHomeScreenState(token: string | null) {
   // ── Nested Zones State ─────────────────────────────────────────────────
   const [activeNestedZone, setActiveNestedZone] = useState<any>(null);
   const [selectedSector, setSelectedSector] = useState<Zone | null>(null);
+  const [activeBuildingId, setActiveBuildingId] = useState<number | null>(null);
 
   // ── Magic Wand (Zone Creation) State ───────────────────────────────────
   const [isMagicWandActive, setIsMagicWandActive] = useState<boolean>(false);
@@ -727,7 +769,13 @@ export function useHomeScreenState(token: string | null) {
         if (data.results) {
           setEvents((prev) => {
             const existingIds = new Set(prev.map((p) => p.id));
-            const newPlaces = data.results.filter((rp: any) => !existingIds.has(rp.id));
+            // Las filas OSM (organizer === 'OpenStreetMap') NUNCA entran a `events`:
+            // ese array alimenta el pipeline pesado de pines interactivos
+            // (renderPinMarker en web, EventMarker/ArtisticMarker en mobile).
+            // Los pines OSM se pintan en una capa liviana aparte (Plan 2/3).
+            const newPlaces = data.results.filter(
+              (rp: any) => !existingIds.has(rp.id) && rp.organizer !== 'OpenStreetMap',
+            );
             return [...prev, ...newPlaces];
           });
         }
@@ -1326,6 +1374,21 @@ export function useHomeScreenState(token: string | null) {
     mapDisplayMode,
     showSecurityCameras,
   ]);
+
+  const visibleOsmCategories = useMemo(() => {
+    // Con Geo-Router activo, la capa OSM sigue el mismo filtro contextual que los pines.
+    if (isRoutingActive) {
+      const filterFn =
+        ROUTER_CATEGORY_PIN_FILTERS[(routeCategory || 'ciudad').toLowerCase()] ||
+        ROUTER_CATEGORY_PIN_FILTERS.ciudad;
+      return ALL_OSM_CATEGORIES.filter((category) =>
+        filterFn({ id: '', category } as TurismoEvent),
+      );
+    }
+    return ALL_OSM_CATEGORIES.filter((cat) =>
+      isCategoryVisible(cat, selectedCategories, mapDisplayMode, showSecurityCameras),
+    );
+  }, [isRoutingActive, routeCategory, selectedCategories, mapDisplayMode, showSecurityCameras]);
 
   const isTacticalModeActiveRef = useRef(isTacticalModeActive);
   useEffect(() => {
@@ -1976,6 +2039,8 @@ export function useHomeScreenState(token: string | null) {
     setActiveNestedZone,
     selectedSector,
     setSelectedSector,
+    activeBuildingId,
+    setActiveBuildingId,
     isMagicWandActive,
     setIsMagicWandActive,
     extractedGeometry,
@@ -2029,6 +2094,7 @@ export function useHomeScreenState(token: string | null) {
     panelWidth,
     openRightSheet,
     filteredEvents,
+    visibleOsmCategories,
     handleSelectEvent,
     closeEventPanel,
 

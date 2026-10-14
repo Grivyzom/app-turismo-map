@@ -293,8 +293,13 @@ export interface MapContainerProps {
   isAuthenticated?: boolean;
   cameraAnimationsEnabled?: boolean;
 
-  // Modo de visualización activo del mapa
-  mapDisplayMode?: 'mapa' | 'turismo' | 'comercial';
+  // Filtrado de pines OSM (Herramientas + modo Mapa/Turismo/Comercial)
+  visibleOsmCategories?: string[];
+  mapDisplayMode?: import('../MapUI/types').MapDisplayMode;
+
+  // Disclosure progresiva: building 3D clickeado revela sus pines anidados
+  activeBuildingId?: number | null;
+  onBuildingSelect?: (id: number | null) => void;
 }
 
 export interface Cluster {

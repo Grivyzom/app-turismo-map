@@ -401,6 +401,9 @@ function WebHomeScreen() {
     viewMode,
     handleToggleViewMode,
     mapDisplayMode,
+    visibleOsmCategories,
+    activeBuildingId,
+    setActiveBuildingId,
     setMapDisplayMode,
     activeToast,
   } = useHomeScreenState(token);
@@ -1073,6 +1076,10 @@ function WebHomeScreen() {
           userLocation={userLocation}
           isAuthenticated={isAuthenticated}
           cameraAnimationsEnabled={cameraAnimationsEnabled}
+          visibleOsmCategories={visibleOsmCategories}
+          mapDisplayMode={mapDisplayMode}
+          activeBuildingId={activeBuildingId}
+          onBuildingSelect={setActiveBuildingId}
         />
       </View>
 

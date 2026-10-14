@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 )
 
 type Place struct {
@@ -25,6 +26,12 @@ type Place struct {
 	HasActiveUpdate     bool    `json:"hasActiveUpdate,omitempty"`
 	RecommendationType  string  `json:"recommendationType,omitempty"`
 	IsSmartNotification bool    `json:"isSmartNotification,omitempty"`
+	Geometry            *string `json:"geometry,omitempty"`
+	OsmTags             *string `json:"osmTags,omitempty"`
+	// SourceLayer es la capa OSM de origen ('buildings', 'mobiliario', etc.).
+	// Solo viene poblado en filas de osm_places; es el discriminador estable
+	// para distinguir buildings del resto sin depender del string de organizer.
+	SourceLayer *string `json:"sourceLayer,omitempty"`
 }
 
 type PlacesResponse struct {
@@ -35,6 +42,14 @@ func PlacesSearchHandler(w http.ResponseWriter, r *http.Request) {
 	queryParam := r.URL.Query().Get("q")
 	followedParam := r.URL.Query().Get("followed")
 	zoneIdParam := r.URL.Query().Get("zoneId")
+	buildingIdParam := r.URL.Query().Get("buildingId")
+
+	if buildingIdParam != "" {
+		if _, convErr := strconv.Atoi(buildingIdParam); convErr != nil {
+			http.Error(w, "buildingId inválido", http.StatusBadRequest)
+			return
+		}
+	}
 
 	minLat := r.URL.Query().Get("minLat")
 	maxLat := r.URL.Query().Get("maxLat")
@@ -93,7 +108,10 @@ func PlacesSearchHandler(w http.ResponseWriter, r *http.Request) {
 	sqlQuery := `
 		SELECT id, title, description, lat, lng, category, organizer, address, time, image_url,
 		       COALESCE((SELECT name FROM zones z WHERE z.id = ANY(u.containing_zone_ids) LIMIT 1), '') as sector_name,
-		       has_active_update
+		       has_active_update,
+		       ST_AsGeoJSON(u.geom) as geometry,
+		       u.osm_tags::text as osm_tags,
+		       u.source_layer
 		FROM (
 			SELECT
 				'branch-' || b.id::text as id,
@@ -110,7 +128,10 @@ func PlacesSearchHandler(w http.ResponseWriter, r *http.Request) {
 				b.company_id,
 				b.containing_zone_ids,
 				COALESCE(b.target_audience, 'all') as target_audience,
-				EXISTS (SELECT 1 FROM branch_updates bu WHERE bu.branch_id = b.id AND bu.is_active = true AND (bu.expires_at IS NULL OR bu.expires_at > CURRENT_TIMESTAMP)) as has_active_update
+				EXISTS (SELECT 1 FROM branch_updates bu WHERE bu.branch_id = b.id AND bu.is_active = true AND (bu.expires_at IS NULL OR bu.expires_at > CURRENT_TIMESTAMP)) as has_active_update,
+				NULL::int as parent_building_id,
+				NULL::jsonb as osm_tags,
+				NULL::text as source_layer
 			FROM company_branches b
 			LEFT JOIN companies c ON b.company_id = c.id
 
@@ -131,7 +152,10 @@ func PlacesSearchHandler(w http.ResponseWriter, r *http.Request) {
 				b.company_id,
 				e.containing_zone_ids,
 				COALESCE(e.target_audience, 'all') as target_audience,
-				false as has_active_update
+				false as has_active_update,
+				NULL::int as parent_building_id,
+				NULL::jsonb as osm_tags,
+				NULL::text as source_layer
 			FROM events e
 			LEFT JOIN company_branches b ON e.branch_emitter_id = b.id
 			LEFT JOIN companies c ON b.company_id = c.id
@@ -161,8 +185,34 @@ func PlacesSearchHandler(w http.ResponseWriter, r *http.Request) {
 				NULL::int as company_id,
 				COALESCE(ep.containing_zone_ids, '{}'::int[]) as containing_zone_ids,
 				ep.target_audience,
-				false as has_active_update
+				false as has_active_update,
+				NULL::int as parent_building_id,
+				NULL::jsonb as osm_tags,
+				NULL::text as source_layer
 			FROM external_places ep
+
+			UNION ALL
+
+			SELECT
+				'osm-' || op.id::text as id,
+				op.name as title,
+				'' as description,
+				op.lat,
+				op.lng,
+				op.category,
+				'OpenStreetMap' as organizer,
+				COALESCE(op.address, '') as address,
+				'24/7' as time,
+				op.geom,
+				'' as image_url,
+				NULL::int as company_id,
+				'{}'::int[] as containing_zone_ids,
+				op.target_audience,
+				false as has_active_update,
+				op.parent_building_id,
+				op.osm_tags,
+				op.source_layer
+			FROM osm_places op
 		) u
 		WHERE 1=1
 	`
@@ -203,7 +253,22 @@ func PlacesSearchHandler(w http.ResponseWriter, r *http.Request) {
 		sqlQuery += " AND NOT EXISTS (SELECT 1 FROM zones z WHERE z.id = ANY(u.containing_zone_ids) AND z.category IN ('edificio', 'reserva') AND z.is_active = true)"
 	}
 
-	sqlQuery += " LIMIT 500"
+	if buildingIdParam != "" {
+		sqlQuery += fmt.Sprintf(" AND u.parent_building_id = $%d", paramCount)
+		args = append(args, buildingIdParam)
+		paramCount++
+	} else {
+		sqlQuery += " AND u.parent_building_id IS NULL"
+	}
+
+	// Techo de seguridad, no el mecanismo principal de acotado: el bbox del
+	// viewport ya filtra en el WHERE (un plan posterior agrega fetch por bounds
+	// reales en el frontend, que es lo que de verdad achica el resultado).
+	// 8000 cubre el dataset vivo completo: osm_places tiene 5638 filas, de las
+	// cuales 5567 califican en un viewport normal de Valdivia (medido 2026-09-12),
+	// mas ~127 de las otras 3 ramas. El viejo LIMIT 500 descartaba ~90% sin
+	// ORDER BY, o sea que que filas sobrevivian era no determinista.
+	sqlQuery += " LIMIT 8000"
 
 	rows, err = database.DB.Query(sqlQuery, args...)
 
@@ -217,9 +282,21 @@ func PlacesSearchHandler(w http.ResponseWriter, r *http.Request) {
 	places := []Place{}
 	for rows.Next() {
 		var p Place
-		if err := rows.Scan(&p.ID, &p.Title, &p.Description, &p.Latitude, &p.Longitude, &p.Category, &p.Organizer, &p.Address, &p.Time, &p.ImageUrl, &p.SectorName, &p.HasActiveUpdate); err != nil {
+		var geometryRaw sql.NullString
+		var osmTagsRaw sql.NullString
+		var sourceLayerRaw sql.NullString
+		if err := rows.Scan(&p.ID, &p.Title, &p.Description, &p.Latitude, &p.Longitude, &p.Category, &p.Organizer, &p.Address, &p.Time, &p.ImageUrl, &p.SectorName, &p.HasActiveUpdate, &geometryRaw, &osmTagsRaw, &sourceLayerRaw); err != nil {
 			log.Printf("Error escaneando fila: %v\n", err)
 			continue
+		}
+		if geometryRaw.Valid {
+			p.Geometry = &geometryRaw.String
+		}
+		if osmTagsRaw.Valid {
+			p.OsmTags = &osmTagsRaw.String
+		}
+		if sourceLayerRaw.Valid {
+			p.SourceLayer = &sourceLayerRaw.String
 		}
 		places = append(places, p)
 	}
