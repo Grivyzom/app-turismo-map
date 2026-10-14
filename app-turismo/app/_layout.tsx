@@ -74,10 +74,6 @@ export default function RootLayout() {
                 <Stack.Screen name="ingresar" options={{}} />
                 <Stack.Screen name="sso-callback" options={{}} />
                 <Stack.Screen name="(home)" options={{}} />
-                <Stack.Screen name="business" options={{ headerShown: false }} />
-                <Stack.Screen name="admin/login/index" options={{}} />
-                <Stack.Screen name="admin/dashboard/index" options={{}} />
-                <Stack.Screen name="admin/logout/index" options={{}} />
               </Stack>
             </CollectionsProvider>
           </UserLocationProvider>

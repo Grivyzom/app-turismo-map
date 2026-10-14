@@ -89,3 +89,11 @@ pnpm dev:admin
 # o: cd admin && npm run dev
 ```
 Disponible con HMR instantáneo en `http://localhost:5173/dev/`.
+
+### 3️⃣ Portal Empresarial (Vite) — `business/`
+App separada para empresas, PYMEs e independientes (login, eventos, novedades, geolocalización). Consume el mismo backend Go (`/auth/login`, `/api/v1/business/*`, `/api/v1/events`).
+```bash
+pnpm dev:business
+# o: cd business && npm run dev
+```
+Disponible en `http://localhost:5180/business/`. Vite proxea `/api`, `/auth` y `/static` al backend (`BACKEND_URL`, por defecto `http://localhost:8081`). En producción nginx la sirve en `/business/` junto a la app turismo (`/`) y el panel admin (`/dev/`).

@@ -11,6 +11,18 @@ RUN npm ci
 COPY admin/ ./
 RUN npm run build
 
+# Stage 1b: Build the business portal Vite SPA (Portal Empresarial)
+FROM node:20 AS business-builder
+
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+
+WORKDIR /app
+COPY business/package*.json ./
+RUN npm ci
+COPY business/ ./
+RUN npm run build
+
 # Stage 2: Build the static Expo Web assets
 FROM node:20 AS expo-builder
 
@@ -66,6 +78,9 @@ COPY --from=expo-builder /app/dist /usr/share/nginx/html
 
 # Copy Admin SPA dist to /dev
 COPY --from=admin-builder /app/dist /usr/share/nginx/html/dev
+
+# Copy Business portal SPA dist to /business
+COPY --from=business-builder /app/dist /usr/share/nginx/html/business
 
 EXPOSE 80
 
