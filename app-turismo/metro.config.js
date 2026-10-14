@@ -18,12 +18,17 @@ const defaultBlockList = Array.isArray(config.resolver.blockList)
   ? config.resolver.blockList
   : [config.resolver.blockList].filter(Boolean);
 
+const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const projectDirPattern = (dir) =>
+  new RegExp(`^${escapeRegExp(projectRoot)}[\\\\/]${dir}[\\\\/].*`);
+
 config.resolver.blockList = [
   ...defaultBlockList,
   // Build and export directories
-  /.*[\\\/]dist[\\\/].*/,
-  /.*[\\\/]web-build[\\\/].*/,
-  /.*[\\\/]build[\\\/].*/,
+  // Solo los del proyecto: los paquetes de node_modules publican su código en build/ y dist/.
+  projectDirPattern('dist'),
+  projectDirPattern('web-build'),
+  projectDirPattern('build'),
   // Expo cache & temporary directories (prevent indexing 10MB+ dev caches)
   /.*[\\/]\.expo[\\/].*/,
   // Cache and temporary files
