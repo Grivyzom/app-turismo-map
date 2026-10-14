@@ -216,7 +216,17 @@ function deterministicRating(id: string | number): { rating: number; reviews: nu
   return { rating, reviews };
 }
 
+// Vista móvil nativa (Android / iOS). Con require + Platform.OS el build web de producción la descarta como código muerto.
+const MobileApp: React.ComponentType | null =
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  Platform.OS === 'web' ? null : require('../../src/mobile/MobileApp').default;
+
 export default function HomeScreen() {
+  if (MobileApp) return <MobileApp />;
+  return <WebHomeScreen />;
+}
+
+function WebHomeScreen() {
   const { token, isAuthModalOpen, openAuthModal, isAuthenticated } = useAuth();
   const { userLocation, retryLocation } = useUserLocationContext();
   console.log('[DEBUG] Rendering HomeScreen v2.2');
