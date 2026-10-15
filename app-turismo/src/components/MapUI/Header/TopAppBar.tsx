@@ -15,7 +15,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import { useUser as useClerkUser } from '@clerk/react';
+import { useUser as useClerkUser } from '../../Auth/clerkHooks';
 
 import { TopAppBarProps, TabType, MapDisplayMode } from '../types';
 import { NAVBAR_TOP } from '../../../utils/layout';

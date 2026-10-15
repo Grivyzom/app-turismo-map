@@ -59,8 +59,8 @@ export async function removeOfflineSnapshot(sectorName: string): Promise<void> {
 async function loadOfflineSnapshots(): Promise<TurismoEvent[]> {
   const keys = (await AsyncStorage.getAllKeys()).filter((k) => k.startsWith(OFFLINE_PREFIX));
   if (keys.length === 0) return [];
-  const entries = await AsyncStorage.getMany(keys);
-  return Object.values(entries).flatMap((raw) => {
+  const entries = await AsyncStorage.multiGet(keys);
+  return entries.flatMap(([, raw]) => {
     try {
       return raw ? (JSON.parse(raw) as TurismoEvent[]) : [];
     } catch {

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
 import { useRouter, useSegments, useRootNavigationState } from 'expo-router';
 import { Platform } from 'react-native';
-import { useAuth as useClerkAuth, useUser as useClerkUser, useClerk } from '@clerk/react';
+import { useAuth as useClerkAuth, useUser as useClerkUser, useClerk } from '../components/Auth/clerkHooks';
 
 import { getAuthTokenAsync, saveAuthTokenAsync, clearAuthTokenAsync } from '../utils/authStorage';
 import {

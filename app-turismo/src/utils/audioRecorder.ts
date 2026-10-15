@@ -1,9 +1,17 @@
-import { Audio } from 'expo-av';
+import {
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+  type AudioRecorder as NativeAudioRecorder,
+} from 'expo-audio';
+// Sin hook: AudioRecorder se usa como singleton fuera de componentes (igual que useAudioRecorder por dentro).
+import AudioModule from 'expo-audio/build/AudioModule';
+import { createRecordingOptions } from 'expo-audio/build/utils/options';
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 
 export class AudioRecorder {
-  private recording: Audio.Recording | null = null;
+  private recording: NativeAudioRecorder | null = null;
   private isBusy: boolean = false;
 
   async requestPermissions(): Promise<boolean> {
@@ -28,7 +36,7 @@ export class AudioRecorder {
         return true;
       }
 
-      const { status } = await Audio.requestPermissionsAsync();
+      const { status } = await requestRecordingPermissionsAsync();
       return status === 'granted';
     } catch (err) {
       console.error('Failed to request audio permissions:', err);
@@ -55,14 +63,16 @@ export class AudioRecorder {
         throw new Error('Microphone permission not granted');
       }
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
+      await setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: true,
       });
 
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY,
+      const recording: NativeAudioRecorder = new AudioModule.AudioRecorder(
+        createRecordingOptions(RecordingPresets.HIGH_QUALITY),
       );
+      await recording.prepareToRecordAsync();
+      recording.record();
       this.recording = recording;
     } catch (err) {
       console.error('Failed to start recording', err);
@@ -95,16 +105,17 @@ export class AudioRecorder {
       const rec = this.recording;
       this.recording = null;
 
-      const status = await rec.getStatusAsync();
-      if (status.canRecord) {
-        await rec.stopAndUnloadAsync();
+      if (rec.isRecording) {
+        await rec.stop();
       }
+      const uri = rec.uri;
+      rec.release();
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
+      await setAudioModeAsync({
+        allowsRecording: false,
       });
 
-      return rec.getURI();
+      return uri;
     } catch (err) {
       console.error('Failed to stop recording internal', err);
       return null;

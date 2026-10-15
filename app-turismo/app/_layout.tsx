@@ -1,4 +1,3 @@
-import { ClerkProvider } from '@clerk/react';
 import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { useFonts } from 'expo-font';
@@ -11,6 +10,7 @@ import { Platform } from 'react-native';
 WebBrowser.maybeCompleteAuthSession();
 
 import { AuthProvider } from '../src/context/AuthContext';
+import { AppClerkProvider } from '../src/components/Auth/AppClerkProvider';
 import { UserLocationProvider } from '../src/context/UserLocationContext';
 import { CollectionsProvider } from '../src/context/CollectionsContext';
 import { GlobalErrorBoundary } from '../src/components/ui/GlobalErrorBoundary';
@@ -58,7 +58,7 @@ export default function RootLayout() {
   }, [fontsLoaded]);
 
   return (
-    <ClerkProvider publishableKey={publishableKey}>
+    <AppClerkProvider publishableKey={publishableKey}>
       <GlobalErrorBoundary>
         <AuthProvider>
           <UserLocationProvider>
@@ -81,6 +81,6 @@ export default function RootLayout() {
         {/* sileo Toaster: renders via Portal into document.body, outside any overflow:hidden container */}
         {SileoToaster && <SileoToaster />}
       </GlobalErrorBoundary>
-    </ClerkProvider>
+    </AppClerkProvider>
   );
 }
