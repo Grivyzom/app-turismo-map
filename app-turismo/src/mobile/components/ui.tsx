@@ -290,11 +290,14 @@ export function Tag({ label }: { label: string }) {
 
 /** Imagen del lugar o, si no hay, el recuadro tachado del wireframe. */
 export function Thumb({
+  asset,
   uri,
   size,
   style,
   icon,
 }: {
+  /** Imagen empaquetada (`require`); tiene prioridad sobre `uri`. */
+  asset?: number;
   uri?: string;
   size?: number;
   style?: StyleProp<ViewStyle>;
@@ -302,10 +305,17 @@ export function Thumb({
 }) {
   const colors = useColors();
   const box: ViewStyle = size ? { width: size, height: size } : {};
-  if (uri && /^https?:\/\//.test(uri)) {
+  const source = asset != null ? asset : uri && /^https?:\/\//.test(uri) ? { uri } : null;
+  if (source) {
     return (
       <View style={[styles.thumb, box, { backgroundColor: colors.placeholder }, style]}>
-        <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        <Image
+          source={source}
+          style={styles.thumbImage}
+          resizeMode="cover"
+          resizeMethod="resize"
+          fadeDuration={0}
+        />
       </View>
     );
   }
@@ -621,6 +631,8 @@ const styles = StyleSheet.create({
     borderRadius: MobileRadii.inner,
     overflow: 'hidden',
   },
+  // Tamaño explícito: con assets empaquetados, Image toma por defecto las dimensiones del archivo
+  thumbImage: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
   segmented: {
     flexDirection: 'row',
     borderRadius: MobileRadii.button,

@@ -214,7 +214,12 @@ export function MapaScreen() {
                 }
                 style={{ flex: 1, flexDirection: 'row', gap: 12 }}
               >
-                <Thumb uri={selected.imageUrl} size={88} icon={categoryIcon(selected.category)} />
+                <Thumb
+                  asset={selected.imageAsset}
+                  uri={selected.imageUrl}
+                  size={88}
+                  icon={categoryIcon(selected.category)}
+                />
                 <View style={{ flex: 1 }}>
                   <T variant="title" weight="700" numberOfLines={1}>
                     {selected.title}

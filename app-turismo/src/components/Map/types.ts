@@ -96,6 +96,8 @@ export interface TurismoEvent {
   time: string;
   attendeesCount?: number;
   imageUrl?: string;
+  /** Ilustración empaquetada en la app (`require('…/archivo.webp')`); tiene prioridad sobre imageUrl. */
+  imageAsset?: number;
   /** Dimensiones originales de la ilustración: permiten reservar el banner sin saltos de layout. */
   imageWidth?: number;
   imageHeight?: number;
@@ -118,6 +120,8 @@ export interface TurismoEvent {
   capacity?: number;
   ageRestriction?: string;
   accessibility?: string[];
+  /** Recomendaciones prácticas para la sección "Bueno saber". */
+  tips?: string[];
   tags?: string[];
   sectorName?: string;
   markerSvg?: string; // Raw SVG string for custom pins (e.g. for fauna)
