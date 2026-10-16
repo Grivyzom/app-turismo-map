@@ -148,3 +148,93 @@ export function webUrl(value: string) {
   const v = value.trim();
   return /^https?:\/\//.test(v) ? v : `https://${v}`;
 }
+
+export type EventKind = NonNullable<TurismoEvent['eventKind']>;
+
+const DAY_SHORT = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+const DAY_LONG = ['domingos', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábados'];
+const DAY_SINGULAR = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+
+/** Lunes primero, como se lee la semana en Chile. */
+function weekOrder(days: number[]) {
+  return [...new Set(days)].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7));
+}
+
+function joinWithY(parts: string[]) {
+  return parts.length <= 1 ? parts.join('') : `${parts.slice(0, -1).join(', ')} y ${parts.at(-1)}`;
+}
+
+/**
+ * "Todos los días", "Sáb y dom", "Mar a sáb" o "Lun, mié y vie".
+ * Con `long`: "Sábados y domingos", "De martes a sábado".
+ */
+export function weekdaysLabel(days: number[] | undefined, long = false): string {
+  const ordered = weekOrder(days ?? []);
+  if (ordered.length === 0 || ordered.length === 7) return 'Todos los días';
+  const names = long ? DAY_LONG : DAY_SHORT;
+  const mondayIdx = ordered.map((d) => (d + 6) % 7);
+  const consecutive = mondayIdx.every((d, i) => i === 0 || d === mondayIdx[i - 1] + 1);
+  const label =
+    consecutive && ordered.length >= 3
+      ? long
+        ? `de ${DAY_SINGULAR[ordered[0]]} a ${DAY_SINGULAR[ordered.at(-1)!]}`
+        : `${names[ordered[0]]} a ${names[ordered.at(-1)!]}`
+      : joinWithY(ordered.map((d) => names[d]));
+  return capitalize(label);
+}
+
+export interface EventHook {
+  /** Etiqueta corta del tipo: "Todos los días", "Sáb y dom", "Anuncio". */
+  badge: string;
+  /** Frase que despierta la curiosidad: "Hoy nuevamente, desde las 10:00". */
+  headline: string;
+  /** true si ocurre hoy (o está ocurriendo ahora). */
+  today: boolean;
+}
+
+/** Texto gancho según el tipo de evento y su próxima ocurrencia. */
+export function eventHook(e: TurismoEvent, now = new Date()): EventHook | null {
+  if (!e.eventKind) return null;
+  const { start, end } = eventWhen(e, now);
+  const badge = e.eventKind === 'publicitario' ? 'Anuncio' : weekdaysLabel(e.weekdays);
+  if (!start) return { badge, headline: e.time, today: false };
+
+  const live = start.getTime() <= now.getTime() && (!end || now.getTime() < end.getTime());
+  const today = live || sameDay(start, now);
+  const until = end ? `hasta las ${hhmm(end)}` : '';
+  const from = `desde las ${hhmm(start)}`;
+  const tomorrow = new Date(now);
+  tomorrow.setDate(now.getDate() + 1);
+  const nextDay = sameDay(start, tomorrow) ? 'mañana' : `el ${DAY_SINGULAR[start.getDay()]}`;
+
+  let headline: string;
+  switch (e.eventKind) {
+    case 'diario':
+      headline = live
+        ? `¡Ahora mismo! Disponible ${until}`
+        : today
+          ? `Hoy nuevamente, ${from}`
+          : `${capitalize(nextDay)} nuevamente, ${from}`;
+      break;
+    case 'dias':
+      headline = live
+        ? `¡Hoy sí hay! Disponible ${until}`
+        : today
+          ? `¡Hoy sí hay! ${capitalize(from)}`
+          : `Vuelve ${nextDay} a las ${hhmm(start)}`;
+      break;
+    case 'publicitario':
+      headline = live
+        ? `Abierto ahora, ${until}`
+        : today
+          ? `Hoy abre a las ${hhmm(start)}`
+          : `Abre ${nextDay} a las ${hhmm(start)}`;
+      break;
+  }
+  return { badge, headline, today };
+}
+
+/** El evento tiene ilustración propia (empaquetada o remota) para mostrar como banner. */
+export function hasBanner(e: TurismoEvent): boolean {
+  return e.imageAsset != null || (!!e.imageUrl && /^https?:\/\//.test(e.imageUrl));
+}

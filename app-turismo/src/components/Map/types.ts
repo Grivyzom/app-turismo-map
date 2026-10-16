@@ -122,6 +122,13 @@ export interface TurismoEvent {
   accessibility?: string[];
   /** Recomendaciones prácticas para la sección "Bueno saber". */
   tips?: string[];
+  /**
+   * Tipo de evento: anuncio de un local que abre como siempre ("publicitario"),
+   * actividad que ocurre solo algunos días ("dias") o experiencia disponible a diario ("diario").
+   */
+  eventKind?: 'publicitario' | 'dias' | 'diario';
+  /** Días en que ocurre (0 = domingo … 6 = sábado). */
+  weekdays?: number[];
   tags?: string[];
   sectorName?: string;
   markerSvg?: string; // Raw SVG string for custom pins (e.g. for fauna)
