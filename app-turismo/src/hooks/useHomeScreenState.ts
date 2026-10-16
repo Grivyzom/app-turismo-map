@@ -1315,7 +1315,11 @@ export function useHomeScreenState(token: string | null) {
       const filterFn =
         ROUTER_CATEGORY_PIN_FILTERS[activeFilterKey] || ROUTER_CATEGORY_PIN_FILTERS.ciudad;
       const query = searchQuery.toLowerCase();
+      const selectedId = selectedEvent?.id;
       return events.filter((event) => {
+        // El pin seleccionado (posible destino de la ruta) nunca se oculta
+        // por el filtro contextual del Geo-Router.
+        if (selectedId != null && event.id === selectedId) return true;
         if (!filterFn(event)) return false;
         if (!query) return true;
         return (
@@ -1369,6 +1373,7 @@ export function useHomeScreenState(token: string | null) {
     events,
     isRoutingActive,
     routeCategory,
+    selectedEvent?.id,
     selectedCategories,
     searchQuery,
     mapDisplayMode,
