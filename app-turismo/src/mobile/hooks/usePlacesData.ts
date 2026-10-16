@@ -7,6 +7,7 @@ import type { TurismoEvent } from '../../components/Map/types';
 import { calculateDistance, getZoneCentroid } from '../../utils/locationUtils';
 import { isEventLike, isVisitable } from '../data/categories';
 import { buildDefaultEvents } from '../data/defaultEvents';
+import { hasBanner } from '../data/eventInfo';
 
 export interface Coordinate {
   latitude: number;
@@ -159,11 +160,11 @@ export function usePlacesData(origin: Coordinate, token: string | null, useHisto
 
   const places = useMemo(() => all.filter(isVisitable), [all]);
 
-  const events = useMemo(() => {
-    const live = places.filter(isEventLike);
-    // Sin agenda publicada: mostramos panoramas culturales cercanos para no dejar el carrusel vacío
-    return live.length > 0 ? live.slice(0, 10) : places.slice(0, 6);
-  }, [places]);
+  // Solo eventos con ilustración propia: el carrusel no muestra tarjetas sin banner
+  const events = useMemo(
+    () => places.filter((e) => isEventLike(e) && hasBanner(e)).slice(0, 10),
+    [places],
+  );
 
   const restrooms = useMemo(() => all.filter((e) => e.category === 'bano'), [all]);
 

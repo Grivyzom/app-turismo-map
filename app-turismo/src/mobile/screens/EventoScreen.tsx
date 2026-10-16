@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useMobileApp } from '../MobileAppContext';
 import { EventBanner } from '../components/EventBanner';
+import { EventHookLine, EventKindBadge } from '../components/EventKindBadge';
 import {
   Avatar,
   Card,
@@ -22,9 +23,11 @@ import {
   eventDuration,
   eventPrice,
   eventStatus,
+  eventHook,
   eventWhen,
   LiveStatus,
   socialUrl,
+  weekdaysLabel,
   webUrl,
 } from '../data/eventInfo';
 import { singleStopRoute } from '../data/routes';
@@ -114,6 +117,10 @@ export function EventoScreen({ event: snapshot }: { event: PlaceWithDistance }) 
 
   const when = eventWhen(event);
   const status = eventStatus(event);
+  const hook = eventHook(event);
+  // Con gancho ("Vuelve mañana…", "¡Ahora mismo!") el estado sería redundante
+  const showStatus = !!status && !hook;
+  const isAd = event.eventKind === 'publicitario';
   const price = eventPrice(event);
   const duration = eventDuration(event);
   const minutes = walkMinutes(event.distanceMeters);
@@ -242,16 +249,26 @@ export function EventoScreen({ event: snapshot }: { event: PlaceWithDistance }) 
           {/* Encabezado */}
           <Card>
             <View style={styles.tagRow}>
-              {status ? <StatusBadge status={status.key} label={status.label} /> : null}
+              {hook && event.eventKind ? (
+                <EventKindBadge kind={event.eventKind} label={hook.badge} />
+              ) : null}
+              {status && showStatus ? (
+                <StatusBadge status={status.key} label={status.label} />
+              ) : null}
               <Tag label={categoryLabel(event.category)} />
               {price.free ? <Tag label="Gratis" /> : null}
             </View>
-            <T variant="headline" weight="800" style={{ marginTop: 10 }}>
+            {hook ? (
+              <View style={{ marginTop: 12 }}>
+                <EventHookLine hook={hook} variant="body" />
+              </View>
+            ) : null}
+            <T variant="headline" weight="800" style={{ marginTop: hook ? 4 : 10 }}>
               {event.title}
             </T>
             {event.organizer ? (
               <T variant="small" color={colors.textSecondary} style={{ marginTop: 4 }}>
-                Organiza {event.organizer}
+                {isAd ? 'Anuncia' : 'Organiza'} {event.organizer}
               </T>
             ) : null}
             {likes > 0 ? (
@@ -313,6 +330,19 @@ export function EventoScreen({ event: snapshot }: { event: PlaceWithDistance }) 
           {/* Horarios */}
           <Card>
             <SectionTitle>Horarios</SectionTitle>
+            {event.eventKind ? (
+              <Row
+                icon="repeat"
+                title={weekdaysLabel(event.weekdays, true)}
+                subtitle={
+                  event.eventKind === 'diario'
+                    ? 'Se repite todos los días'
+                    : event.eventKind === 'dias'
+                      ? 'Solo estos días de la semana'
+                      : 'Horario habitual del local'
+                }
+              />
+            ) : null}
             <Row icon="calendar-clear-outline" title={when.primary} subtitle={when.secondary} />
             {event.schedule?.map((s, i) => (
               <Row
@@ -335,36 +365,38 @@ export function EventoScreen({ event: snapshot }: { event: PlaceWithDistance }) 
             ) : null}
           </Card>
 
-          {/* Entradas */}
-          <Card>
-            <SectionTitle>Entradas</SectionTitle>
-            <View style={styles.priceRow}>
-              <View style={{ flex: 1 }}>
-                <T variant="headline" weight="800">
-                  {price.label}
-                </T>
-                <T variant="small" color={colors.textSecondary}>
-                  {price.free
-                    ? 'Entrada liberada. Llega con tiempo si hay cupos limitados.'
-                    : price.known
-                      ? 'Valor informado por el organizador.'
-                      : 'El organizador aún no informa el valor.'}
-                </T>
+          {/* Entradas (un anuncio sin venta de entradas ya muestra el valor en los datos rápidos) */}
+          {isAd && !event.ticketUrl ? null : (
+            <Card>
+              <SectionTitle>Entradas</SectionTitle>
+              <View style={styles.priceRow}>
+                <View style={{ flex: 1 }}>
+                  <T variant="headline" weight="800">
+                    {price.label}
+                  </T>
+                  <T variant="small" color={colors.textSecondary}>
+                    {price.free
+                      ? 'Sin costo de entrada. Llega con tiempo si hay cupos limitados.'
+                      : price.known
+                        ? 'Valor informado por el organizador.'
+                        : 'El organizador aún no informa el valor.'}
+                  </T>
+                </View>
               </View>
-            </View>
-            {event.ticketUrl && !ended ? (
-              <PrimaryButton
-                label={price.free ? 'Reservar cupo' : 'Comprar entradas'}
-                onPress={() => openLink(webUrl(event.ticketUrl!))}
-                style={{ marginTop: 14 }}
-              />
-            ) : null}
-          </Card>
+              {event.ticketUrl && !ended ? (
+                <PrimaryButton
+                  label={price.free ? 'Reservar cupo' : 'Comprar entradas'}
+                  onPress={() => openLink(webUrl(event.ticketUrl!))}
+                  style={{ marginTop: 14 }}
+                />
+              ) : null}
+            </Card>
+          )}
 
           {/* Organizador */}
           {event.organizer ? (
             <Card>
-              <SectionTitle>Organiza</SectionTitle>
+              <SectionTitle>{isAd ? 'Anuncia' : 'Organiza'}</SectionTitle>
               <View style={styles.organizer}>
                 <Avatar name={event.organizer} uri={event.organizerAvatarUrl} size={52} />
                 <View style={{ flex: 1, minWidth: 0 }}>
