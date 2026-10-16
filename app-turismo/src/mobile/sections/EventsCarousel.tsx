@@ -80,6 +80,7 @@ export function EventsCarousel({ events }: { events: PlaceWithDistance[] }) {
                 accessibilityLabel={`Ver detalles de ${item.title}`}
               >
                 <Thumb
+                  asset={item.imageAsset}
                   uri={item.imageUrl}
                   style={{ height: 130, width: '100%' }}
                   icon={categoryIcon(item.category)}

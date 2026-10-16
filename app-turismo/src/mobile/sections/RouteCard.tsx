@@ -52,7 +52,12 @@ export function RouteCard({
               {i + 1}
             </T>
           </View>
-          <Thumb uri={stop.place.imageUrl} size={44} icon={categoryIcon(stop.place.category)} />
+          <Thumb
+            asset={stop.place.imageAsset}
+            uri={stop.place.imageUrl}
+            size={44}
+            icon={categoryIcon(stop.place.category)}
+          />
           <View style={{ flex: 1 }}>
             <T weight="600" numberOfLines={1}>
               {stop.place.title}

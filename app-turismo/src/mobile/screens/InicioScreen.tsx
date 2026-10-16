@@ -293,7 +293,7 @@ export function InicioScreen() {
       {/* Beneficio de comercio local */}
       {benefit && prefs.notifications.businessBenefits ? (
         <Card style={styles.benefit}>
-          <Thumb uri={benefit.imageUrl} size={64} />
+          <Thumb asset={benefit.imageAsset} uri={benefit.imageUrl} size={64} />
           <View style={{ flex: 1 }}>
             <T variant="caption" color={colors.textSecondary}>
               Beneficio de comercio local

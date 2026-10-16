@@ -35,7 +35,12 @@ export function PlaceRow({
         },
       ]}
     >
-      <Thumb uri={place.imageUrl} size={48} icon={categoryIcon(place.category)} />
+      <Thumb
+        asset={place.imageAsset}
+        uri={place.imageUrl}
+        size={48}
+        icon={categoryIcon(place.category)}
+      />
       <View style={{ flex: 1 }}>
         <T weight="600" numberOfLines={1}>
           {place.title}

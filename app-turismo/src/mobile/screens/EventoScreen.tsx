@@ -192,6 +192,7 @@ export function EventoScreen({ event: snapshot }: { event: PlaceWithDistance }) 
       icon: 'accessibility-outline' as const,
       text,
     })),
+    ...(event.tips ?? []).map((text) => ({ icon: 'information-circle-outline' as const, text })),
     event.ageRestriction ? { icon: 'id-card-outline' as const, text: event.ageRestriction } : null,
     event.capacity && !event.attendeesCount
       ? { icon: 'people-outline' as const, text: `Capacidad para ${event.capacity} personas` }
@@ -229,6 +230,7 @@ export function EventoScreen({ event: snapshot }: { event: PlaceWithDistance }) 
         contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}
       >
         <EventBanner
+          asset={event.imageAsset}
           uri={event.imageUrl}
           title={event.title}
           width={event.imageWidth}

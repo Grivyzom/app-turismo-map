@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   Image,
+  ImageSourcePropType,
   Modal,
   ScrollView,
   StatusBar,
@@ -25,6 +26,14 @@ function isRemote(uri?: string): uri is string {
   return !!uri && /^https?:\/\//.test(uri);
 }
 
+/** Proporción de un asset empaquetado: se conoce sin descargar ni decodificar la imagen. */
+function assetRatio(asset?: number): number | null {
+  // resolveAssetSource existe en Android/iOS pero no en react-native-web
+  if (asset == null || typeof Image.resolveAssetSource !== 'function') return null;
+  const meta = Image.resolveAssetSource(asset);
+  return meta?.width && meta?.height ? meta.width / meta.height : null;
+}
+
 /**
  * Banner de la ilustración del evento.
  *
@@ -35,14 +44,18 @@ function isRemote(uri?: string): uri is string {
  * - En Android se decodifica al tamaño físico del banner (`resizeMethod="resize"`): nitidez completa
  *   a la densidad de la pantalla sin pagar memoria por píxeles que no se ven.
  * Tocarla abre el visor a pantalla completa con la resolución original.
+ *
+ * Acepta una ilustración empaquetada en la app (`asset`, vía `require`) o una URL remota (`uri`).
  */
 export function EventBanner({
+  asset,
   uri,
   title,
   width: intrinsicWidth,
   height: intrinsicHeight,
   fallbackIcon,
 }: {
+  asset?: number;
   uri?: string;
   title: string;
   width?: number;
@@ -51,13 +64,17 @@ export function EventBanner({
 }) {
   const colors = useColors();
   const { width } = useWindowDimensions();
-  const [ratio, setRatio] = useState<number | null>(() =>
-    intrinsicWidth && intrinsicHeight ? intrinsicWidth / intrinsicHeight : null,
+  const [ratio, setRatio] = useState<number | null>(
+    () =>
+      assetRatio(asset) ??
+      (intrinsicWidth && intrinsicHeight ? intrinsicWidth / intrinsicHeight : null),
   );
   const [failed, setFailed] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
 
-  if (!isRemote(uri) || failed) {
+  const source: ImageSourcePropType | null = asset != null ? asset : isRemote(uri) ? { uri } : null;
+
+  if (!source || failed) {
     return (
       <View
         style={[
@@ -80,11 +97,16 @@ export function EventBanner({
         pressedOpacity={0.92}
         accessibilityRole="imagebutton"
         accessibilityLabel={`Ilustración de ${title}. Toca para verla en pantalla completa`}
-        style={{ width, height: width / shown, backgroundColor: colors.placeholder }}
+        style={{
+          width,
+          height: width / shown,
+          backgroundColor: colors.placeholder,
+          overflow: 'hidden',
+        }}
       >
         <Image
-          source={{ uri }}
-          style={StyleSheet.absoluteFill}
+          source={source}
+          style={styles.fill}
           resizeMode="contain"
           resizeMethod="resize"
           fadeDuration={0}
@@ -93,7 +115,7 @@ export function EventBanner({
             const source = e.nativeEvent?.source;
             if (source?.width > 0 && source?.height > 0) {
               setRatio(source.width / source.height);
-            } else {
+            } else if (isRemote(uri)) {
               // Algunas plataformas no informan dimensiones en onLoad: la imagen ya está en caché
               Image.getSize(
                 uri,
@@ -106,7 +128,7 @@ export function EventBanner({
         />
       </Tap>
       <ArtViewer
-        uri={uri}
+        source={source}
         title={title}
         visible={viewerOpen}
         onClose={() => setViewerOpen(false)}
@@ -117,12 +139,12 @@ export function EventBanner({
 
 /** Visor a pantalla completa: fondo negro liso, obra completa a resolución original (zoom en iOS). */
 function ArtViewer({
-  uri,
+  source,
   title,
   visible,
   onClose,
 }: {
-  uri: string;
+  source: ImageSourcePropType;
   title: string;
   visible: boolean;
   onClose: () => void;
@@ -148,7 +170,7 @@ function ArtViewer({
           contentContainerStyle={{ width, height }}
         >
           <Image
-            source={{ uri }}
+            source={source}
             style={{ width, height }}
             resizeMode="contain"
             resizeMethod="scale"
@@ -169,6 +191,8 @@ function ArtViewer({
 
 const styles = StyleSheet.create({
   placeholder: { alignItems: 'center', justifyContent: 'center' },
+  // Tamaño explícito: con assets empaquetados, Image toma por defecto las dimensiones del archivo
+  fill: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
   viewer: { flex: 1, backgroundColor: '#000' },
   viewerClose: { position: 'absolute', right: 16 },
 });

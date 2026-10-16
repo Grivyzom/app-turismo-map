@@ -6,6 +6,7 @@ import { INITIAL_EVENTS } from '../../data/mockEvents';
 import type { TurismoEvent } from '../../components/Map/types';
 import { calculateDistance, getZoneCentroid } from '../../utils/locationUtils';
 import { isEventLike, isVisitable } from '../data/categories';
+import { buildDefaultEvents } from '../data/defaultEvents';
 
 export interface Coordinate {
   latitude: number;
@@ -45,7 +46,8 @@ export async function saveOfflineSnapshot(
 ): Promise<number> {
   // Sin campos pesados que la vista móvil no usa
   const slim = items.map(
-    ({ polygon, catalog, galeria, markerSvg, activeUpdates, ...rest }) => rest,
+    // imageAsset es un id de módulo del bundle actual: no sirve guardado entre versiones
+    ({ polygon, catalog, galeria, markerSvg, activeUpdates, imageAsset, ...rest }) => rest,
   );
   const json = JSON.stringify(slim);
   await AsyncStorage.setItem(OFFLINE_PREFIX + sectorName, json);
@@ -138,7 +140,9 @@ export function usePlacesData(origin: Coordinate, token: string | null, useHisto
 
   const all = useMemo<PlaceWithDistance[]>(() => {
     const byId = new Map<string, TurismoEvent>();
-    for (const e of [...INITIAL_EVENTS, ...remote]) byId.set(String(e.id), e);
+    for (const e of [...INITIAL_EVENTS, ...buildDefaultEvents(), ...remote]) {
+      byId.set(String(e.id), e);
+    }
     return [...byId.values()]
       .filter((e) => Number.isFinite(e.latitude) && Number.isFinite(e.longitude))
       .map((e) => ({
