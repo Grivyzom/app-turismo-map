@@ -1,6 +1,6 @@
 import { calculateDistance } from '../../utils/locationUtils';
 import type { Coordinate, PlaceWithDistance } from '../hooks/usePlacesData';
-import { WALK_SPEED_MPS } from '../hooks/usePlacesData';
+import { WALK_SPEED_MPS, walkMinutes } from '../hooks/usePlacesData';
 import type { DayRhythm } from '../hooks/useMobilePreferences';
 
 import { quickCategoryOf } from './categories';
@@ -42,6 +42,18 @@ export function formatDurationShort(minutes: number): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   return m ? `${h} h ${m} min` : `${h} h`;
+}
+
+/** Ruta de una sola parada para reutilizar la navegación de "Rutas" (mapa, ficha de evento). */
+export function singleStopRoute(place: PlaceWithDistance): RecommendedRoute {
+  const minutes = walkMinutes(place.distanceMeters);
+  return {
+    id: `go-${place.id}`,
+    title: place.title,
+    stops: [{ place, eta: addMinutes(new Date(), minutes) }],
+    totalMinutes: minutes,
+    totalMeters: place.distanceMeters,
+  };
 }
 
 /**

@@ -9,15 +9,27 @@ import { useUserLocationContext } from '../../context/UserLocationContext';
 import { useWalkPreview } from '../../hooks/useWalkPreview';
 import { useMobileApp } from '../MobileAppContext';
 import { GpsButton } from '../components/GpsButton';
-import { Card, Chip, IconButton, PrimaryButton, T, Tag, Thumb, useColors } from '../components/ui';
+import {
+  Card,
+  Chip,
+  IconButton,
+  PillButton,
+  PrimaryButton,
+  T,
+  Tag,
+  Tap,
+  Thumb,
+  useColors,
+} from '../components/ui';
 import {
   categoryIcon,
   categoryLabel,
+  isEventLike,
   matchesQuickCategory,
   QUICK_CATEGORIES,
   QuickCategory,
 } from '../data/categories';
-import { formatDurationShort, RecommendedRoute } from '../data/routes';
+import { formatDurationShort, singleStopRoute } from '../data/routes';
 import { formatMeters, PlaceWithDistance, walkMinutes } from '../hooks/usePlacesData';
 import { useVoiceQuestion } from '../hooks/useVoiceQuestion';
 import { sharePlace } from '../utils/external';
@@ -32,26 +44,9 @@ function normalize(s: string) {
   return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
-/** Ruta de una sola parada para reutilizar la navegación de "Rutas" desde el mapa. */
-function singleStopRoute(place: PlaceWithDistance): RecommendedRoute {
-  const minutes = walkMinutes(place.distanceMeters);
-  const eta = new Date(Date.now() + minutes * 60_000);
-  return {
-    id: `go-${place.id}`,
-    title: place.title,
-    stops: [
-      {
-        place,
-        eta: `${String(eta.getHours()).padStart(2, '0')}:${String(eta.getMinutes()).padStart(2, '0')}`,
-      },
-    ],
-    totalMinutes: minutes,
-    totalMeters: place.distanceMeters,
-  };
-}
-
 export function MapaScreen() {
-  const { places, mapFocus, prefs, toggleSavedEvent, startRoute, textScale, tab } = useMobileApp();
+  const { places, mapFocus, prefs, toggleSavedEvent, startRoute, openEvent, textScale, tab } =
+    useMobileApp();
   const { userLocation } = useUserLocationContext();
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -110,6 +105,7 @@ export function MapaScreen() {
       ? walkMinutes(selected.distanceMeters)
       : 0;
   const saved = selected ? prefs.savedEventIds.includes(String(selected.id)) : false;
+  const selectedIsEvent = selected ? isEventLike(selected) : false;
 
   return (
     <View style={styles.root}>
@@ -209,20 +205,38 @@ export function MapaScreen() {
           <Card style={styles.peek}>
             <View style={[styles.grabber, { backgroundColor: colors.borderStrong }]} />
             <View style={{ flexDirection: 'row', gap: 12 }}>
-              <Thumb uri={selected.imageUrl} size={88} icon={categoryIcon(selected.category)} />
-              <View style={{ flex: 1 }}>
-                <T variant="title" weight="700" numberOfLines={1}>
-                  {selected.title}
-                </T>
-                <T variant="small" color={colors.textSecondary} numberOfLines={2}>
-                  {categoryLabel(selected.category)} · {formatMeters(selected.distanceMeters)} ·{' '}
-                  {formatDurationShort(minutes)} a pie
-                </T>
-                <View style={styles.tags}>
-                  {selected.openingHours ? <Tag label={selected.openingHours} /> : null}
-                  {selected.address ? <Tag label={selected.address} /> : null}
+              <Tap
+                onPress={() => openEvent(selected)}
+                disabled={!selectedIsEvent}
+                accessibilityRole={selectedIsEvent ? 'button' : undefined}
+                accessibilityLabel={
+                  selectedIsEvent ? `Ver detalles de ${selected.title}` : undefined
+                }
+                style={{ flex: 1, flexDirection: 'row', gap: 12 }}
+              >
+                <Thumb uri={selected.imageUrl} size={88} icon={categoryIcon(selected.category)} />
+                <View style={{ flex: 1 }}>
+                  <T variant="title" weight="700" numberOfLines={1}>
+                    {selected.title}
+                  </T>
+                  <T variant="small" color={colors.textSecondary} numberOfLines={2}>
+                    {categoryLabel(selected.category)} · {formatMeters(selected.distanceMeters)} ·{' '}
+                    {formatDurationShort(minutes)} a pie
+                  </T>
+                  <View style={styles.tags}>
+                    {selected.openingHours ? <Tag label={selected.openingHours} /> : null}
+                    {selected.address ? <Tag label={selected.address} /> : null}
+                  </View>
+                  {selectedIsEvent ? (
+                    <PillButton
+                      label="Ver evento"
+                      icon="information-circle-outline"
+                      onPress={() => openEvent(selected)}
+                      style={{ alignSelf: 'flex-start', marginTop: 8 }}
+                    />
+                  ) : null}
                 </View>
-              </View>
+              </Tap>
               <IconButton
                 icon="close"
                 size={32}
@@ -237,7 +251,7 @@ export function MapaScreen() {
                 style={{ flex: 1 }}
               />
               <IconButton
-                icon={saved ? 'heart' : 'heart-outline'}
+                icon={saved ? 'bookmark' : 'bookmark-outline'}
                 onPress={() => toggleSavedEvent(String(selected.id))}
                 accessibilityLabel={saved ? 'Quitar de guardados' : 'Guardar'}
               />
