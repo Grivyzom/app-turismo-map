@@ -18,6 +18,16 @@ export function updateMapLibreStoreModal(
   let modalContainer = pinEl.querySelector('.store-modal-container') as HTMLDivElement | null;
 
   if (showModal) {
+    // Reapertura durante la animación de salida: cancelar el desmontaje
+    // diferido, si no el timer destruiría el modal mientras sigue en hover.
+    const pendingClose = (modalContainer as any)?._closeTimer;
+    if (modalContainer && pendingClose) {
+      clearTimeout(pendingClose);
+      delete (modalContainer as any)._closeTimer;
+      modalContainer.style.opacity = '1';
+      modalContainer.style.transform = 'scale(1) translateY(0)';
+    }
+
     if (!modalContainer) {
       modalContainer = document.createElement('div');
       modalContainer.className = 'store-modal-container';
@@ -99,12 +109,13 @@ export function updateMapLibreStoreModal(
 
       root.render(modalContent);
     }
-  } else if (modalContainer) {
+  } else if (modalContainer && !(modalContainer as any)._closeTimer) {
     // Punto 3: animación de salida — fade out antes de destruir el React root
     modalContainer.style.opacity = '0';
     modalContainer.style.transform = 'scale(0.8) translateY(15px)';
     const capturedContainer = modalContainer;
-    setTimeout(() => {
+    (capturedContainer as any)._closeTimer = setTimeout(() => {
+      delete (capturedContainer as any)._closeTimer;
       const root = (capturedContainer as any)._reactRoot;
       if (root) {
         root.unmount();

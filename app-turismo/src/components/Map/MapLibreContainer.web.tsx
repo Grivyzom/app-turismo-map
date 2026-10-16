@@ -50,6 +50,7 @@ import {
 } from './utils/markerHelpers';
 import { detectSurfaceType, detectSurfaceTypeForBoat } from './utils/surfaceDetection';
 import { createSvgIcon } from './utils/svgIcons';
+import { isTouchCompatMouseEvent } from './utils/touchCompatGuard';
 import { applyHillshade } from './utils/hillshade';
 import { attachPerformanceWatchdog } from './utils/performanceWatchdog';
 import { CAMERA_CONSTRAINTS, applyCameraGate, resetNorthPitch } from './utils/cameraConstraints';
@@ -1978,10 +1979,17 @@ export function MapLibreContainer({
           }, delayMs);
         };
 
-        pinEl.addEventListener('mouseenter', handleOpenMinimodal);
-        pinEl.addEventListener('focus', handleOpenMinimodal); // A11y
+        // En táctil, mouseenter/focus/mouseleave son emulados tras el tap y
+        // el `click` ya resuelve la interacción (ver touchCompatGuard).
+        const openUnlessTouch = () => {
+          if (!isTouchCompatMouseEvent()) handleOpenMinimodal();
+        };
+        pinEl.addEventListener('mouseenter', openUnlessTouch);
+        pinEl.addEventListener('focus', openUnlessTouch); // A11y
 
-        pinEl.addEventListener('mouseleave', handleCloseMinimodal);
+        pinEl.addEventListener('mouseleave', () => {
+          if (!isTouchCompatMouseEvent()) handleCloseMinimodal();
+        });
         pinEl.addEventListener('blur', handleCloseMinimodal); // A11y
 
         pinEl.addEventListener('keydown', (e) => {
