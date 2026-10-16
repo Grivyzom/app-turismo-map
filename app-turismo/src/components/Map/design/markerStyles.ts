@@ -430,6 +430,13 @@ export const MAP_MARKER_CSS = `
           opacity: var(--halo-min, 0.28) !important;
         }
 
+        /* Mapa congelado (pestaña oculta en móvil): sin trabajo de composición */
+        .map-frozen *,
+        .map-frozen *::before,
+        .map-frozen *::after {
+          animation-play-state: paused !important;
+        }
+
         @media (prefers-reduced-motion: reduce) {
           .pin-ambient,
           .pin-enter,

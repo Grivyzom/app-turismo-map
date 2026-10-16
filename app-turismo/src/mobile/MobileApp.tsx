@@ -1,5 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { BackHandler, StyleSheet, View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withDelay,
+  withTiming,
+} from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 
 import { AuthModal } from '../components/Auth/AuthModal';
@@ -26,6 +33,54 @@ const SCREENS: Record<MobileTab, React.ComponentType> = {
 
 const GPS_KEY = '__gps__';
 
+/** Duración del fundido entre pestañas. Corto: se percibe suave sin sentirse lento. */
+const TAB_FADE_MS = 180;
+/** Tras abrir la app, el mapa se monta oculto para que al entrar ya esté pintado. */
+const MAP_PREWARM_DELAY_MS = 1200;
+
+/**
+ * Pestaña montada. La entrante se funde sobre la saliente, que queda visible
+ * debajo hasta que termina el fundido (sin destello del fondo). Todo corre en
+ * el hilo de UI con Reanimated, así que no compite con el JS ni con el mapa.
+ */
+function TabScene({
+  visible,
+  animateIn,
+  children,
+}: {
+  visible: boolean;
+  animateIn: boolean;
+  children: React.ReactNode;
+}) {
+  const reduceMotion = useReducedMotion();
+  const opacity = useSharedValue(visible && !animateIn ? 1 : 0);
+  const first = useRef(true);
+
+  useEffect(() => {
+    const duration = reduceMotion ? 0 : TAB_FADE_MS;
+    if (visible) {
+      opacity.value = withTiming(1, { duration });
+    } else if (!first.current) {
+      // La saliente se oculta recién cuando la entrante ya la cubrió
+      opacity.value = withDelay(duration, withTiming(0, { duration: 0 }));
+    }
+    first.current = false;
+  }, [visible, reduceMotion, opacity]);
+
+  const animatedStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+
+  return (
+    <Animated.View
+      style={[StyleSheet.absoluteFill, { zIndex: visible ? 1 : 0 }, animatedStyle]}
+      pointerEvents={visible ? 'auto' : 'none'}
+      accessibilityElementsHidden={!visible}
+      importantForAccessibility={visible ? 'auto' : 'no-hide-descendants'}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
 function Shell() {
   const {
     tab,
@@ -45,6 +100,16 @@ function Shell() {
   // Las pestañas visitadas quedan montadas: conservan scroll, chat y el mapa ya cargado
   const [mounted, setMounted] = useState<Set<MobileTab>>(() => new Set<MobileTab>(['inicio']));
   if (!mounted.has(tab)) setMounted(new Set(mounted).add(tab));
+
+  // Precarga del mapa: el WebView, MapLibre, el estilo y las teselas tardan en
+  // equipos modestos. Montarlo oculto mientras el usuario mira el Inicio evita
+  // el mapa en blanco al entrar (oculto queda congelado y sin animaciones).
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMounted((prev) => (prev.has('mapa') ? prev : new Set(prev).add('mapa')));
+    }, MAP_PREWARM_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Botón "atrás" de Android: cierra overlays y vuelve al Inicio antes de salir
   useEffect(() => {
@@ -90,15 +155,10 @@ function Shell() {
       <StatusBar style="dark" />
       {[...mounted].map((key) => {
         const Component = SCREENS[key];
-        const visible = key === tab;
         return (
-          <View
-            key={key}
-            style={[StyleSheet.absoluteFill, !visible && styles.hidden]}
-            pointerEvents={visible ? 'auto' : 'none'}
-          >
+          <TabScene key={key} visible={key === tab} animateIn={key !== 'inicio'}>
             <Component />
-          </View>
+          </TabScene>
         );
       })}
 
@@ -138,5 +198,4 @@ export default function MobileApp() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  hidden: { opacity: 0, zIndex: -1 },
 });

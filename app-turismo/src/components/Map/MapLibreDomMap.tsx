@@ -4,7 +4,7 @@ import React from 'react';
 import type { DOMProps } from 'expo/dom';
 
 import { MapLibreContainer } from './MapLibreContainer.web';
-import type { MapContainerProps } from './types';
+import { MAP_PLACEHOLDER_COLOR, type MapContainerProps } from './types';
 
 /**
  * Expo DOM component: monta el mismo MapLibreContainer de la web (MapLibre +
@@ -25,6 +25,7 @@ export default function MapLibreDomMap(props: MapContainerProps & { dom?: DOMPro
         flexDirection: 'column',
         overflow: 'hidden',
         touchAction: 'none',
+        background: MAP_PLACEHOLDER_COLOR,
       }}
     >
       <MapLibreContainer {...mapProps} />

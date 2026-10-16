@@ -1,10 +1,15 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import Animated, { FadeOut } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MapContainer } from '../../components/Map/MapContainer';
-import type { MapLayer, TurismoEvent } from '../../components/Map/types';
+import {
+  MAP_PLACEHOLDER_COLOR,
+  type MapLayer,
+  type TurismoEvent,
+} from '../../components/Map/types';
 import { useUserLocationContext } from '../../context/UserLocationContext';
 import { useWalkPreview } from '../../hooks/useWalkPreview';
 import { useMobileApp } from '../MobileAppContext';
@@ -19,6 +24,7 @@ import {
 } from '../data/categories';
 import { formatDurationShort, RecommendedRoute } from '../data/routes';
 import { formatMeters, PlaceWithDistance, walkMinutes } from '../hooks/usePlacesData';
+import { useStableMapEvents, useStableMapLocation } from '../hooks/useStableMapProps';
 import { useVoiceQuestion } from '../hooks/useVoiceQuestion';
 import { sharePlace } from '../utils/external';
 import { cardShadow, MobileFont, MobileRadii, MobileSpacing, TAB_BAR_HEIGHT } from '../theme';
@@ -61,8 +67,9 @@ export function MapaScreen() {
   const [selected, setSelected] = useState<PlaceWithDistance | null>(null);
   const [layer, setLayer] = useState<MapLayer>('light');
   const [centerTrigger, setCenterTrigger] = useState(0);
-  const [zoom, setZoom] = useState(15);
   const [peekHeight, setPeekHeight] = useState(0);
+  const [mapReady, setMapReady] = useState(false);
+  const onMapReady = useCallback(() => setMapReady(true), []);
 
   // Llegadas desde Inicio / Guía: aplicar filtro y lugar pedidos
   const [seenFocus, setSeenFocus] = useState(0);
@@ -89,19 +96,25 @@ export function MapaScreen() {
   }, [places, filter, query]);
 
   // El lugar enfocado debe estar siempre en el mapa aunque no calce con el filtro
-  const mapEvents = useMemo(
-    () =>
-      selected && !visible.some((p) => p.id === selected.id) ? [selected, ...visible] : visible,
-    [visible, selected],
+  const mapEvents = useStableMapEvents(
+    useMemo(
+      () =>
+        selected && !visible.some((p) => p.id === selected.id) ? [selected, ...visible] : visible,
+      [visible, selected],
+    ),
   );
+  const mapLocation = useStableMapLocation(userLocation);
 
-  const onSelect = useCallback(
-    (event: TurismoEvent | null) => {
-      if (!event) return setSelected(null);
-      setSelected(places.find((p) => p.id === event.id) ?? null);
-    },
-    [places],
-  );
+  // Callback estable: `places` cambia con cada lectura del GPS y una función
+  // nueva obligaría a reenviar todas las props al WebView del mapa.
+  const placesRef = useRef(places);
+  useEffect(() => {
+    placesRef.current = places;
+  }, [places]);
+  const onSelect = useCallback((event: TurismoEvent | null) => {
+    if (!event) return setSelected(null);
+    setSelected(placesRef.current.find((p) => p.id === event.id) ?? null);
+  }, []);
 
   const walk = useWalkPreview(userLocation, selected);
   const minutes = walk.route
@@ -120,14 +133,25 @@ export function MapaScreen() {
         mapLayer={layer}
         onSelectLayer={setLayer}
         centerTrigger={centerTrigger}
-        zoom={zoom}
-        onZoomChange={setZoom}
-        userLocation={userLocation}
+        zoom={15}
+        userLocation={mapLocation}
         walkPreviewGeojson={selected ? (walk.route?.geojson ?? null) : null}
         isFrozen={tab !== 'mapa'}
         mapDisplayMode="turismo"
         controlsTopOffset={insets.top + 130}
+        onMapReady={onMapReady}
       />
+
+      {/* Placeholder del color del mapa hasta que se pinten las primeras teselas */}
+      {!mapReady ? (
+        <Animated.View
+          exiting={FadeOut.duration(220)}
+          style={[StyleSheet.absoluteFill, styles.placeholder]}
+          pointerEvents="none"
+        >
+          <ActivityIndicator color={colors.textSecondary} />
+        </Animated.View>
+      ) : null}
 
       {/* Búsqueda + filtros */}
       <View style={[styles.top, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
@@ -256,6 +280,11 @@ export function MapaScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  placeholder: {
+    backgroundColor: MAP_PLACEHOLDER_COLOR,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   top: { position: 'absolute', left: 0, right: 0, top: 0, paddingHorizontal: MobileSpacing.screen },
   search: {
     flexDirection: 'row',

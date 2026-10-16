@@ -4,6 +4,7 @@ import { getCategoryColor } from '../../../utils/mapUtils';
 import { hexToRgba } from './markerHelpers';
 import { updateMarkerDomRefs } from './mapHelpers';
 import { AMBIENT_MIN_ZOOM, AMBIENT_MAX_MARKERS } from './mapLibreConfig';
+import { isMapPerformanceLite, LITE_AMBIENT_MAX_MARKERS } from './mapPerformance';
 import {
   isEmergencyCategory,
   isMiniModalCategory,
@@ -98,7 +99,8 @@ export function createAestheticsUpdater(
     // Presupuesto de animación: a zoom bajo o con el mapa saturado sólo
     // dejamos vivas las ambientales críticas (emergencias) y la del pin activo.
     const markerCount = Object.keys(markersRef.current).length;
-    const ambientBudgetTight = z < AMBIENT_MIN_ZOOM || markerCount > AMBIENT_MAX_MARKERS;
+    const maxAmbient = isMapPerformanceLite() ? LITE_AMBIENT_MAX_MARKERS : AMBIENT_MAX_MARKERS;
+    const ambientBudgetTight = z < AMBIENT_MIN_ZOOM || markerCount > maxAmbient;
 
     Object.keys(markersRef.current).forEach((id) => {
       const markerObj = markersRef.current[id];

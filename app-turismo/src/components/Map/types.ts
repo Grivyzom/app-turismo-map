@@ -198,6 +198,9 @@ export type MapCoordinate = {
   surface?: 'land' | 'water';
 };
 
+/** Color de fondo del mapa base claro (Positron): placeholder mientras carga. */
+export const MAP_PLACEHOLDER_COLOR = '#F2F3F0';
+
 /** Zoom máximo permitido por capa. Satellite permite overscaling más allá del nativo. */
 export const MAX_ZOOM_PER_LAYER: Record<MapLayer, number> = {
   dark: 20,
@@ -303,6 +306,15 @@ export interface MapContainerProps {
 
   /** Distancia desde arriba para los botones 2D/3D y brújula (MapLibre). Por defecto 80. */
   controlsTopOffset?: number;
+
+  /**
+   * Perfil liviano para el mapa dentro del WebView de iOS/Android: pixel ratio
+   * acotado, sin nubes animadas ni entrada animada de pines, y menos
+   * animaciones ambientales simultáneas. Pensado para teléfonos de gama baja.
+   */
+  liteMode?: boolean;
+  /** Se llama una vez, cuando el mapa base terminó de pintar sus primeras teselas (MapLibre). */
+  onMapReady?: () => void;
 }
 
 export interface Cluster {

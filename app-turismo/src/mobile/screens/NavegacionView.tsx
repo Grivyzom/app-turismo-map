@@ -1,4 +1,4 @@
-import React, { ComponentProps, useEffect, useRef, useState } from 'react';
+import React, { ComponentProps, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Linking, Platform, StyleSheet, View } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,11 +19,13 @@ import {
 } from '../components/ui';
 import { formatDurationShort } from '../data/routes';
 import { walkMinutes } from '../hooks/usePlacesData';
+import { useStableMapLocation } from '../hooks/useStableMapProps';
 import { cardShadow, MobileRadii, MobileSpacing, TAB_BAR_HEIGHT } from '../theme';
 
 type MaterialIconName = ComponentProps<typeof MaterialIcons>['name'];
 
 const REROUTE_AFTER_M = 40;
+const noop = () => undefined;
 const ARRIVED_WITHIN_M = 35;
 
 /** Navegación paso a paso de la ruta en curso (mapa + instrucción + progreso de paradas). */
@@ -92,6 +94,10 @@ export function NavegacionView({ active }: { active: ActiveRoute }) {
   const minutesLeft = leg ? Math.max(1, Math.round(leg.duration / 60)) : walkMinutes(remaining);
   const isLast = active.stopIndex === active.route.stops.length - 1;
 
+  // Props estables para el mapa (WebView): ver useStableMapProps
+  const stopPlaces = useMemo(() => active.route.stops.map((s) => s.place), [active.route]);
+  const mapLocation = useStableMapLocation(userLocation);
+
   const confirmEnd = () =>
     Alert.alert('Terminar ruta', '¿Quieres terminar la ruta en curso?', [
       { text: 'Seguir', style: 'cancel' },
@@ -101,11 +107,11 @@ export function NavegacionView({ active }: { active: ActiveRoute }) {
   return (
     <View style={{ flex: 1 }}>
       <MapContainer
-        events={active.route.stops.map((s) => s.place)}
+        events={stopPlaces}
         selectedEvent={null}
-        onSelectEvent={() => undefined}
+        onSelectEvent={noop}
         mapLayer="light"
-        userLocation={userLocation}
+        userLocation={mapLocation}
         navRouteGeojson={leg?.geojson ?? null}
         centerTrigger={centerTrigger}
         isFrozen={tab !== 'rutas'}

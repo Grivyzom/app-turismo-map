@@ -116,6 +116,11 @@ import { createBuildingLOD } from './utils/buildingLOD';
 import { createZonesSync } from './utils/zonesLayer';
 import { registerZoneInteractions } from './utils/zoneInteractions';
 import { createAestheticsUpdater } from './utils/aesthetics';
+import {
+  getLitePixelRatio,
+  MAX_ANIMATED_PIN_ENTRIES,
+  setMapPerformanceLite,
+} from './utils/mapPerformance';
 
 
 export function MapLibreContainer({
@@ -158,6 +163,9 @@ export function MapLibreContainer({
   isRouteFinished = false,
   mapDisplayMode = 'turismo',
   controlsTopOffset = 80,
+  liteMode = false,
+  onMapReady,
+  isFrozen = false,
 }: MapContainerProps) {
   const mapNodeRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -166,6 +174,19 @@ export function MapLibreContainer({
   const hasSpawnedRef = useRef<boolean>(false);
   const lastCenterTriggerRef = useRef<number>(0);
   const mapReadyRef = useRef<boolean>(false);
+  // Primer 'idle' tras cargar: teselas base pintadas. Antes de eso no se animan
+  // entradas de pines (en equipos lentos dejaban ver sólo la sombra un rato).
+  const firstIdleRef = useRef<boolean>(false);
+  const onMapReadyRef = useRef(onMapReady);
+  const liteModeRef = useRef(liteMode);
+  const isFrozenRef = useRef(isFrozen);
+  // Declarado antes de la inicialización del mapa: corre primero.
+  useEffect(() => {
+    onMapReadyRef.current = onMapReady;
+    liteModeRef.current = liteMode;
+    isFrozenRef.current = isFrozen;
+    setMapPerformanceLite(liteMode);
+  }, [onMapReady, liteMode, isFrozen]);
   const [currentBounds, setCurrentBounds] = useState<
     | {
         minLat: number;
@@ -613,6 +634,11 @@ export function MapLibreContainer({
       maxZoom: initialMaxZoom,
       maxPitch: CAMERA_CONSTRAINTS.maxPitch,
       attributionControl: false,
+      // Perfil liviano (WebView móvil): un canvas a DPR 3 cuesta ~2.3x los
+      // píxeles de uno a DPR 2 sin diferencia visible en un teléfono.
+      ...(liteModeRef.current
+        ? { pixelRatio: getLitePixelRatio(), fadeDuration: 150, refreshExpiredTiles: false }
+        : {}),
       transformRequest: (url: string) => {
         const cartoKey =
           CARTO_API_KEY ||
@@ -892,6 +918,19 @@ export function MapLibreContainer({
     map.on('pitch', throttledUpdateAesthetics);
     map.on('rotate', throttledUpdateAesthetics);
     map.on('move', throttledUpdateAesthetics);
+
+    // "Mapa listo" = primer idle tras el load (teselas visibles). Con red lenta
+    // el idle puede tardar; a los 2.5s del load se avisa igual para no dejar
+    // al usuario mirando un placeholder.
+    const notifyReady = () => {
+      if (firstIdleRef.current) return;
+      firstIdleRef.current = true;
+      onMapReadyRef.current?.();
+    };
+    map.once('load', () => {
+      map.once('idle', notifyReady);
+      setTimeout(notifyReady, 2500);
+    });
 
     map.on('idle', () => {
       let updated = false;
@@ -1692,6 +1731,19 @@ export function MapLibreContainer({
 
     const newMarkerIds = new Set(nonClusterItems.map((e) => e.id));
 
+    // Entrada animada sólo para pines sueltos que aparecen con el mapa ya
+    // pintado. En la carga inicial o en lotes grandes la animación (que parte
+    // con opacidad 0) se atrasa en equipos lentos y se veía sólo la sombra.
+    let pendingNewMarkers = 0;
+    for (const item of nonClusterItems) {
+      if (!markersRef.current[item.id]) pendingNewMarkers++;
+    }
+    const animateEntries =
+      !liteModeRef.current &&
+      firstIdleRef.current &&
+      !isZoomingRef.current &&
+      pendingNewMarkers <= MAX_ANIMATED_PIN_ENTRIES;
+
     // ── Eliminación diferida adaptativa ─────────────────────────────────────
     // El grace period varía según el gesto de cámara activo:
     //   • Zoom (rueda scroll) → eliminación inmediata.
@@ -1905,7 +1957,7 @@ export function MapLibreContainer({
         // Animación de despliegue desde el punto de anclaje al mapa.
         // Solo se aplica fuera de zoom (en zoom se crean muchos pines a la vez
         // y la animación escalonada quedaría caótica).
-        if (!isZoomingRef.current && !isPinlessCategory(catLower)) {
+        if (animateEntries && !isPinlessCategory(catLower)) {
           pinEl.classList.add('pin-enter');
           // Auto-remover la clase tras la duración de la animación para no
           // interferir con transforms posteriores de updateAesthetics.
@@ -2184,7 +2236,7 @@ export function MapLibreContainer({
           color,
           iconName,
           isEmergencyState,
-          true,
+          animateEntries,
         );
         pinEl.dataset.renderKey = renderKey;
         updateMarkerDomRefs(markerObj);
@@ -3434,7 +3486,8 @@ export function MapLibreContainer({
 
     const interval = setInterval(() => {
       const map = mapRef.current;
-      if (!map || !map.isStyleLoaded()) return;
+      // Pestaña oculta (móvil): sin simulación, nadie la ve
+      if (!map || isFrozenRef.current || !map.isStyleLoaded()) return;
 
       Object.values(markersRef.current).forEach((markerObj) => {
         const event = markerObj.event;
@@ -3531,8 +3584,14 @@ export function MapLibreContainer({
 
   return (
     <View style={styles.container}>
-      <div ref={mapNodeRef} style={{ width: '100%', height: '100%' }}>
-        <CloudShadows />
+      {/* map-frozen pausa las animaciones CSS de pines mientras la pestaña está oculta */}
+      <div
+        ref={mapNodeRef}
+        className={isFrozen ? 'map-frozen' : undefined}
+        style={{ width: '100%', height: '100%' }}
+      >
+        {/* Nubes con blur(80px) animado: decorativas y carísimas en GPU móvil */}
+        {!liteMode && <CloudShadows />}
       </div>
 
       {/* Botón flotante para alternar entre vista 2D y perspectiva 3D inclinada */}
@@ -3575,7 +3634,7 @@ export function MapLibreContainer({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            backdropFilter: 'blur(8px)',
+            backdropFilter: liteMode ? undefined : 'blur(8px)',
             transition: 'all 0.2s ease',
           }}
         >
@@ -3597,7 +3656,7 @@ export function MapLibreContainer({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              backdropFilter: 'blur(8px)',
+              backdropFilter: liteMode ? undefined : 'blur(8px)',
               marginLeft: '-3px',
             }}
           >

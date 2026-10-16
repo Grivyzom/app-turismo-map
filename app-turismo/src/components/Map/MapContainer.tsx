@@ -46,6 +46,7 @@ import {
   MAX_ZOOM_PER_LAYER,
   MAX_WEATHER_ZOOM,
   MAX_RAINVIEWER_ZOOM,
+  MAP_PLACEHOLDER_COLOR,
 } from './types';
 import { ArtisticMarker, ArtisticMarkerType } from './Markers/ArtisticMarker';
 import { StoreMarker } from './Markers/StoreMarker';
@@ -1610,14 +1611,17 @@ const GoogleNativeMapContainer = React.memo(MapContainerInner, (prev, next) => {
 });
 
 // MapLibre en un WebView (Expo DOM component): reutiliza el mapa web y sus pines.
-// Mientras la pestaña está congelada no se reenvían props al WebView.
+// Cada render reenvía TODAS las props como JSON por el puente nativo→WebView,
+// así que sólo se re-renderiza cuando algo cambió de verdad.
 const OpenSourceMapContainer = React.memo(
   function OpenSourceMapContainer(props: MapContainerProps) {
     return (
       <MapLibreDomMap
         {...props}
+        liteMode
         dom={{
-          style: { flex: 1 },
+          // Mismo tono que el mapa base: sin destello blanco mientras carga el WebView
+          style: { flex: 1, backgroundColor: MAP_PLACEHOLDER_COLOR },
           scrollEnabled: false,
           bounces: false,
         }}
@@ -1625,7 +1629,11 @@ const OpenSourceMapContainer = React.memo(
     );
   },
   (prev, next) => {
-    if (prev.isFrozen && next.isFrozen) return true;
+    // Pestaña oculta: no se reenvía la cámara ni el GPS, pero sí los datos y la
+    // capa para que al volver el mapa ya tenga los pines pintados.
+    if (prev.isFrozen && next.isFrozen) {
+      return prev.events === next.events && prev.mapLayer === next.mapLayer;
+    }
     const keys = new Set([...Object.keys(prev), ...Object.keys(next)]) as Set<
       keyof MapContainerProps
     >;
