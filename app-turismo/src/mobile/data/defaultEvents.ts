@@ -124,16 +124,16 @@ export function buildDefaultEvents(now = new Date()): TurismoEvent[] {
       id: 'destacado-noche-esmeralda',
       title: 'Noche en Esmeralda',
       description:
-        'La calle Esmeralda se enciende cuando cae la noche. Grado 13 abre su terraza bajo las ' +
-        'estrellas con música en vivo, DJ hasta la madrugada y la mejor coctelería y cerveza artesanal ' +
-        'valdiviana. Un plan perfecto para cerrar el día conociendo la vida nocturna de la ciudad, ' +
-        'en el barrio bohemio a pasos del centro.',
+        'La calle Esmeralda se enciende cuando cae la noche. El restobar Grado 13 abre su terraza ' +
+        'bajo las estrellas con música en vivo, DJ hasta la madrugada, coctelería, cerveza artesanal ' +
+        'valdiviana y una carta para picar o cenar. Un plan perfecto para cerrar el día conociendo ' +
+        'la vida nocturna de la ciudad, en el barrio bohemio a pasos del centro.',
       latitude: -39.8177,
       longitude: -73.2399,
       category: 'musica',
       status: 'agendado',
       organizer: 'Grado 13',
-      organizerType: 'Bar y terraza · Calle Esmeralda',
+      organizerType: 'Restobar · Calle Esmeralda',
       organizerVerified: true,
       time: 'Viernes 21:00 – 03:00',
       imageAsset: require('../../../assets/events/noche-esmeralda.webp'),
@@ -155,6 +155,7 @@ export function buildDefaultEvents(now = new Date()): TurismoEvent[] {
       ageRestriction: 'Solo mayores de 18 años; se pide carnet en la entrada',
       tips: [
         'El cover incluye un trago de bienvenida',
+        'Cocina abierta toda la noche: tablas, platos y opciones vegetarianas',
         'Terraza techada y calefaccionada',
         'Reserva de mesas para grupos en el local',
         'Para volver, prefiere taxi o colectivo',
