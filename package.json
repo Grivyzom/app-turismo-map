@@ -10,6 +10,7 @@
     "services:up": "docker compose up -d",
     "services:down": "docker compose down",
     "services:logs": "docker compose logs -f",
-    "build:apk": "./build-apk.sh"
+    "build:apk": "./build-apk.sh",
+    "release:apk": "./release-apk.sh"
   }
 }
