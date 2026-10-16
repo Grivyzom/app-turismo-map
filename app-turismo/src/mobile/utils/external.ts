@@ -29,10 +29,15 @@ export function openWalkingDirections(dest: Coordinate) {
   );
 }
 
-export function sharePlace(title: string, point: Coordinate) {
+export function sharePlace(title: string, point: Coordinate, details?: string) {
   Share.share({
-    message: `${title}\nhttps://www.google.com/maps/search/?api=1&query=${point.latitude},${point.longitude}`,
+    message: `${title}${details ? `\n${details}` : ''}\nhttps://www.google.com/maps/search/?api=1&query=${point.latitude},${point.longitude}`,
   }).catch(() => undefined);
+}
+
+/** Abre un enlace externo (web, mailto, tel); avisa si el sistema no puede manejarlo. */
+export function openLink(url: string) {
+  Linking.openURL(url).catch(() => Alert.alert('No se pudo abrir el enlace', url));
 }
 
 function call(number: string) {

@@ -39,6 +39,10 @@ interface MobileAppContextValue {
   /** Abre la Guía con una pregunta precargada. */
   askGuide: (question: string) => void;
   guidePrompt: { text: string; nonce: number } | null;
+  /** Ficha "Acerca del evento" abierta sobre la pestaña actual. */
+  eventDetail: PlaceWithDistance | null;
+  openEvent: (event: PlaceWithDistance) => void;
+  closeEvent: () => void;
 
   // Preferencias
   prefs: MobilePreferences;
@@ -78,6 +82,7 @@ interface MobileAppContextValue {
   endRoute: () => void;
 
   toggleSavedEvent: (id: string) => void;
+  toggleLikedEvent: (id: string) => void;
 }
 
 const MobileAppContext = createContext<MobileAppContextValue | undefined>(undefined);
@@ -99,6 +104,7 @@ export function MobileAppProvider({ children }: { children: React.ReactNode }) {
   const [guidePrompt, setGuidePrompt] = useState<MobileAppContextValue['guidePrompt']>(null);
   const [sectorOverride, setSectorOverride] = useState<Sector | null>(null);
   const [activeRoute, setActiveRoute] = useState<ActiveRoute | null>(null);
+  const [eventDetail, setEventDetail] = useState<PlaceWithDistance | null>(null);
 
   const gps = useMemo<Coordinate | null>(
     () =>
@@ -144,6 +150,7 @@ export function MobileAppProvider({ children }: { children: React.ReactNode }) {
     (place?: PlaceWithDistance | null, category: QuickCategory = 'todo') => {
       setMapFocus((prev) => ({ place: place ?? null, category, nonce: prev.nonce + 1 }));
       setOverlay(null);
+      setEventDetail(null);
       setTab('mapa');
     },
     [],
@@ -152,6 +159,7 @@ export function MobileAppProvider({ children }: { children: React.ReactNode }) {
   const askGuide = useCallback((question: string) => {
     setGuidePrompt((prev) => ({ text: question, nonce: (prev?.nonce ?? 0) + 1 }));
     setOverlay(null);
+    setEventDetail(null);
     setTab('guia');
   }, []);
 
@@ -162,6 +170,7 @@ export function MobileAppProvider({ children }: { children: React.ReactNode }) {
 
   const startRoute = useCallback((route: RecommendedRoute) => {
     setActiveRoute({ route, stopIndex: 0 });
+    setEventDetail(null);
     setTab('rutas');
   }, []);
 
@@ -185,6 +194,19 @@ export function MobileAppProvider({ children }: { children: React.ReactNode }) {
     [prefs.savedEventIds, updatePrefs],
   );
 
+  const toggleLikedEvent = useCallback(
+    (id: string) => {
+      const liked = prefs.likedEventIds.includes(id)
+        ? prefs.likedEventIds.filter((x) => x !== id)
+        : [...prefs.likedEventIds, id];
+      updatePrefs({ likedEventIds: liked });
+    },
+    [prefs.likedEventIds, updatePrefs],
+  );
+
+  const openEvent = useCallback((event: PlaceWithDistance) => setEventDetail(event), []);
+  const closeEvent = useCallback(() => setEventDetail(null), []);
+
   const value: MobileAppContextValue = {
     tab,
     setTab,
@@ -196,6 +218,9 @@ export function MobileAppProvider({ children }: { children: React.ReactNode }) {
     mapFocus,
     askGuide,
     guidePrompt,
+    eventDetail,
+    openEvent,
+    closeEvent,
     prefs,
     updatePrefs,
     resetPrefs,
@@ -228,6 +253,7 @@ export function MobileAppProvider({ children }: { children: React.ReactNode }) {
     advanceRoute,
     endRoute,
     toggleSavedEvent,
+    toggleLikedEvent,
   };
 
   return <MobileAppContext.Provider value={value}>{children}</MobileAppContext.Provider>;

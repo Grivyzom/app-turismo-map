@@ -10,6 +10,7 @@ import { TabBar } from './components/TabBar';
 import { useColors } from './components/ui';
 import { AvisosScreen } from './screens/AvisosScreen';
 import { ClimaScreen } from './screens/ClimaScreen';
+import { EventOverlay } from './screens/EventoScreen';
 import { GuiaScreen } from './screens/GuiaScreen';
 import { InicioScreen } from './screens/InicioScreen';
 import { MapaScreen } from './screens/MapaScreen';
@@ -39,6 +40,8 @@ function Shell() {
     setSectorOverride,
     usingSectorOverride,
     hasGps,
+    eventDetail,
+    closeEvent,
   } = useMobileApp();
   const colors = useColors();
 
@@ -53,6 +56,10 @@ function Shell() {
         setSectorPickerOpen(false);
         return true;
       }
+      if (eventDetail) {
+        closeEvent();
+        return true;
+      }
       if (overlay) {
         setOverlay(null);
         return true;
@@ -64,7 +71,16 @@ function Shell() {
       return false;
     });
     return () => sub.remove();
-  }, [overlay, tab, sectorPickerOpen, setOverlay, setTab, setSectorPickerOpen]);
+  }, [
+    overlay,
+    tab,
+    sectorPickerOpen,
+    eventDetail,
+    closeEvent,
+    setOverlay,
+    setTab,
+    setSectorPickerOpen,
+  ]);
 
   const sectorOptions: Option<string>[] = [
     ...(hasGps
@@ -109,6 +125,9 @@ function Shell() {
       ) : null}
 
       <TabBar />
+
+      {/* Ficha de evento: cubre también el dock, tiene su propia barra de acciones */}
+      <EventOverlay />
 
       <OptionSheet
         visible={sectorPickerOpen}

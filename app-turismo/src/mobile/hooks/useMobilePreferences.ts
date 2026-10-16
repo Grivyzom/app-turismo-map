@@ -48,6 +48,7 @@ export interface MobilePreferences {
   locationUse: LocationUse;
   historyRecommendations: boolean;
   savedEventIds: string[];
+  likedEventIds: string[];
   dismissedAlert: string | null;
 }
 
@@ -77,6 +78,7 @@ export const DEFAULT_MOBILE_PREFERENCES: MobilePreferences = {
   locationUse: 'uso',
   historyRecommendations: true,
   savedEventIds: [],
+  likedEventIds: [],
   dismissedAlert: null,
 };
 

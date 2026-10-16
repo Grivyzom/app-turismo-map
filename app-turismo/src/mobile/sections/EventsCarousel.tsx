@@ -18,6 +18,7 @@ import {
   PrimaryButton,
   T,
   Tag,
+  Tap,
   Thumb,
   useColors,
 } from '../components/ui';
@@ -28,7 +29,7 @@ const PEEK = 44; // cuánto asoma la tarjeta siguiente
 /** Carrusel paginado "Eventos cerca de ti" con guardado y "Cómo llegar". */
 export function EventsCarousel({ events }: { events: PlaceWithDistance[] }) {
   const { width } = useWindowDimensions();
-  const { prefs, toggleSavedEvent, openOnMap } = useMobileApp();
+  const { prefs, toggleSavedEvent, openOnMap, openEvent } = useMobileApp();
   const colors = useColors();
   const listRef = useRef<FlatList<PlaceWithDistance>>(null);
   const [page, setPage] = useState(0);
@@ -72,7 +73,12 @@ export function EventsCarousel({ events }: { events: PlaceWithDistance[] }) {
           const saved = prefs.savedEventIds.includes(String(item.id));
           return (
             <Card style={{ width: cardWidth, padding: 10 }}>
-              <View>
+              <Tap
+                onPress={() => openEvent(item)}
+                pressedOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={`Ver detalles de ${item.title}`}
+              >
                 <Thumb
                   uri={item.imageUrl}
                   style={{ height: 130, width: '100%' }}
@@ -85,15 +91,21 @@ export function EventsCarousel({ events }: { events: PlaceWithDistance[] }) {
                     </T>
                   </View>
                 ) : null}
-                <PillButton
-                  label={saved ? 'Guardado' : 'Guardar'}
-                  icon={saved ? 'heart' : 'heart-outline'}
-                  onPress={() => toggleSavedEvent(String(item.id))}
-                  style={[styles.overlayRight, { backgroundColor: colors.surface }]}
-                />
-              </View>
+              </Tap>
+              <PillButton
+                label={saved ? 'Guardado' : 'Guardar'}
+                icon={saved ? 'bookmark' : 'bookmark-outline'}
+                onPress={() => toggleSavedEvent(String(item.id))}
+                style={[styles.overlayRight, { backgroundColor: colors.surface }]}
+              />
               <View style={{ paddingHorizontal: 6, paddingTop: 12 }}>
-                <T variant="title" weight="700" numberOfLines={1}>
+                <T
+                  variant="title"
+                  weight="700"
+                  numberOfLines={1}
+                  onPress={() => openEvent(item)}
+                  suppressHighlighting
+                >
                   {item.title}
                 </T>
                 <T variant="caption" color={colors.textSecondary} numberOfLines={1}>
@@ -148,7 +160,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 10,
   },
-  overlayRight: { position: 'absolute', top: 8, right: 8 },
+  overlayRight: { position: 'absolute', top: 18, right: 18 },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',

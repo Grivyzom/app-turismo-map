@@ -96,6 +96,30 @@ export interface TurismoEvent {
   time: string;
   attendeesCount?: number;
   imageUrl?: string;
+  /** Dimensiones originales de la ilustración: permiten reservar el banner sin saltos de layout. */
+  imageWidth?: number;
+  imageHeight?: number;
+  // Ficha de evento ("Acerca del evento")
+  startTime?: string; // ISO 8601
+  endTime?: string; // ISO 8601
+  /** Bloques del programa: "Apertura · 18:00", "Show principal · 21:00"… */
+  schedule?: { label: string; time: string }[];
+  /** Precio en CLP. 0 = gratis; sin valor = no informado. */
+  price?: number;
+  /** Texto libre del precio cuando no es un único monto ("Desde $5.000", "Aporte voluntario"). */
+  priceLabel?: string;
+  ticketUrl?: string;
+  website?: string;
+  organizerAvatarUrl?: string;
+  organizerVerified?: boolean;
+  /** "Empresa", "Municipalidad", "Vecino"… */
+  organizerType?: string;
+  likesCount?: number;
+  capacity?: number;
+  ageRestriction?: string;
+  accessibility?: string[];
+  tags?: string[];
+  sectorName?: string;
   markerSvg?: string; // Raw SVG string for custom pins (e.g. for fauna)
   address?: string; // Dirección física del evento
   isRealTime?: boolean; // Destaca si fue agregado por WebSocket
