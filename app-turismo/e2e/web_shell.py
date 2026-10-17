@@ -288,6 +288,42 @@ def escape_in_guide_input_is_noop(browser):
     assert box.input_value() == 'museos cerca', 'Escape borró el texto'
 
 
+@check
+def back_keeps_mounted_state(browser):
+    page = open_page(browser, COMPACT, '?s=guia')
+    expect_section(page, 'guia')
+    box = page.locator('[data-testid="section-guia-active"] [aria-label="Pregunta para la guía"]')
+    box.fill('museos cerca')
+    click_section(page, 'Rutas')
+    expect_section(page, 'rutas')
+    click_section(page, 'Perfil')
+    expect_section(page, 'perfil')
+    page.go_back()
+    expect_section(page, 'rutas')
+    page.go_back()
+    expect_section(page, 'guia')
+    page.wait_for_timeout(500)
+    value = page.locator('[aria-label="Pregunta para la guía"]').first.input_value()
+    assert value == 'museos cerca', f'Atrás remontó el shell: el texto quedó {value!r}'
+
+
+@check
+def escape_closes_only_top_modal(browser):
+    page = open_page(browser, WIDE)
+    page.wait_for_selector('[data-testid="events-carousel"] img')
+    page.wait_for_timeout(800)
+    page.locator('[data-testid="events-carousel"] img').first.click()
+    page.wait_for_selector('[data-testid="event-panel"]')
+    page.wait_for_timeout(800)
+    page.locator('[data-testid="event-panel"] [aria-label^="Ilustración de"]').first.click()
+    page.wait_for_selector('[aria-modal="true"]')
+    page.wait_for_timeout(500)
+    page.keyboard.press('Escape')
+    page.wait_for_selector('[aria-modal="true"]', state='detached')
+    page.wait_for_timeout(600)
+    assert count(page, 'event-panel') == 1, 'Escape cerró también la ficha del evento'
+
+
 def main(names):
     selected = names or list(CHECKS)
     failed = []

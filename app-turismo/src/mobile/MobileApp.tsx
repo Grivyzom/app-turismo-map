@@ -97,11 +97,13 @@ function Shell() {
     return () => sub.remove();
   }, [closeTopLayer, tab, setTab]);
 
-  // Web: Escape cierra la capa de más arriba (el modal de acceso maneja su propio cierre)
+  // Web: Escape cierra la capa de más arriba (los modales manejan su propio cierre)
   useEffect(() => {
     if (Platform.OS !== 'web') return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || isAuthModalOpen) return;
+      // Un Modal abierto (visor, hojas) se cierra solo con su Escape; no cerrar también lo de abajo
+      if (document.querySelector('[aria-modal="true"]')) return;
       if (closeTopLayer()) e.preventDefault();
     };
     window.addEventListener('keydown', onKey);
