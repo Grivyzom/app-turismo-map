@@ -1,6 +1,8 @@
 import React from 'react';
-import { Redirect } from 'expo-router';
+import { Redirect, useLocalSearchParams } from 'expo-router';
 
 export default function RootIndex() {
-  return <Redirect href="/(home)" />;
+  // Reenvía la query (`?s=`, `?auth=`, `?action=`…) para no perderla en la redirección
+  const params = useLocalSearchParams();
+  return <Redirect href={{ pathname: '/(home)', params }} />;
 }

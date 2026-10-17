@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { BackHandler, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { router, useLocalSearchParams } from 'expo-router';
 
 import { AuthModal } from '../components/Auth/AuthModal';
+import { useAuth } from '../context/AuthContext';
 
 import { MobileAppProvider, MobileTab, useMobileApp } from './MobileAppContext';
 import { Option, OptionSheet } from './components/OptionSheet';
@@ -13,13 +15,13 @@ import { ClimaScreen } from './screens/ClimaScreen';
 import { EventOverlay } from './screens/EventoScreen';
 import { GuiaScreen } from './screens/GuiaScreen';
 import { InicioScreen } from './screens/InicioScreen';
-import { MapaScreen } from './screens/MapaScreen';
+import { MapSection } from './screens/MapSection';
 import { PerfilScreen } from './screens/PerfilScreen';
 import { RutasScreen } from './screens/RutasScreen';
 
 const SCREENS: Record<MobileTab, React.ComponentType> = {
   inicio: InicioScreen,
-  mapa: MapaScreen,
+  mapa: MapSection,
   guia: GuiaScreen,
   rutas: RutasScreen,
   perfil: PerfilScreen,
@@ -45,8 +47,17 @@ function Shell() {
   } = useMobileApp();
   const colors = useColors();
 
+  // Enlaces `?auth=login|register` (p. ej. desde el onboarding) abren el modal de acceso
+  const { isAuthenticated, openAuthModal } = useAuth();
+  const { auth } = useLocalSearchParams<{ auth?: string }>();
+  useEffect(() => {
+    if (auth !== 'login' && auth !== 'register') return;
+    if (!isAuthenticated) openAuthModal(auth);
+    router.setParams({ auth: undefined });
+  }, [auth, isAuthenticated, openAuthModal]);
+
   // Las pestañas visitadas quedan montadas: conservan scroll, chat y el mapa ya cargado
-  const [mounted, setMounted] = useState<Set<MobileTab>>(() => new Set<MobileTab>(['inicio']));
+  const [mounted, setMounted] = useState<Set<MobileTab>>(() => new Set<MobileTab>([tab]));
   if (!mounted.has(tab)) setMounted(new Set(mounted).add(tab));
 
   // Botón "atrás" de Android: cierra overlays y vuelve al Inicio antes de salir
@@ -102,7 +113,7 @@ function Shell() {
       : String(sectors.find((s) => s.name === sectorName)?.id ?? '');
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
+    <View testID="app-shell" style={[styles.root, { backgroundColor: colors.background }]}>
       <StatusBar style="dark" />
       {[...mounted].map((key) => {
         const Component = SCREENS[key];
@@ -110,6 +121,7 @@ function Shell() {
         return (
           <View
             key={key}
+            testID={visible ? `section-${key}-active` : `section-${key}`}
             style={[StyleSheet.absoluteFill, !visible && styles.hidden]}
             pointerEvents={visible ? 'auto' : 'none'}
           >
@@ -146,10 +158,10 @@ function Shell() {
   );
 }
 
-/** Experiencia móvil nativa (Android / iOS): Inicio, Mapa, Guía, Rutas y Perfil. */
-export default function MobileApp() {
+/** Experiencia móvil: Inicio, Mapa, Guía, Rutas y Perfil (Android, iOS y web). */
+export default function MobileApp({ initialTab }: { initialTab?: MobileTab }) {
   return (
-    <MobileAppProvider>
+    <MobileAppProvider initialTab={initialTab}>
       <Shell />
     </MobileAppProvider>
   );
