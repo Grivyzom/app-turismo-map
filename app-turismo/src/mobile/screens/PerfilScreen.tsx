@@ -11,6 +11,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import NetInfo from '@react-native-community/netinfo';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useAuth } from '../../context/AuthContext';
 import { useMobileApp } from '../MobileAppContext';
@@ -25,6 +26,7 @@ import {
   Hint,
   OutlineButton,
   PillButton,
+  PrimaryButton,
   Segmented,
   T,
   ToggleRow,
@@ -91,8 +93,18 @@ const LOCATION_USE: Option<LocationUse>[] = [
 
 const OFFLINE_RADIUS_M = 5000;
 
+const ACCOUNT_PERKS = [
+  'Guardar tu alojamiento y volver a él con un toque',
+  'Ajustar ritmo, presupuesto, transporte y dieta',
+  'Elegir qué avisos recibir',
+  'Descargar el mapa de tu sector para usarlo sin conexión',
+  'Configurar tu contacto de emergencia y compartir tu ruta',
+  'Ver tus eventos guardados',
+];
+
 export function PerfilScreen() {
-  const { prefs, updatePrefs, resetPrefs, places, sectorName, openOnMap } = useMobileApp();
+  const { prefs, updatePrefs, resetPrefs, places, sectorName, openOnMap, isGuest, requireAccount } =
+    useMobileApp();
   const { isAuthenticated, openAuthModal, signOut } = useAuth();
   const colors = useColors();
   const [locating, setLocating] = useState(false);
@@ -244,108 +256,122 @@ export function PerfilScreen() {
         </T>
       </Card>
 
-      {/* Identidad */}
-      <Card>
-        <View style={styles.photoRow}>
-          <Avatar name={prefs.nick || 'Visitante'} uri={prefs.photoUri} size={88} />
-          <View style={{ flex: 1 }}>
-            <T weight="700">Foto de perfil</T>
-            <Hint>Así te verán en tus reseñas y rutas compartidas.</Hint>
-            <PillButton
-              label="Cambiar foto"
-              onPress={pickPhoto}
-              style={{ alignSelf: 'flex-start', marginTop: 8 }}
-            />
+      {isGuest ? (
+        /* Identidad (invitado) */
+        <Card>
+          <View style={styles.photoRow}>
+            <Avatar name="Visitante" uri={null} size={88} />
+            <View style={{ flex: 1 }}>
+              <T weight="700">Estás como invitado</T>
+              <Hint>Crea una cuenta para personalizar tu perfil y guardar tus lugares.</Hint>
+            </View>
           </View>
-        </View>
-        <FieldLabel>¿Cómo quieres que te llamemos?</FieldLabel>
-        <Field
-          value={prefs.nick}
-          onChangeText={(nick) => updatePrefs({ nick })}
-          placeholder="Tu nombre o apodo"
-        />
-        <Hint>Aparece en el saludo del inicio. Puede ser un apodo.</Hint>
-        <View style={{ marginTop: 14 }}>
-          {isAuthenticated ? (
-            <OutlineButton label="Cerrar sesión" onPress={signOut} />
-          ) : (
-            <PillButton
-              label="Iniciar sesión o crear cuenta"
-              onPress={() => openAuthModal('login')}
+          <View style={{ gap: 10, marginTop: 14 }}>
+            <PrimaryButton label="Crear cuenta" onPress={() => openAuthModal('register')} />
+            <OutlineButton label="Iniciar sesión" onPress={() => openAuthModal('login')} />
+          </View>
+        </Card>
+      ) : (
+        <>
+          {/* Identidad */}
+          <Card>
+            <View style={styles.photoRow}>
+              <Avatar name={prefs.nick || 'Visitante'} uri={prefs.photoUri} size={88} />
+              <View style={{ flex: 1 }}>
+                <T weight="700">Foto de perfil</T>
+                <Hint>Así te verán en tus reseñas y rutas compartidas.</Hint>
+                <PillButton
+                  label="Cambiar foto"
+                  onPress={pickPhoto}
+                  style={{ alignSelf: 'flex-start', marginTop: 8 }}
+                />
+              </View>
+            </View>
+            <FieldLabel>¿Cómo quieres que te llamemos?</FieldLabel>
+            <Field
+              value={prefs.nick}
+              onChangeText={(nick) => updatePrefs({ nick })}
+              placeholder="Tu nombre o apodo"
             />
-          )}
-        </View>
-      </Card>
+            <Hint>Aparece en el saludo del inicio. Puede ser un apodo.</Hint>
+            <View style={{ marginTop: 14 }}>
+              <OutlineButton label="Cerrar sesión" onPress={signOut} />
+            </View>
+          </Card>
 
-      {/* Alojamiento */}
-      <Card>
-        <T variant="title" weight="700">
-          Dónde te alojas
-        </T>
-        <Hint>
-          La guía lo usa para calcular distancias y para el botón «Volver a mi alojamiento».
-        </Hint>
-        <FieldLabel>Dirección</FieldLabel>
-        <Field
-          value={prefs.lodging.street}
-          onChangeText={(street) => updatePrefs({ lodging: { ...prefs.lodging, street } })}
-          onEndEditing={geocodeLodging}
-          placeholder="Calle número, ciudad"
-        />
-        <FieldLabel>Referencia (opcional)</FieldLabel>
-        <Field
-          value={prefs.lodging.reference}
-          onChangeText={(reference) => updatePrefs({ lodging: { ...prefs.lodging, reference } })}
-          placeholder="Depto, cabaña o nombre del hotel"
-        />
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12 }}>
-          <PillButton
-            label="Usar mi ubicación actual"
-            icon="locate-outline"
-            onPress={useCurrentLocation}
-          />
-          {locating ? <ActivityIndicator color={colors.text} /> : null}
-        </View>
-        {prefs.lodging.street && prefs.lodging.latitude === null ? (
-          <Hint>No encontramos esa dirección en el mapa; prueba agregando la ciudad.</Hint>
-        ) : null}
-      </Card>
-
-      {/* Preferencias */}
-      <Card>
-        <T variant="title" weight="700">
-          Mis preferencias
-        </T>
-        <FieldLabel>Ritmo del día</FieldLabel>
-        <Segmented
-          options={RHYTHMS}
-          value={prefs.rhythm}
-          onChange={(rhythm) => updatePrefs({ rhythm })}
-        />
-        <FieldLabel>Presupuesto</FieldLabel>
-        <Segmented
-          options={BUDGETS}
-          value={prefs.budget}
-          onChange={(budget) => updatePrefs({ budget })}
-        />
-        <FieldLabel>Cómo me muevo</FieldLabel>
-        <View style={styles.chips}>
-          {TRANSPORTS.map((t) => (
-            <Chip
-              key={t.key}
-              label={t.label}
-              selected={prefs.transport.includes(t.key)}
-              onPress={() => toggleTransport(t.key)}
+          {/* Alojamiento */}
+          <Card>
+            <T variant="title" weight="700">
+              Dónde te alojas
+            </T>
+            <Hint>
+              La guía lo usa para calcular distancias y para el botón «Volver a mi alojamiento».
+            </Hint>
+            <FieldLabel>Dirección</FieldLabel>
+            <Field
+              value={prefs.lodging.street}
+              onChangeText={(street) => updatePrefs({ lodging: { ...prefs.lodging, street } })}
+              onEndEditing={geocodeLodging}
+              placeholder="Calle número, ciudad"
             />
-          ))}
-        </View>
-        <FieldLabel>Alimentación (opcional)</FieldLabel>
-        <Field
-          value={prefs.diet}
-          onChangeText={(diet) => updatePrefs({ diet })}
-          placeholder="Ej.: vegetariano, sin gluten"
-        />
-      </Card>
+            <FieldLabel>Referencia (opcional)</FieldLabel>
+            <Field
+              value={prefs.lodging.reference}
+              onChangeText={(reference) =>
+                updatePrefs({ lodging: { ...prefs.lodging, reference } })
+              }
+              placeholder="Depto, cabaña o nombre del hotel"
+            />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12 }}>
+              <PillButton
+                label="Usar mi ubicación actual"
+                icon="locate-outline"
+                onPress={useCurrentLocation}
+              />
+              {locating ? <ActivityIndicator color={colors.text} /> : null}
+            </View>
+            {prefs.lodging.street && prefs.lodging.latitude === null ? (
+              <Hint>No encontramos esa dirección en el mapa; prueba agregando la ciudad.</Hint>
+            ) : null}
+          </Card>
+
+          {/* Preferencias */}
+          <Card>
+            <T variant="title" weight="700">
+              Mis preferencias
+            </T>
+            <FieldLabel>Ritmo del día</FieldLabel>
+            <Segmented
+              options={RHYTHMS}
+              value={prefs.rhythm}
+              onChange={(rhythm) => updatePrefs({ rhythm })}
+            />
+            <FieldLabel>Presupuesto</FieldLabel>
+            <Segmented
+              options={BUDGETS}
+              value={prefs.budget}
+              onChange={(budget) => updatePrefs({ budget })}
+            />
+            <FieldLabel>Cómo me muevo</FieldLabel>
+            <View style={styles.chips}>
+              {TRANSPORTS.map((t) => (
+                <Chip
+                  key={t.key}
+                  label={t.label}
+                  selected={prefs.transport.includes(t.key)}
+                  onPress={() => toggleTransport(t.key)}
+                />
+              ))}
+            </View>
+            <FieldLabel>Alimentación (opcional)</FieldLabel>
+            <Field
+              value={prefs.diet}
+              onChangeText={(diet) => updatePrefs({ diet })}
+              placeholder="Ej.: vegetariano, sin gluten"
+            />
+          </Card>
+        </>
+      )}
 
       {/* Accesibilidad */}
       <Card>
@@ -405,173 +431,211 @@ export function PerfilScreen() {
         </Hint>
       </Card>
 
-      {/* Avisos */}
-      <Card>
-        <T variant="title" weight="700">
-          Avisos
-        </T>
-        <ToggleRow
-          title="Eventos cerca de mí"
-          subtitle="Máximo uno al día"
-          value={prefs.notifications.nearbyEvents}
-          onChange={(v) =>
-            updatePrefs({ notifications: { ...prefs.notifications, nearbyEvents: v } })
-          }
-        />
-        <ToggleRow
-          title="Alertas de clima y de la ciudad"
-          subtitle="Lluvia fuerte, viento, cortes de calle"
-          value={prefs.notifications.weatherAndCity}
-          onChange={(v) =>
-            updatePrefs({ notifications: { ...prefs.notifications, weatherAndCity: v } })
-          }
-        />
-        <ToggleRow
-          title="Cambios en mi ruta"
-          subtitle="Si un lugar cierra o cambia su horario"
-          value={prefs.notifications.routeChanges}
-          onChange={(v) =>
-            updatePrefs({ notifications: { ...prefs.notifications, routeChanges: v } })
-          }
-        />
-        <ToggleRow
-          title="Beneficios de comercios"
-          value={prefs.notifications.businessBenefits}
-          onChange={(v) =>
-            updatePrefs({ notifications: { ...prefs.notifications, businessBenefits: v } })
-          }
-        />
-        <FieldLabel>No molestar desde</FieldLabel>
-        <SelectField
-          title="No molestar desde"
-          options={QUIET_HOURS}
-          value={prefs.notifications.quietFrom}
-          onChange={(quietFrom) =>
-            updatePrefs({ notifications: { ...prefs.notifications, quietFrom } })
-          }
-        />
-      </Card>
+      {isGuest ? (
+        <>
+          {/* Resto del perfil: requiere cuenta */}
+          <Card>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <Ionicons name="lock-closed-outline" size={20} color={colors.text} />
+              <T variant="title" weight="700" style={{ flex: 1 }}>
+                Con una cuenta puedes…
+              </T>
+            </View>
+            <View style={{ gap: 8, marginTop: 12 }}>
+              {ACCOUNT_PERKS.map((perk) => (
+                <View key={perk} style={{ flexDirection: 'row', gap: 8 }}>
+                  <Ionicons name="checkmark" size={18} color={colors.textSecondary} />
+                  <T variant="small" style={{ flex: 1 }}>
+                    {perk}
+                  </T>
+                </View>
+              ))}
+            </View>
+            <PillButton
+              label="Iniciar sesión o crear cuenta"
+              onPress={() => requireAccount('perfil')}
+              style={{ alignSelf: 'flex-start', marginTop: 14 }}
+            />
+          </Card>
+        </>
+      ) : (
+        <>
+          {/* Avisos */}
+          <Card>
+            <T variant="title" weight="700">
+              Avisos
+            </T>
+            <ToggleRow
+              title="Eventos cerca de mí"
+              subtitle="Máximo uno al día"
+              value={prefs.notifications.nearbyEvents}
+              onChange={(v) =>
+                updatePrefs({ notifications: { ...prefs.notifications, nearbyEvents: v } })
+              }
+            />
+            <ToggleRow
+              title="Alertas de clima y de la ciudad"
+              subtitle="Lluvia fuerte, viento, cortes de calle"
+              value={prefs.notifications.weatherAndCity}
+              onChange={(v) =>
+                updatePrefs({ notifications: { ...prefs.notifications, weatherAndCity: v } })
+              }
+            />
+            <ToggleRow
+              title="Cambios en mi ruta"
+              subtitle="Si un lugar cierra o cambia su horario"
+              value={prefs.notifications.routeChanges}
+              onChange={(v) =>
+                updatePrefs({ notifications: { ...prefs.notifications, routeChanges: v } })
+              }
+            />
+            <ToggleRow
+              title="Beneficios de comercios"
+              value={prefs.notifications.businessBenefits}
+              onChange={(v) =>
+                updatePrefs({ notifications: { ...prefs.notifications, businessBenefits: v } })
+              }
+            />
+            <FieldLabel>No molestar desde</FieldLabel>
+            <SelectField
+              title="No molestar desde"
+              options={QUIET_HOURS}
+              value={prefs.notifications.quietFrom}
+              onChange={(quietFrom) =>
+                updatePrefs({ notifications: { ...prefs.notifications, quietFrom } })
+              }
+            />
+          </Card>
 
-      {/* Sin conexión */}
-      <Card>
-        <T variant="title" weight="700">
-          Usar sin conexión
-        </T>
-        <Hint>
-          Descarga los lugares y rutas de tu sector para usarlos sin señal, por ejemplo en la costa
-          o en el río.
-        </Hint>
-        <View style={styles.offlineRow}>
-          <View style={{ flex: 1 }}>
-            <T weight="600">Sector {sectorName}</T>
+          {/* Sin conexión */}
+          <Card>
+            <T variant="title" weight="700">
+              Usar sin conexión
+            </T>
             <Hint>
-              {offlineDone
-                ? `Descargado${offlineSize ? ` · ${(offlineSize / 1024).toFixed(0)} KB` : ''}`
-                : 'No descargado'}
+              Descarga los lugares y rutas de tu sector para usarlos sin señal, por ejemplo en la
+              costa o en el río.
             </Hint>
-          </View>
-          {downloading ? (
-            <ActivityIndicator color={colors.text} />
-          ) : (
-            <PillButton label={offlineDone ? 'Eliminar' : 'Descargar'} onPress={downloadSector} />
-          )}
-        </View>
-        <ToggleRow
-          title="Descargar solo con wifi"
-          value={prefs.offline.wifiOnly}
-          onChange={(wifiOnly) => updatePrefs({ offline: { ...prefs.offline, wifiOnly } })}
-        />
-      </Card>
-
-      {/* Seguridad */}
-      <Card>
-        <T variant="title" weight="700">
-          Seguridad
-        </T>
-        <Hint>Tu contacto de emergencia aparece en el botón SOS del inicio.</Hint>
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          <View style={{ flex: 1 }}>
-            <FieldLabel>Contacto</FieldLabel>
-            <Field
-              value={prefs.emergencyContact.name}
-              onChangeText={(name) =>
-                updatePrefs({ emergencyContact: { ...prefs.emergencyContact, name } })
-              }
-              placeholder="Nombre"
+            <View style={styles.offlineRow}>
+              <View style={{ flex: 1 }}>
+                <T weight="600">Sector {sectorName}</T>
+                <Hint>
+                  {offlineDone
+                    ? `Descargado${offlineSize ? ` · ${(offlineSize / 1024).toFixed(0)} KB` : ''}`
+                    : 'No descargado'}
+                </Hint>
+              </View>
+              {downloading ? (
+                <ActivityIndicator color={colors.text} />
+              ) : (
+                <PillButton
+                  label={offlineDone ? 'Eliminar' : 'Descargar'}
+                  onPress={downloadSector}
+                />
+              )}
+            </View>
+            <ToggleRow
+              title="Descargar solo con wifi"
+              value={prefs.offline.wifiOnly}
+              onChange={(wifiOnly) => updatePrefs({ offline: { ...prefs.offline, wifiOnly } })}
             />
-          </View>
-          <View style={{ flex: 1 }}>
-            <FieldLabel>Teléfono</FieldLabel>
-            <Field
-              value={prefs.emergencyContact.phone}
-              onChangeText={(phone) =>
-                updatePrefs({ emergencyContact: { ...prefs.emergencyContact, phone } })
-              }
-              placeholder="+56 9…"
-              keyboardType="phone-pad"
-            />
-          </View>
-        </View>
-        <ToggleRow
-          title="Compartir mi ruta en curso"
-          subtitle="Al iniciar una ruta, le enviamos tu recorrido por SMS"
-          value={prefs.shareActiveRoute}
-          onChange={(shareActiveRoute) => updatePrefs({ shareActiveRoute })}
-        />
-      </Card>
+          </Card>
 
-      {/* Privacidad */}
-      <Card>
-        <T variant="title" weight="700">
-          Privacidad y cuenta
-        </T>
-        <FieldLabel>Uso de mi ubicación</FieldLabel>
-        <SelectField
-          title="Uso de mi ubicación"
-          options={LOCATION_USE}
-          value={prefs.locationUse}
-          onChange={(locationUse) => {
-            updatePrefs({ locationUse });
-            // El permiso real lo controla el sistema operativo
-            Alert.alert('Permiso de ubicación', 'Confirma el cambio en los ajustes del teléfono.', [
-              { text: 'Ahora no', style: 'cancel' },
-              { text: 'Abrir ajustes', onPress: () => Linking.openSettings() },
-            ]);
-          }}
-        />
-        <ToggleRow
-          title="Recomendaciones según mi historial"
-          subtitle="Usa los lugares que visitaste"
-          value={prefs.historyRecommendations}
-          onChange={(historyRecommendations) => updatePrefs({ historyRecommendations })}
-        />
-        <View style={{ gap: 10, marginTop: 14, alignItems: 'flex-start' }}>
-          <PillButton label="Descargar mis datos" onPress={exportData} />
-          <OutlineButton label="Eliminar mis datos" onPress={deleteData} />
-        </View>
-      </Card>
-
-      {/* Guardados */}
-      <Card>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <T variant="title" weight="700" style={{ flex: 1 }}>
-            Eventos guardados
-          </T>
-          <T color={colors.textSecondary}>{saved.length}</T>
-        </View>
-        {saved.length === 0 ? (
-          <Hint>Aún no guardas eventos. Usa el botón «Guardar» en el inicio.</Hint>
-        ) : (
-          saved.map((p, i) => (
-            <PlaceRow
-              key={p.id}
-              place={p}
-              onPress={() => openOnMap(p)}
-              divider={i < saved.length - 1}
+          {/* Seguridad */}
+          <Card>
+            <T variant="title" weight="700">
+              Seguridad
+            </T>
+            <Hint>Tu contacto de emergencia aparece en el botón SOS del inicio.</Hint>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <View style={{ flex: 1 }}>
+                <FieldLabel>Contacto</FieldLabel>
+                <Field
+                  value={prefs.emergencyContact.name}
+                  onChangeText={(name) =>
+                    updatePrefs({ emergencyContact: { ...prefs.emergencyContact, name } })
+                  }
+                  placeholder="Nombre"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <FieldLabel>Teléfono</FieldLabel>
+                <Field
+                  value={prefs.emergencyContact.phone}
+                  onChangeText={(phone) =>
+                    updatePrefs({ emergencyContact: { ...prefs.emergencyContact, phone } })
+                  }
+                  placeholder="+56 9…"
+                  keyboardType="phone-pad"
+                />
+              </View>
+            </View>
+            <ToggleRow
+              title="Compartir mi ruta en curso"
+              subtitle="Al iniciar una ruta, le enviamos tu recorrido por SMS"
+              value={prefs.shareActiveRoute}
+              onChange={(shareActiveRoute) => updatePrefs({ shareActiveRoute })}
             />
-          ))
-        )}
-      </Card>
+          </Card>
+
+          {/* Privacidad */}
+          <Card>
+            <T variant="title" weight="700">
+              Privacidad y cuenta
+            </T>
+            <FieldLabel>Uso de mi ubicación</FieldLabel>
+            <SelectField
+              title="Uso de mi ubicación"
+              options={LOCATION_USE}
+              value={prefs.locationUse}
+              onChange={(locationUse) => {
+                updatePrefs({ locationUse });
+                // El permiso real lo controla el sistema operativo
+                Alert.alert(
+                  'Permiso de ubicación',
+                  'Confirma el cambio en los ajustes del teléfono.',
+                  [
+                    { text: 'Ahora no', style: 'cancel' },
+                    { text: 'Abrir ajustes', onPress: () => Linking.openSettings() },
+                  ],
+                );
+              }}
+            />
+            <ToggleRow
+              title="Recomendaciones según mi historial"
+              subtitle="Usa los lugares que visitaste"
+              value={prefs.historyRecommendations}
+              onChange={(historyRecommendations) => updatePrefs({ historyRecommendations })}
+            />
+            <View style={{ gap: 10, marginTop: 14, alignItems: 'flex-start' }}>
+              <PillButton label="Descargar mis datos" onPress={exportData} />
+              <OutlineButton label="Eliminar mis datos" onPress={deleteData} />
+            </View>
+          </Card>
+
+          {/* Guardados */}
+          <Card>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <T variant="title" weight="700" style={{ flex: 1 }}>
+                Eventos guardados
+              </T>
+              <T color={colors.textSecondary}>{saved.length}</T>
+            </View>
+            {saved.length === 0 ? (
+              <Hint>Aún no guardas eventos. Usa el botón «Guardar» en el inicio.</Hint>
+            ) : (
+              saved.map((p, i) => (
+                <PlaceRow
+                  key={p.id}
+                  place={p}
+                  onPress={() => openOnMap(p)}
+                  divider={i < saved.length - 1}
+                />
+              ))
+            )}
+          </Card>
+        </>
+      )}
     </Screen>
   );
 }

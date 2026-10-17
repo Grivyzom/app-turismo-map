@@ -22,13 +22,19 @@ def check(fn):
     return fn
 
 
-def open_page(browser, viewport, query=''):
+def open_page(browser, viewport, query='', skip_welcome=True):
     page = browser.new_page(viewport=viewport)
     page.set_default_timeout(TIMEOUT)
     page.goto(BASE + query)
     page.wait_for_selector('[data-testid="app-shell"]')
     # El toast de errores de desarrollo (LogBox web) tapa el dock; no existe en producción
     page.add_style_tag(content='#error-toast{display:none!important}')
+    if skip_welcome:
+        # Sin sesión la app abre con la bienvenida: se sigue como invitado
+        guest = page.get_by_text('Continuar como invitado', exact=True)
+        guest.wait_for()
+        guest.click()
+        guest.wait_for(state='detached')
     return page
 
 
@@ -68,7 +74,7 @@ def action_param_opens_mapa(browser):
 
 @check
 def auth_param_opens_modal(browser):
-    page = open_page(browser, WIDE, '?auth=login')
+    page = open_page(browser, WIDE, '?auth=login', skip_welcome=False)
     page.wait_for_selector('[aria-label="Cerrar modal de autenticación"]')
     assert len(page.query_selector_all('[aria-label="Cerrar modal de autenticación"]')) == 1, \
         'hay más de un AuthModal abierto'
@@ -170,6 +176,10 @@ def resize_keeps_section(browser):
     expect_section(page, 'rutas')
 
 
+def guest_box(page, section):
+    return page.wait_for_selector(f'[data-testid="section-{section}-active"] [data-testid="guia-guest"]').bounding_box()
+
+
 def content_box(page, section, scroll_testid):
     sel = f'[data-testid="section-{section}-active"] [data-testid="{scroll_testid}"] > div'
     return page.wait_for_selector(sel).bounding_box()
@@ -180,10 +190,10 @@ def screens_centered_on_wide(browser):
     page = open_page(browser, WIDE)
     area_x, area_w = 88, WIDE['width'] - 88
     for label, key, scroll in [('Inicio', 'inicio', 'screen-scroll'), ('Rutas', 'rutas', 'screen-scroll'),
-                               ('Perfil', 'perfil', 'screen-scroll'), ('Guía', 'guia', 'guia-scroll')]:
+                               ('Perfil', 'perfil', 'screen-scroll'), ('Guía', 'guia', 'guia-guest')]:
         click_section(page, label)
         expect_section(page, key)
-        box = content_box(page, key, scroll)
+        box = guest_box(page, key) if scroll == 'guia-guest' else content_box(page, key, scroll)
         assert box['width'] <= 761, f'{key}: columna de {box["width"]}px, máx 760'
         center = box['x'] + box['width'] / 2
         assert abs(center - (area_x + area_w / 2)) <= 2, f'{key}: columna no centrada ({box})'
@@ -278,32 +288,32 @@ def sector_sheet_is_dialog_on_wide(browser):
 
 
 @check
-def escape_in_guide_input_is_noop(browser):
-    page = open_page(browser, WIDE, '?s=guia')
-    expect_section(page, 'guia')
-    box = page.locator('[data-testid="section-guia-active"] [aria-label="Pregunta para la guía"]')
+def escape_in_question_input_is_noop(browser):
+    page = open_page(browser, WIDE)
+    expect_section(page, 'inicio')
+    box = page.locator('[data-testid="section-inicio-active"] [aria-label="Pregunta para la guía"]')
     box.fill('museos cerca')
     box.press('Escape')
-    expect_section(page, 'guia')
+    expect_section(page, 'inicio')
     assert box.input_value() == 'museos cerca', 'Escape borró el texto'
 
 
 @check
 def back_keeps_mounted_state(browser):
-    page = open_page(browser, COMPACT, '?s=guia')
-    expect_section(page, 'guia')
-    box = page.locator('[data-testid="section-guia-active"] [aria-label="Pregunta para la guía"]')
+    page = open_page(browser, COMPACT)
+    expect_section(page, 'inicio')
+    box = page.locator('[data-testid="section-inicio-active"] [aria-label="Pregunta para la guía"]')
     box.fill('museos cerca')
     click_section(page, 'Rutas')
     expect_section(page, 'rutas')
-    click_section(page, 'Perfil')
-    expect_section(page, 'perfil')
+    click_section(page, 'Mapa')
+    expect_section(page, 'mapa')
     page.go_back()
     expect_section(page, 'rutas')
     page.go_back()
-    expect_section(page, 'guia')
+    expect_section(page, 'inicio')
     page.wait_for_timeout(500)
-    value = page.locator('[aria-label="Pregunta para la guía"]').first.input_value()
+    value = page.locator('[data-testid="section-inicio-active"] [aria-label="Pregunta para la guía"]').input_value()
     assert value == 'museos cerca', f'Atrás remontó el shell: el texto quedó {value!r}'
 
 

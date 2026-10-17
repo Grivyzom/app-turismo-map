@@ -46,6 +46,8 @@ export function InicioScreen() {
     askGuide,
     refresh,
     loadingPlaces,
+    isGuest,
+    requireAccount,
   } = app;
   const colors = useColors();
   const [now] = useState(() => new Date());
@@ -163,6 +165,24 @@ export function InicioScreen() {
             onPress={() => updatePrefs({ dismissedAlert: alert })}
             accessibilityLabel="Descartar aviso"
           />
+        </Card>
+      ) : null}
+
+      {/* Invitado: recordatorio para crear cuenta */}
+      {isGuest ? (
+        <Card style={styles.alert}>
+          <View style={[styles.alertIcon, { backgroundColor: colors.surfaceMuted }]}>
+            <Ionicons name="person-outline" size={18} color={colors.text} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <T variant="small" weight="600">
+              Estás como invitado
+            </T>
+            <T variant="caption" color={colors.textSecondary}>
+              Inicia sesión para guardar lugares, usar la guía y seguir rutas.
+            </T>
+          </View>
+          <PillButton label="Entrar" onPress={() => requireAccount('perfil')} />
         </Card>
       ) : null}
 
