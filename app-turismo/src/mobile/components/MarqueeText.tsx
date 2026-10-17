@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 
 import { T } from './ui';
@@ -16,7 +16,7 @@ export function MarqueeText({
 }: { width: number; children: React.ReactNode } & Omit<TProps, 'numberOfLines'>) {
   const [textW, setTextW] = useState(0);
   const [textH, setTextH] = useState(0);
-  const x = useRef(new Animated.Value(0)).current;
+  const [x] = useState(() => new Animated.Value(0));
   const overflow = Math.max(0, textW - width);
 
   useEffect(() => {
