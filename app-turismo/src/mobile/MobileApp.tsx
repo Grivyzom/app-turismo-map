@@ -8,8 +8,10 @@ import { useAuth } from '../context/AuthContext';
 
 import { MobileAppProvider, MobileTab, useMobileApp } from './MobileAppContext';
 import { Option, OptionSheet } from './components/OptionSheet';
+import { SideRail } from './components/SideRail';
 import { TabBar } from './components/TabBar';
 import { useColors } from './components/ui';
+import { useLayoutMode } from './hooks/useLayoutMode';
 import { useSectionUrlSync } from './hooks/useSectionUrlSync';
 import { AvisosScreen } from './screens/AvisosScreen';
 import { ClimaScreen } from './screens/ClimaScreen';
@@ -58,6 +60,7 @@ function Shell() {
   }, [auth, isAuthenticated, openAuthModal]);
 
   useSectionUrlSync(tab, setTab);
+  const wide = useLayoutMode() === 'wide';
 
   // Las pestañas visitadas quedan montadas: conservan scroll, chat y el mapa ya cargado
   const [mounted, setMounted] = useState<Set<MobileTab>>(() => new Set<MobileTab>([tab]));
@@ -116,33 +119,40 @@ function Shell() {
       : String(sectors.find((s) => s.name === sectorName)?.id ?? '');
 
   return (
-    <View testID="app-shell" style={[styles.root, { backgroundColor: colors.background }]}>
+    <View
+      testID="app-shell"
+      style={[styles.root, wide && styles.rootWide, { backgroundColor: colors.background }]}
+    >
       <StatusBar style="dark" />
-      {[...mounted].map((key) => {
-        const Component = SCREENS[key];
-        const visible = key === tab;
-        return (
-          <View
-            key={key}
-            testID={visible ? `section-${key}-active` : `section-${key}`}
-            style={[StyleSheet.absoluteFill, !visible && styles.hidden]}
-            pointerEvents={visible ? 'auto' : 'none'}
-          >
-            <Component />
+      {wide ? <SideRail /> : null}
+
+      <View style={styles.content}>
+        {[...mounted].map((key) => {
+          const Component = SCREENS[key];
+          const visible = key === tab;
+          return (
+            <View
+              key={key}
+              testID={visible ? `section-${key}-active` : `section-${key}`}
+              style={[StyleSheet.absoluteFill, !visible && styles.hidden]}
+              pointerEvents={visible ? 'auto' : 'none'}
+            >
+              <Component />
+            </View>
+          );
+        })}
+
+        {overlay ? (
+          <View style={StyleSheet.absoluteFill}>
+            {overlay === 'clima' ? <ClimaScreen /> : <AvisosScreen />}
           </View>
-        );
-      })}
+        ) : null}
 
-      {overlay ? (
-        <View style={StyleSheet.absoluteFill}>
-          {overlay === 'clima' ? <ClimaScreen /> : <AvisosScreen />}
-        </View>
-      ) : null}
+        {wide ? null : <TabBar />}
 
-      <TabBar />
-
-      {/* Ficha de evento: cubre también el dock, tiene su propia barra de acciones */}
-      <EventOverlay />
+        {/* Ficha de evento: cubre también el dock, tiene su propia barra de acciones */}
+        <EventOverlay />
+      </View>
 
       <OptionSheet
         visible={sectorPickerOpen}
@@ -172,5 +182,7 @@ export default function MobileApp({ initialTab }: { initialTab?: MobileTab }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  rootWide: { flexDirection: 'row' },
+  content: { flex: 1, position: 'relative' },
   hidden: { opacity: 0, zIndex: -1 },
 });

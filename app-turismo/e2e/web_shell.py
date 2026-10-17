@@ -130,6 +130,46 @@ def reload_keeps_section(browser):
     expect_section(page, 'perfil')
 
 
+def count(page, testid):
+    return len(page.query_selector_all(f'[data-testid="{testid}"]'))
+
+
+@check
+def rail_on_wide_dock_on_compact(browser):
+    page = open_page(browser, WIDE)
+    page.wait_for_selector('[data-testid="side-rail"]')
+    assert count(page, 'tab-bar') == 0, 'el dock no debe verse en escritorio'
+    box = page.query_selector('[data-testid="side-rail"]').bounding_box()
+    assert box['x'] == 0 and abs(box['width'] - 88) <= 1, f'rail mal ubicado: {box}'
+    for label, key in [('Mapa', 'mapa'), ('Guía', 'guia'), ('Rutas', 'rutas'), ('Perfil', 'perfil'), ('Inicio', 'inicio')]:
+        click_section(page, label)
+        expect_section(page, key)
+
+    page = open_page(browser, COMPACT)
+    page.wait_for_selector('[data-testid="tab-bar"]')
+    assert count(page, 'side-rail') == 0, 'el rail no debe verse en ancho de teléfono'
+
+
+@check
+def content_starts_after_rail(browser):
+    page = open_page(browser, WIDE)
+    box = page.wait_for_selector('[data-testid="section-inicio-active"]').bounding_box()
+    assert abs(box['x'] - 88) <= 1, f'el contenido debe empezar después del rail: {box}'
+
+
+@check
+def resize_keeps_section(browser):
+    page = open_page(browser, WIDE)
+    click_section(page, 'Rutas')
+    expect_section(page, 'rutas')
+    page.set_viewport_size(COMPACT)
+    page.wait_for_selector('[data-testid="tab-bar"]')
+    expect_section(page, 'rutas')
+    page.set_viewport_size(WIDE)
+    page.wait_for_selector('[data-testid="side-rail"]')
+    expect_section(page, 'rutas')
+
+
 def main(names):
     selected = names or list(CHECKS)
     failed = []

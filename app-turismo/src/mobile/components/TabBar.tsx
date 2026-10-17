@@ -1,39 +1,13 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MobileTab, useMobileApp } from '../MobileAppContext';
 import { dockShadow, MobileRadii, MobileSpacing, TAB_BAR_HEIGHT } from '../theme';
 
+import { NAV_ITEMS } from './navItems';
 import { T, useColors } from './ui';
-
-type TabDef = { key: MobileTab; label: string; render: (color: string) => React.ReactNode };
-
-const TABS: TabDef[] = [
-  {
-    key: 'inicio',
-    label: 'Inicio',
-    render: (c) => <Ionicons name="home-outline" size={22} color={c} />,
-  },
-  {
-    key: 'mapa',
-    label: 'Mapa',
-    render: (c) => <Ionicons name="map-outline" size={22} color={c} />,
-  },
-  { key: 'guia', label: 'Guía', render: () => null },
-  {
-    key: 'rutas',
-    label: 'Rutas',
-    render: (c) => <MaterialIcons name="route" size={22} color={c} />,
-  },
-  {
-    key: 'perfil',
-    label: 'Perfil',
-    render: (c) => <Ionicons name="person-outline" size={22} color={c} />,
-  },
-];
 
 /** Dock inferior flotante con la Guía como botón central elevado. */
 export function TabBar() {
@@ -48,11 +22,12 @@ export function TabBar() {
 
   return (
     <View
+      testID="tab-bar"
       pointerEvents="box-none"
       style={[styles.wrapper, { paddingBottom: Math.max(insets.bottom, 10) }]}
     >
       <View style={[styles.dock, { backgroundColor: colors.surface }, dockShadow]}>
-        {TABS.map((t) => {
+        {NAV_ITEMS.map((t) => {
           const active = tab === t.key;
           const color = active ? colors.text : colors.textSecondary;
           if (t.key === 'guia') {
