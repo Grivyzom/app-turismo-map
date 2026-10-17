@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Animated, Easing, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useLayoutMode } from '../hooks/useLayoutMode';
+import { DIALOG_MAX_WIDTH } from '../layout';
 import { MobileMotion, MobileRadii, MobileSpacing } from '../theme';
 
 import { T, useColors } from './ui';
@@ -78,8 +80,13 @@ export function BottomSheet({
   const insets = useSafeAreaInsets();
   const { progress, mounted } = usePresence(visible);
   const [height, setHeight] = useState(600);
+  const wide = useLayoutMode() === 'wide';
 
-  const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [height, 0] });
+  // Teléfono: sube desde abajo. Escritorio: diálogo centrado que aparece con un leve desplazamiento
+  const translateY = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: wide ? [16, 0] : [height, 0],
+  });
 
   return (
     <Modal
@@ -90,20 +97,24 @@ export function BottomSheet({
       navigationBarTranslucent
       onRequestClose={onClose}
     >
-      <View style={styles.root}>
+      <View style={wide ? styles.rootWide : styles.root}>
         <Scrim progress={progress} onPress={onClose} />
         <Animated.View
+          testID="sheet"
           onLayout={(e) => setHeight(e.nativeEvent.layout.height)}
           style={[
-            styles.sheet,
+            wide ? styles.dialog : styles.sheet,
             {
               backgroundColor: colors.surface,
-              paddingBottom: insets.bottom + 16,
+              paddingBottom: wide ? 16 : insets.bottom + 16,
               transform: [{ translateY }],
             },
+            wide && { opacity: progress },
           ]}
         >
-          <View style={[styles.grabber, { backgroundColor: colors.borderStrong }]} />
+          {wide ? null : (
+            <View style={[styles.grabber, { backgroundColor: colors.borderStrong }]} />
+          )}
           {title ? (
             <T variant="title" weight="700" style={styles.title} accessibilityRole="header">
               {title}
@@ -118,6 +129,14 @@ export function BottomSheet({
 
 const styles = StyleSheet.create({
   root: { flex: 1, justifyContent: 'flex-end' },
+  rootWide: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  dialog: {
+    width: '100%',
+    maxWidth: DIALOG_MAX_WIDTH,
+    borderRadius: MobileRadii.card,
+    paddingHorizontal: MobileSpacing.screen,
+    paddingTop: 16,
+  },
   sheet: {
     borderTopLeftRadius: MobileRadii.card,
     borderTopRightRadius: MobileRadii.card,

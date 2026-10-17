@@ -214,6 +214,80 @@ def carousel_fits_column(browser):
             assert right <= col['x'] + col['width'] + 1, f'ilustración desborda: {left}-{right}, columna {col}'
 
 
+def open_avisos(page):
+    page.locator('[aria-label^="Avisos"]').first.click()
+
+
+@check
+def overlay_is_side_panel_on_wide(browser):
+    page = open_page(browser, WIDE)
+    open_avisos(page)
+    box = page.wait_for_selector('[data-testid="side-panel"]').bounding_box()
+    page.wait_for_timeout(500)
+    box = page.query_selector('[data-testid="side-panel"]').bounding_box()
+    assert abs(box['width'] - 440) <= 1, f'panel de {box["width"]}px'
+    assert abs(box['x'] + box['width'] - WIDE['width']) <= 1, f'panel no pegado a la derecha: {box}'
+    page.keyboard.press('Escape')
+    page.wait_for_selector('[data-testid="side-panel"]', state='detached')
+    open_avisos(page)
+    page.wait_for_selector('[data-testid="side-panel"]')
+    page.wait_for_timeout(500)
+    page.mouse.click(400, 400)  # scrim
+    page.wait_for_selector('[data-testid="side-panel"]', state='detached')
+    expect_section(page, 'inicio')
+
+
+@check
+def overlay_fullscreen_on_compact(browser):
+    page = open_page(browser, COMPACT)
+    open_avisos(page)
+    page.wait_for_timeout(600)
+    assert count(page, 'side-panel') == 0, 'en teléfono el overlay es pantalla completa'
+
+
+@check
+def event_panel_fits_on_wide(browser):
+    page = open_page(browser, WIDE)
+    page.wait_for_selector('[data-testid="events-carousel"] img')
+    page.wait_for_timeout(800)
+    page.locator('[data-testid="events-carousel"] img').first.click()
+    panel = page.wait_for_selector('[data-testid="event-panel"]')
+    page.wait_for_timeout(800)
+    box = panel.bounding_box()
+    assert abs(box['width'] - 440) <= 1 and abs(box['x'] + 440 - WIDE['width']) <= 1, f'ficha mal ubicada: {box}'
+    imgs = page.eval_on_selector_all(
+        '[data-testid="event-panel"] img',
+        'els => els.map(e => e.getBoundingClientRect()).filter(r => r.width > 0).map(r => r.width)')
+    assert imgs and max(imgs) <= 441, f'ilustración más ancha que el panel: {imgs}'
+    page.keyboard.press('Escape')
+    page.wait_for_selector('[data-testid="event-panel"]', state='detached')
+
+
+@check
+def sector_sheet_is_dialog_on_wide(browser):
+    page = open_page(browser, WIDE)
+    page.locator('[aria-label^="Sector"]').first.click()
+    page.wait_for_selector('[data-testid="sheet"]')
+    page.wait_for_timeout(500)
+    box = page.query_selector('[data-testid="sheet"]').bounding_box()
+    assert box['width'] <= 481, f'diálogo de {box["width"]}px'
+    assert abs(box['x'] + box['width'] / 2 - WIDE['width'] / 2) <= 2, f'diálogo no centrado: {box}'
+    assert box['y'] + box['height'] < WIDE['height'] - 8, f'diálogo pegado abajo: {box}'
+    page.keyboard.press('Escape')
+    page.wait_for_selector('[data-testid="sheet"]', state='detached')
+
+
+@check
+def escape_in_guide_input_is_noop(browser):
+    page = open_page(browser, WIDE, '?s=guia')
+    expect_section(page, 'guia')
+    box = page.locator('[data-testid="section-guia-active"] [aria-label="Pregunta para la guía"]')
+    box.fill('museos cerca')
+    box.press('Escape')
+    expect_section(page, 'guia')
+    assert box.input_value() == 'museos cerca', 'Escape borró el texto'
+
+
 def main(names):
     selected = names or list(CHECKS)
     failed = []
