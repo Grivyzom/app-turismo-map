@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, BackHandler, StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, BackHandler, Platform, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { router, useLocalSearchParams } from 'expo-router';
 
 import { AuthModal } from '../components/Auth/AuthModal';
 import { useAuth } from '../context/AuthContext';
@@ -8,21 +9,25 @@ import { useAuth } from '../context/AuthContext';
 import { MobileAppProvider, MobileTab, useMobileApp } from './MobileAppContext';
 import { AccountGateSheet } from './components/AccountGateSheet';
 import { Option, OptionSheet } from './components/OptionSheet';
+import { SidePanel } from './components/SidePanel';
+import { SideRail } from './components/SideRail';
 import { TabBar } from './components/TabBar';
 import { useColors } from './components/ui';
+import { useLayoutMode } from './hooks/useLayoutMode';
+import { useSectionUrlSync } from './hooks/useSectionUrlSync';
 import { AvisosScreen } from './screens/AvisosScreen';
 import { BienvenidaScreen } from './screens/BienvenidaScreen';
 import { ClimaScreen } from './screens/ClimaScreen';
-import { EventOverlay } from './screens/EventoScreen';
+import { EventOverlay, EventoScreen } from './screens/EventoScreen';
 import { GuiaScreen } from './screens/GuiaScreen';
 import { InicioScreen } from './screens/InicioScreen';
-import { MapaScreen } from './screens/MapaScreen';
+import { MapSection } from './screens/MapSection';
 import { PerfilScreen } from './screens/PerfilScreen';
 import { RutasScreen } from './screens/RutasScreen';
 
 const SCREENS: Record<MobileTab, React.ComponentType> = {
   inicio: InicioScreen,
-  mapa: MapaScreen,
+  mapa: MapSection,
   guia: GuiaScreen,
   rutas: RutasScreen,
   perfil: PerfilScreen,
@@ -50,14 +55,55 @@ function Shell() {
     accountGate,
     closeAccountGate,
   } = useMobileApp();
-  const { isAuthModalOpen, closeAuthModal } = useAuth();
   const colors = useColors();
 
+  // Enlaces `?auth=login|register` (p. ej. desde el onboarding) abren el modal de acceso
+  const { isAuthenticated, isAuthModalOpen, openAuthModal, closeAuthModal } = useAuth();
+  const { auth } = useLocalSearchParams<{ auth?: string }>();
+  useEffect(() => {
+    if (auth !== 'login' && auth !== 'register') return;
+    if (!isAuthenticated) openAuthModal(auth);
+    router.setParams({ auth: undefined });
+  }, [auth, isAuthenticated, openAuthModal]);
+
+  useSectionUrlSync(tab, setTab);
+  const wide = useLayoutMode() === 'wide';
+
   // Las pestañas visitadas quedan montadas: conservan scroll, chat y el mapa ya cargado
-  const [mounted, setMounted] = useState<Set<MobileTab>>(() => new Set<MobileTab>(['inicio']));
+  const [mounted, setMounted] = useState<Set<MobileTab>>(() => new Set<MobileTab>([tab]));
   if (!mounted.has(tab)) setMounted(new Set(mounted).add(tab));
 
-  // Botón "atrás" de Android: cierra overlays y vuelve al Inicio antes de salir
+  // Cierra la capa de más arriba (cuenta → selector → evento → overlay). Devuelve si cerró algo.
+  const closeTopLayer = useCallback(() => {
+    if (accountGate) {
+      closeAccountGate();
+      return true;
+    }
+    if (sectorPickerOpen) {
+      setSectorPickerOpen(false);
+      return true;
+    }
+    if (eventDetail) {
+      closeEvent();
+      return true;
+    }
+    if (overlay) {
+      setOverlay(null);
+      return true;
+    }
+    return false;
+  }, [
+    accountGate,
+    closeAccountGate,
+    sectorPickerOpen,
+    eventDetail,
+    overlay,
+    setSectorPickerOpen,
+    closeEvent,
+    setOverlay,
+  ]);
+
+  // Botón "atrás" de Android: cierra capas y vuelve al Inicio antes de salir
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (isAuthModalOpen) {
@@ -66,22 +112,7 @@ function Shell() {
       }
       // En la bienvenida, "atrás" sale de la app
       if (showWelcome) return false;
-      if (accountGate) {
-        closeAccountGate();
-        return true;
-      }
-      if (sectorPickerOpen) {
-        setSectorPickerOpen(false);
-        return true;
-      }
-      if (eventDetail) {
-        closeEvent();
-        return true;
-      }
-      if (overlay) {
-        setOverlay(null);
-        return true;
-      }
+      if (closeTopLayer()) return true;
       if (tab !== 'inicio') {
         setTab('inicio');
         return true;
@@ -89,21 +120,20 @@ function Shell() {
       return false;
     });
     return () => sub.remove();
-  }, [
-    overlay,
-    tab,
-    sectorPickerOpen,
-    eventDetail,
-    closeEvent,
-    setOverlay,
-    setTab,
-    setSectorPickerOpen,
-    showWelcome,
-    accountGate,
-    closeAccountGate,
-    isAuthModalOpen,
-    closeAuthModal,
-  ]);
+  }, [closeTopLayer, tab, setTab, isAuthModalOpen, closeAuthModal, showWelcome]);
+
+  // Web: Escape cierra la capa de más arriba (los modales manejan su propio cierre)
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || isAuthModalOpen) return;
+      // Un Modal abierto (visor, hojas) se cierra solo con su Escape; no cerrar también lo de abajo
+      if (document.querySelector('[aria-modal="true"]')) return;
+      if (closeTopLayer()) e.preventDefault();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [closeTopLayer, isAuthModalOpen]);
 
   const sectorOptions: Option<string>[] = [
     ...(hasGps
@@ -125,32 +155,51 @@ function Shell() {
       : String(sectors.find((s) => s.name === sectorName)?.id ?? '');
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
+    <View
+      testID="app-shell"
+      style={[styles.root, wide && styles.rootWide, { backgroundColor: colors.background }]}
+    >
       <StatusBar style="dark" />
-      {[...mounted].map((key) => {
-        const Component = SCREENS[key];
-        const visible = key === tab;
-        return (
-          <View
-            key={key}
-            style={[StyleSheet.absoluteFill, !visible && styles.hidden]}
-            pointerEvents={visible ? 'auto' : 'none'}
-          >
-            <Component />
+      {wide ? <SideRail /> : null}
+
+      <View style={styles.content}>
+        {[...mounted].map((key) => {
+          const Component = SCREENS[key];
+          const visible = key === tab;
+          return (
+            <View
+              key={key}
+              testID={visible ? `section-${key}-active` : `section-${key}`}
+              style={[StyleSheet.absoluteFill, !visible && styles.hidden]}
+              pointerEvents={visible ? 'auto' : 'none'}
+            >
+              <Component />
+            </View>
+          );
+        })}
+
+        {!wide && overlay ? (
+          <View style={StyleSheet.absoluteFill}>
+            {overlay === 'clima' ? <ClimaScreen /> : <AvisosScreen />}
           </View>
-        );
-      })}
+        ) : null}
 
-      {overlay ? (
-        <View style={StyleSheet.absoluteFill}>
-          {overlay === 'clima' ? <ClimaScreen /> : <AvisosScreen />}
-        </View>
+        {wide ? null : <TabBar />}
+
+        {/* Ficha de evento: cubre también el dock, tiene su propia barra de acciones */}
+        {wide ? null : <EventOverlay />}
+      </View>
+
+      {wide ? (
+        <>
+          <SidePanel item={overlay} onClose={() => setOverlay(null)} testID="side-panel">
+            {(o) => (o === 'clima' ? <ClimaScreen /> : <AvisosScreen />)}
+          </SidePanel>
+          <SidePanel item={eventDetail} onClose={closeEvent} testID="event-panel">
+            {(ev) => <EventoScreen key={ev.id} event={ev} />}
+          </SidePanel>
+        </>
       ) : null}
-
-      <TabBar />
-
-      {/* Ficha de evento: cubre también el dock, tiene su propia barra de acciones */}
-      <EventOverlay />
 
       <OptionSheet
         visible={sectorPickerOpen}
@@ -183,10 +232,10 @@ function Shell() {
   );
 }
 
-/** Experiencia móvil nativa (Android / iOS): Inicio, Mapa, Guía, Rutas y Perfil. */
-export default function MobileApp() {
+/** Experiencia móvil: Inicio, Mapa, Guía, Rutas y Perfil (Android, iOS y web). */
+export default function MobileApp({ initialTab }: { initialTab?: MobileTab }) {
   return (
-    <MobileAppProvider>
+    <MobileAppProvider initialTab={initialTab}>
       <Shell />
     </MobileAppProvider>
   );
@@ -194,6 +243,8 @@ export default function MobileApp() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  rootWide: { flexDirection: 'row' },
+  content: { flex: 1, position: 'relative' },
   hidden: { opacity: 0, zIndex: -1 },
   loading: { alignItems: 'center', justifyContent: 'center' },
 });

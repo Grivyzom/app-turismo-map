@@ -8,33 +8,42 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
 type CompanyLocationResponse struct {
-	Success     bool    `json:"success"`
-	HasLocation bool    `json:"hasLocation"`
-	Latitude    float64 `json:"latitude"`
-	Longitude   float64 `json:"longitude"`
-	Address     string  `json:"address"`
-	BranchName  string  `json:"branchName"`
-	Description string  `json:"description"`
-	Category    string  `json:"category"`
-	Phone       string  `json:"phone"`
-	ImageUrl    string  `json:"imageUrl"`
-	Message     string  `json:"message,omitempty"`
+	Success         bool    `json:"success"`
+	HasLocation     bool    `json:"hasLocation"`
+	Latitude        float64 `json:"latitude"`
+	Longitude       float64 `json:"longitude"`
+	Address         string  `json:"address"`
+	BranchName      string  `json:"branchName"`
+	Description     string  `json:"description"`
+	Category        string  `json:"category"`
+	Phone           string  `json:"phone"`
+	ImageUrl        string  `json:"imageUrl"`
+	Whatsapp        string  `json:"whatsapp"`
+	WhatsappMessage string  `json:"whatsappMessage"`
+	WebsiteUrl      string  `json:"websiteUrl"`
+	MenuPdfUrl      string  `json:"menuPdfUrl"`
+	MenuPdfSize     int     `json:"menuPdfSize"`
+	Message         string  `json:"message,omitempty"`
 }
 
 type UpdateLocationRequest struct {
-	Latitude    float64 `json:"latitude"`
-	Longitude   float64 `json:"longitude"`
-	Address     string  `json:"address"`
-	BranchName  string  `json:"branchName,omitempty"`
-	Description string  `json:"description"`
-	Category    string  `json:"category"`
-	Phone       string  `json:"phone"`
-	ImageUrl    string  `json:"imageUrl"`
+	Latitude        float64 `json:"latitude"`
+	Longitude       float64 `json:"longitude"`
+	Address         string  `json:"address"`
+	BranchName      string  `json:"branchName,omitempty"`
+	Description     string  `json:"description"`
+	Category        string  `json:"category"`
+	Phone           string  `json:"phone"`
+	ImageUrl        string  `json:"imageUrl"`
+	Whatsapp        string  `json:"whatsapp"`
+	WhatsappMessage string  `json:"whatsappMessage"`
+	WebsiteUrl      string  `json:"websiteUrl"`
 }
 
 // GetCompanyLocationHandler devuelve la ubicación actual de la empresa vinculada al usuario con todos sus detalles
@@ -97,6 +106,8 @@ func GetCompanyLocationHandler(w http.ResponseWriter, r *http.Request) {
 	var address string
 	var phone string
 	var imageUrl string
+	var whatsapp, whatsappMessage, websiteUrl, menuPdfUrl string
+	var menuPdfSize int
 	var lat, lng float64
 
 	err = database.DB.QueryRow(`
@@ -108,12 +119,17 @@ func GetCompanyLocationHandler(w http.ResponseWriter, r *http.Request) {
 			COALESCE(address, ''), 
 			COALESCE(phone, ''), 
 			COALESCE(image_url, ''),
+			COALESCE(whatsapp, ''),
+			COALESCE(whatsapp_message, ''),
+			COALESCE(website_url, ''),
+			COALESCE(menu_pdf_url, ''),
+			COALESCE(menu_pdf_size, 0),
 			ST_Y(geom::geometry) as lat, 
 			ST_X(geom::geometry) as lng
 		FROM company_branches
 		WHERE company_id = $1
 		ORDER BY id ASC
-		LIMIT 1`, companyID).Scan(&branchID, &branchName, &description, &category, &address, &phone, &imageUrl, &lat, &lng)
+		LIMIT 1`, companyID).Scan(&branchID, &branchName, &description, &category, &address, &phone, &imageUrl, &whatsapp, &whatsappMessage, &websiteUrl, &menuPdfUrl, &menuPdfSize, &lat, &lng)
 
 	if err == sql.ErrNoRows {
 		// La empresa no tiene sucursal / ubicación configurada
@@ -139,16 +155,21 @@ func GetCompanyLocationHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(CompanyLocationResponse{
-		Success:     true,
-		HasLocation: true,
-		Latitude:    lat,
-		Longitude:   lng,
-		Address:     address,
-		BranchName:  branchName,
-		Description: description,
-		Category:    category,
-		Phone:       phone,
-		ImageUrl:    imageUrl,
+		Success:         true,
+		HasLocation:     true,
+		Latitude:        lat,
+		Longitude:       lng,
+		Address:         address,
+		BranchName:      branchName,
+		Description:     description,
+		Category:        category,
+		Phone:           phone,
+		ImageUrl:        imageUrl,
+		Whatsapp:        whatsapp,
+		WhatsappMessage: whatsappMessage,
+		WebsiteUrl:      websiteUrl,
+		MenuPdfUrl:      menuPdfUrl,
+		MenuPdfSize:     menuPdfSize,
 	})
 }
 
@@ -200,6 +221,22 @@ func UpdateCompanyLocationHandler(w http.ResponseWriter, r *http.Request) {
 			Success: false,
 			Message: "Las coordenadas de latitud y longitud son requeridas",
 		})
+		return
+	}
+
+	whatsapp, ok := normalizeWhatsapp(req.Whatsapp)
+	if !ok {
+		writeJSONError(w, http.StatusBadRequest, "Número de WhatsApp inválido (ej. +56 9 1234 5678)")
+		return
+	}
+	websiteUrl, ok := normalizeWebsite(req.WebsiteUrl)
+	if !ok {
+		writeJSONError(w, http.StatusBadRequest, "Sitio web inválido (ej. https://minegocio.cl)")
+		return
+	}
+	whatsappMessage := strings.TrimSpace(req.WhatsappMessage)
+	if len([]rune(whatsappMessage)) > 300 {
+		writeJSONError(w, http.StatusBadRequest, "El mensaje de WhatsApp debe tener máximo 300 caracteres")
 		return
 	}
 
@@ -258,8 +295,8 @@ func UpdateCompanyLocationHandler(w http.ResponseWriter, r *http.Request) {
 	if err == sql.ErrNoRows {
 		// Crear nueva sucursal
 		_, err = database.DB.Exec(`
-			INSERT INTO company_branches (company_id, branch_name, description, category, address, phone, image_url, geom)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, ST_SetSRID(ST_MakePoint($8, $9), 4326))`,
+			INSERT INTO company_branches (company_id, branch_name, description, category, address, phone, image_url, whatsapp, whatsapp_message, website_url, geom)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, NULLIF($10, ''), NULLIF($11, ''), NULLIF($12, ''), ST_SetSRID(ST_MakePoint($8, $9), 4326))`,
 			companyID,
 			finalBranchName,
 			req.Description,
@@ -269,6 +306,9 @@ func UpdateCompanyLocationHandler(w http.ResponseWriter, r *http.Request) {
 			req.ImageUrl,
 			req.Longitude,
 			req.Latitude,
+			whatsapp,
+			whatsappMessage,
+			websiteUrl,
 		)
 		if err != nil {
 			log.Printf("Error creando sucursal de empresa %d: %v\n", companyID, err)
@@ -285,7 +325,10 @@ func UpdateCompanyLocationHandler(w http.ResponseWriter, r *http.Request) {
 			    category = $4,
 			    phone = $5,
 			    image_url = $6,
-			    geom = ST_SetSRID(ST_MakePoint($7, $8), 4326)
+			    geom = ST_SetSRID(ST_MakePoint($7, $8), 4326),
+			    whatsapp = NULLIF($10, ''),
+			    whatsapp_message = NULLIF($11, ''),
+			    website_url = NULLIF($12, '')
 			WHERE id = $9`,
 			finalBranchName,
 			req.Address,
@@ -296,6 +339,9 @@ func UpdateCompanyLocationHandler(w http.ResponseWriter, r *http.Request) {
 			req.Longitude,
 			req.Latitude,
 			branchID,
+			whatsapp,
+			whatsappMessage,
+			websiteUrl,
 		)
 		if err != nil {
 			log.Printf("Error actualizando sucursal %d de empresa %d: %v\n", branchID, companyID, err)
@@ -310,16 +356,19 @@ func UpdateCompanyLocationHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(CompanyLocationResponse{
-		Success:     true,
-		HasLocation: true,
-		Latitude:    req.Latitude,
-		Longitude:   req.Longitude,
-		Address:     req.Address,
-		BranchName:  finalBranchName,
-		Description: req.Description,
-		Category:    finalCategory,
-		Phone:       finalPhone,
-		ImageUrl:    req.ImageUrl,
-		Message:     "Ubicación de la empresa guardada correctamente",
+		Success:         true,
+		HasLocation:     true,
+		Latitude:        req.Latitude,
+		Longitude:       req.Longitude,
+		Address:         req.Address,
+		BranchName:      finalBranchName,
+		Description:     req.Description,
+		Category:        finalCategory,
+		Phone:           finalPhone,
+		ImageUrl:        req.ImageUrl,
+		Whatsapp:        whatsapp,
+		WhatsappMessage: whatsappMessage,
+		WebsiteUrl:      websiteUrl,
+		Message:         "Ubicación de la empresa guardada correctamente",
 	})
 }

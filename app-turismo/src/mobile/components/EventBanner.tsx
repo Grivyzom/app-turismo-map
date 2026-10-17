@@ -63,7 +63,6 @@ export function EventBanner({
   fallbackIcon: IoniconName;
 }) {
   const colors = useColors();
-  const { width } = useWindowDimensions();
   const [ratio, setRatio] = useState<number | null>(
     () =>
       assetRatio(asset) ??
@@ -79,7 +78,8 @@ export function EventBanner({
       <View
         style={[
           styles.placeholder,
-          { width, height: width / FALLBACK_RATIO, backgroundColor: colors.placeholder },
+          // Ancho del contenedor (pantalla en el teléfono, panel lateral en escritorio)
+          { width: '100%', aspectRatio: FALLBACK_RATIO, backgroundColor: colors.placeholder },
         ]}
         accessibilityLabel="Evento sin ilustración"
       >
@@ -98,8 +98,8 @@ export function EventBanner({
         accessibilityRole="imagebutton"
         accessibilityLabel={`Ilustración de ${title}. Toca para verla en pantalla completa`}
         style={{
-          width,
-          height: width / shown,
+          width: '100%',
+          aspectRatio: shown,
           backgroundColor: colors.placeholder,
           overflow: 'hidden',
         }}

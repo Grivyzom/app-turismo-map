@@ -4,6 +4,7 @@ import (
 	"backend/database"
 	"backend/handlers"
 	"backend/internal/catalog"
+	"backend/internal/storage"
 	intdb "backend/internal/database"
 	"backend/middleware"
 	"backend/utils"
@@ -30,6 +31,10 @@ func main() {
 	database.InitDB()
 	database.InitRedis()
 	utils.InitJWT()
+
+	if err := storage.Init(); err != nil {
+		log.Printf("Aviso: object storage deshabilitado (%v); la subida de cartas PDF no estará disponible\n", err)
+	}
 
 	// Inicializar Clerk SDK si la clave secreta está presente
 	clerkKey := os.Getenv("CLERK_SECRET_KEY")
@@ -81,6 +86,9 @@ func main() {
 	mux.HandleFunc("POST /api/v1/profile/view-mode", middleware.AuthMiddleware(handlers.UpdateViewModeHandler))
 	mux.HandleFunc("/api/v1/business/location", middleware.AuthMiddleware(handlers.GetCompanyLocationHandler))
 	mux.HandleFunc("/api/v1/business/location/update", middleware.AuthMiddleware(handlers.UpdateCompanyLocationHandler))
+	mux.HandleFunc("POST /api/v1/business/menu/upload-url", middleware.AuthMiddleware(handlers.MenuUploadURLHandler))
+	mux.HandleFunc("POST /api/v1/business/menu/confirm", middleware.AuthMiddleware(handlers.MenuConfirmHandler))
+	mux.HandleFunc("DELETE /api/v1/business/menu", middleware.AuthMiddleware(handlers.MenuDeleteHandler))
 	mux.HandleFunc("/api/v1/events", middleware.AuthMiddleware(handlers.CreateEventHandler))
 	mux.HandleFunc("GET /api/v1/zones", handlers.GetZonesHandler)
 	mux.HandleFunc("POST /api/v1/zones", middleware.AuthMiddleware(handlers.CreateZoneHandler))
@@ -116,6 +124,7 @@ func main() {
 	// ── Rutas de Novedades y Notificaciones ──────────────────────────────
 	mux.HandleFunc("POST /api/v1/business/updates", middleware.AuthMiddleware(handlers.CreateBranchUpdateHandler))
 	mux.HandleFunc("GET /api/v1/branches/{id}/updates", handlers.GetBranchUpdatesHandler) // Público
+	mux.HandleFunc("GET /api/v1/branches/{id}/links", handlers.GetBranchLinksHandler)     // Público
 	mux.HandleFunc("GET /api/v1/notifications", middleware.AuthMiddleware(handlers.GetNotificationsHandler))
 	mux.HandleFunc("PUT /api/v1/notifications/{id}/read", middleware.AuthMiddleware(handlers.MarkNotificationReadHandler))
 

@@ -1,9 +1,9 @@
-import { useEffect, useState, type FormEvent } from 'react'
-import { Crosshair, Save } from 'lucide-react'
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { Crosshair, ExternalLink, FileText, Save, Trash2, Upload } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../lib/api'
 import { CATEGORIES } from '../lib/catalog'
-import { getCompanyLocation } from '../lib/company'
+import { deleteMenuPdf, formatBytes, getCompanyLocation, uploadMenuPdf } from '../lib/company'
 import { usePin } from '../lib/usePin'
 import LocationPicker from '../components/LocationPicker'
 import CategoryPicker from '../components/CategoryPicker'
@@ -18,6 +18,12 @@ export default function LocationPage() {
   const [category, setCategory] = useState('gastronomia')
   const [phone, setPhone] = useState('')
   const [imageUrl, setImageUrl] = useState('')
+  const [whatsapp, setWhatsapp] = useState('')
+  const [whatsappMessage, setWhatsappMessage] = useState('')
+  const [websiteUrl, setWebsiteUrl] = useState('')
+  const [menu, setMenu] = useState<{ url: string; size: number } | null>(null)
+  const [menuBusy, setMenuBusy] = useState(false)
+  const menuInput = useRef<HTMLInputElement>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -35,6 +41,10 @@ export default function LocationPage() {
         setCategory(d.category || 'gastronomia')
         setPhone(d.phone || '')
         setImageUrl(d.imageUrl || '')
+        setWhatsapp(d.whatsapp || '')
+        setWhatsappMessage(d.whatsappMessage || '')
+        setWebsiteUrl(d.websiteUrl || '')
+        setMenu(d.menuPdfUrl ? { url: d.menuPdfUrl, size: d.menuPdfSize } : null)
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false))
@@ -56,12 +66,48 @@ export default function LocationPage() {
         category,
         phone: phone.trim(),
         imageUrl: imageUrl.trim(),
+        whatsapp: whatsapp.trim(),
+        whatsappMessage: whatsappMessage.trim(),
+        websiteUrl: websiteUrl.trim(),
       })
       setSuccess('Ubicación guardada. Tu negocio ya aparece en el mapa turístico.')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo guardar la ubicación.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const onMenuSelected = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setError('')
+    setSuccess('')
+    setMenuBusy(true)
+    try {
+      const r = await uploadMenuPdf(file)
+      setMenu({ url: r.menuPdfUrl, size: r.menuPdfSize })
+      setSuccess('Carta publicada. Los clientes ya pueden verla desde el mapa.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo subir la carta.')
+    } finally {
+      setMenuBusy(false)
+    }
+  }
+
+  const onMenuDelete = async () => {
+    setError('')
+    setSuccess('')
+    setMenuBusy(true)
+    try {
+      await deleteMenuPdf()
+      setMenu(null)
+      setSuccess('Carta eliminada.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo eliminar la carta.')
+    } finally {
+      setMenuBusy(false)
     }
   }
 
@@ -105,6 +151,48 @@ export default function LocationPage() {
             </label>
           </div>
           {imageUrl && <img className="preview" src={imageUrl} alt="Vista previa" onError={(e) => (e.currentTarget.style.display = 'none')} />}
+
+          <h3>Enlaces para clientes</h3>
+          <p className="muted">Aparecen como botones en el pin de tu negocio.</p>
+          <div className="row">
+            <label className="label">
+              WhatsApp
+              <input className="input" type="tel" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+56 9 1234 5678" />
+            </label>
+            <label className="label">
+              Sitio web
+              <input className="input" type="url" value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} placeholder="https://minegocio.cl" />
+            </label>
+          </div>
+          <label className="label">
+            Mensaje inicial de WhatsApp <span className="counter">{whatsappMessage.length}/300</span>
+            <input className="input" maxLength={300} value={whatsappMessage} onChange={(e) => setWhatsappMessage(e.target.value)} placeholder="Hola, vi su negocio en el mapa turístico y quiero consultar…" />
+          </label>
+
+          <div className="label">
+            Carta (PDF, máx. 5 MB)
+            {menu ? (
+              <div className="row">
+                <a className="btn btn-ghost" href={menu.url} target="_blank" rel="noreferrer">
+                  <FileText size={16} /> Ver carta · {formatBytes(menu.size)} <ExternalLink size={14} />
+                </a>
+                <div className="row">
+                  <button type="button" className="btn btn-ghost" disabled={menuBusy} onClick={() => menuInput.current?.click()}>
+                    <Upload size={16} /> Reemplazar
+                  </button>
+                  <button type="button" className="btn btn-ghost" disabled={menuBusy} onClick={onMenuDelete}>
+                    <Trash2 size={16} /> Quitar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button type="button" className="btn btn-ghost" disabled={menuBusy} onClick={() => menuInput.current?.click()}>
+                {menuBusy ? <span className="spinner sm" /> : <><Upload size={16} /> Subir carta PDF</>}
+              </button>
+            )}
+            <input ref={menuInput} type="file" accept="application/pdf" hidden onChange={onMenuSelected} />
+          </div>
+
           {error && <Notice kind="error">{error}</Notice>}
           {success && <Notice kind="success">{success}</Notice>}
           <button className="btn btn-primary" disabled={saving}>

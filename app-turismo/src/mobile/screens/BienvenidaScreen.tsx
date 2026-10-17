@@ -75,6 +75,9 @@ export function BienvenidaScreen() {
 const styles = StyleSheet.create({
   content: {
     flexGrow: 1,
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
     justifyContent: 'center',
     paddingHorizontal: MobileSpacing.screen,
     gap: 24,

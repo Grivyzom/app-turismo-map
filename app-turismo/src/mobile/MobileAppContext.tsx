@@ -3,6 +3,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { useAuth } from '../context/AuthContext';
 import { useUserLocationContext } from '../context/UserLocationContext';
 
+import type { Section } from './layout';
 import { buildRecommendedRoute, RecommendedRoute } from './data/routes';
 import { IoniconName, QuickCategory } from './data/categories';
 import { useMobileNotifications } from './hooks/useMobileNotifications';
@@ -17,7 +18,7 @@ import {
   usePlacesData,
 } from './hooks/usePlacesData';
 
-export type MobileTab = 'inicio' | 'mapa' | 'guia' | 'rutas' | 'perfil';
+export type MobileTab = Section;
 export type MobileOverlay = 'clima' | 'avisos' | null;
 
 /** Funciones que requieren cuenta: el invitado ve una hoja que lo invita a iniciar sesión. */
@@ -128,13 +129,20 @@ const AUTH_WAIT_MS = 6000;
 
 const MobileAppContext = createContext<MobileAppContextValue | undefined>(undefined);
 
-export function MobileAppProvider({ children }: { children: React.ReactNode }) {
+export function MobileAppProvider({
+  children,
+  initialTab = 'inicio',
+}: {
+  children: React.ReactNode;
+  /** Sección de arranque (en la web sale de `?s=`). */
+  initialTab?: MobileTab;
+}) {
   const { token, isAuthenticated, isLoading: authLoading } = useAuth();
   const { userLocation, retryLocation, locationError, isLoadingLocation } =
     useUserLocationContext();
   const { prefs, update: updatePrefs, reset: resetPrefs } = useMobilePreferences();
 
-  const [tab, setTab] = useState<MobileTab>('inicio');
+  const [tab, setTab] = useState<MobileTab>(initialTab);
   const [overlay, setOverlay] = useState<MobileOverlay>(null);
   const [sectorPickerOpen, setSectorPickerOpen] = useState(false);
   const [mapFocus, setMapFocus] = useState<MobileAppContextValue['mapFocus']>({

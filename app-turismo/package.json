@@ -80,7 +80,8 @@
     "web": "NODE_OPTIONS=\"--max-old-space-size=4096\" BROWSER=none expo start --web --port 8082",
     "lint": "eslint \"**/*.{js,jsx,ts,tsx}\"",
     "lint:fix": "eslint \"**/*.{js,jsx,ts,tsx}\" --fix",
-    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md}\""
+    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md}\"",
+    "test": "node --experimental-strip-types --no-warnings --test 'tests/**/*.test.mjs'"
   },
   "private": true
 }

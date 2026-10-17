@@ -48,11 +48,13 @@ export function EventsCarousel({ events }: { events: PlaceWithDistance[] }) {
   /** null = sin elección del usuario (se sigue la preferencia de movimiento del sistema). */
   const [userPaused, setUserPaused] = useState<boolean | null>(null);
   const [progress] = useState(() => new Animated.Value(0));
+  // Ancho real del carrusel: en escritorio la columna es más angosta que la ventana
+  const [boxWidth, setBoxWidth] = useState<number | null>(null);
 
   const count = events.length;
   const current = Math.min(page, Math.max(0, count - 1));
-  const cardWidth = width - MobileSpacing.screen * 2;
-  const snap = cardWidth + CARD_GAP; // = ancho de pantalla: nunca asoma la tarjeta vecina
+  const cardWidth = boxWidth ?? width - MobileSpacing.screen * 2;
+  const snap = cardWidth + CARD_GAP; // = ancho de la columna: nunca asoma la tarjeta vecina
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (s) => setAppActive(s === 'active'));
@@ -110,7 +112,7 @@ export function EventsCarousel({ events }: { events: PlaceWithDistance[] }) {
   }
 
   return (
-    <View>
+    <View testID="events-carousel" onLayout={(e) => setBoxWidth(e.nativeEvent.layout.width)}>
       <FlatList
         ref={listRef}
         data={events}
