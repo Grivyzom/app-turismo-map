@@ -122,7 +122,10 @@ Sin esto, el resto de las propuestas no se nota.
    - Viven en `src/mobile/sections/`. El saludo por hora y la fecha están en `src/mobile/data/greeting.ts`, con tests.
    - `GuideCard`: el invitado ve la caja de la guía bloqueada con "Entrar", en vez de escribir y recién al enviar enterarse.
    - `LodgingCard`: el invitado no usa un alojamiento guardado de otra sesión. "Agregar" abre el acceso en vez de llevar al Perfil bloqueado.
-4. Redirigir a `requireAccount` las acciones de invitado que hoy llevan a Perfil.
+4. ✅ **Hecho:** redirigir a `requireAccount` las acciones de invitado que hoy llevan a Perfil.
+   - `openProfile()` en `MobileAppContext` va al Perfil o, para el invitado, abre la hoja "Necesitas una cuenta".
+   - Lo usan `RouteCard` "Ajustar" (Inicio y Rutas), `LodgingCard` "Agregar" y "Ajustes" en Avisos. El header ya abría el login.
+   - En Rutas, "Guardados" deja de mostrarle al invitado lo guardado en el teléfono, y le muestra "Entrar".
 5. Separar el resto de las secciones: `WeatherChip`, `CityAlertCard`, `QuickCategoriesCard`, `ServicesCard`, `BenefitCard`.
 6. Guardados y me gusta en el backend, y separación de preferencias de dispositivo y de cuenta.
 7. Eventos de ejemplo solo como respaldo.

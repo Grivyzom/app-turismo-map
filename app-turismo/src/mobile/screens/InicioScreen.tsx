@@ -32,7 +32,7 @@ export function InicioScreen() {
     recommendedRoute,
     restrooms,
     setOverlay,
-    setTab,
+    openProfile,
     openOnMap,
     refresh,
     loadingPlaces,
@@ -174,7 +174,7 @@ export function InicioScreen() {
       <LodgingCard />
 
       {/* Ruta recomendada */}
-      <RouteCard route={recommendedRoute} onAdjust={() => setTab('perfil')} />
+      <RouteCard route={recommendedRoute} onAdjust={openProfile} />
 
       {/* Cerca de ti */}
       <SectionHeader title="Cerca de ti" actionLabel="Abrir mapa" onAction={() => openOnMap()} />

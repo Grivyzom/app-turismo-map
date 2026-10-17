@@ -1,9 +1,10 @@
 import React, { useMemo } from 'react';
+import { View } from 'react-native';
 
 import { useMobileApp } from '../MobileAppContext';
 import { AppHeader } from '../components/AppHeader';
 import { Screen } from '../components/Screen';
-import { Card, SectionHeader, T, useColors } from '../components/ui';
+import { Card, PillButton, SectionHeader, T, useColors } from '../components/ui';
 import { buildRecommendedRoute } from '../data/routes';
 import { PlaceRow } from '../sections/PlaceRow';
 import { RouteCard } from '../sections/RouteCard';
@@ -20,8 +21,10 @@ export function RutasScreen() {
     prefs,
     weather,
     sectorName,
-    setTab,
+    openProfile,
     openOnMap,
+    isGuest,
+    requireAccount,
   } = useMobileApp();
   const colors = useColors();
 
@@ -45,21 +48,22 @@ export function RutasScreen() {
     recommendedRoute?.id,
   ]);
 
+  // Lo guardado requiere cuenta: el invitado no ve guardados de una sesión anterior en el teléfono
   const saved = useMemo(
-    () => places.filter((p) => prefs.savedEventIds.includes(String(p.id))),
-    [places, prefs.savedEventIds],
+    () => (isGuest ? [] : places.filter((p) => prefs.savedEventIds.includes(String(p.id)))),
+    [isGuest, places, prefs.savedEventIds],
   );
 
   if (activeRoute) return <NavegacionView active={activeRoute} />;
 
   return (
     <Screen header={<AppHeader />}>
-      <RouteCard route={recommendedRoute} onAdjust={() => setTab('perfil')} />
+      <RouteCard route={recommendedRoute} onAdjust={openProfile} />
 
       {alternative ? (
         <RouteCard
           route={alternative.route}
-          onAdjust={() => setTab('perfil')}
+          onAdjust={openProfile}
           eyebrow={
             alternative.rhythm === 'intenso'
               ? 'Si quieres aprovechar más el día'
@@ -68,9 +72,16 @@ export function RutasScreen() {
         />
       ) : null}
 
-      <SectionHeader title="Guardados" hint={`${saved.length}`} />
+      <SectionHeader title="Guardados" hint={isGuest ? undefined : `${saved.length}`} />
       <Card>
-        {saved.length === 0 ? (
+        {isGuest ? (
+          <View style={{ gap: 10, alignItems: 'flex-start' }}>
+            <T variant="small" color={colors.textSecondary}>
+              Inicia sesión para guardar lugares y encontrarlos aquí.
+            </T>
+            <PillButton label="Entrar" onPress={() => requireAccount('guardar')} />
+          </View>
+        ) : saved.length === 0 ? (
           <T variant="small" color={colors.textSecondary}>
             Aún no guardas lugares. Usa el botón «Guardar» en el Inicio o el corazón en el Mapa.
           </T>

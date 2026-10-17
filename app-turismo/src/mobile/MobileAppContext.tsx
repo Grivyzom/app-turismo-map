@@ -66,6 +66,8 @@ interface MobileAppContextValue {
   requireAccount: (feature: GatedFeature) => boolean;
   accountGate: GatedFeature | null;
   closeAccountGate: () => void;
+  /** Va al Perfil; el invitado ve en cambio la hoja "Necesitas una cuenta" (el Perfil está bloqueado). */
+  openProfile: () => void;
 
   // Navegación
   tab: MobileTab;
@@ -186,6 +188,13 @@ export function MobileAppProvider({
     },
     [isAuthenticated],
   );
+
+  const openProfile = useCallback(() => {
+    if (!requireAccount('perfil')) return;
+    setOverlay(null);
+    setEventDetail(null);
+    setTab('perfil');
+  }, [requireAccount]);
 
   const gps = useMemo<Coordinate | null>(
     () =>
@@ -311,6 +320,7 @@ export function MobileAppProvider({
     requireAccount,
     accountGate,
     closeAccountGate: () => setAccountGate(null),
+    openProfile,
     tab,
     setTab,
     overlay,

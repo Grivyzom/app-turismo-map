@@ -11,7 +11,7 @@ import { openWalkingDirections } from '../utils/external';
  * el invitado no usa uno guardado (puede ser de una sesión anterior) y "Agregar" abre el acceso.
  */
 export function LodgingCard() {
-  const { prefs, setTab, isGuest, requireAccount } = useMobileApp();
+  const { prefs, isGuest, openProfile } = useMobileApp();
   const colors = useColors();
   const { lodging } = prefs;
   const hasLodging = !isGuest && lodging.latitude !== null && lodging.longitude !== null;
@@ -44,10 +44,7 @@ export function LodgingCard() {
           }
         />
       ) : (
-        <PillButton
-          label="Agregar"
-          onPress={() => (isGuest ? requireAccount('perfil') : setTab('perfil'))}
-        />
+        <PillButton label="Agregar" onPress={openProfile} />
       )}
     </Card>
   );
