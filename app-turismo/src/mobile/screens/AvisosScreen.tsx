@@ -99,7 +99,7 @@ function NotificationRow({
 
 /** "Avisos": lista de notificaciones del usuario con el mismo lenguaje visual que el resto de la app. */
 export function AvisosScreen() {
-  const { setOverlay, setTab, prefs, notifications } = useMobileApp();
+  const { setOverlay, openProfile, prefs, notifications } = useMobileApp();
   const { isAuthenticated, openAuthModal } = useAuth();
   const colors = useColors();
   const { items, unreadCount, loading, error, refresh, markAsRead, markAllAsRead } = notifications;
@@ -120,13 +120,7 @@ export function AvisosScreen() {
       <T variant="small" color={colors.textSecondary} style={{ flex: 1 }}>
         Tienes los avisos desactivados.
       </T>
-      <PillButton
-        label="Ajustes"
-        onPress={() => {
-          setOverlay(null);
-          setTab('perfil');
-        }}
-      />
+      <PillButton label="Ajustes" onPress={openProfile} />
     </Card>
   ) : null;
 
