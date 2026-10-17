@@ -10,6 +10,7 @@ import { MobileAppProvider, MobileTab, useMobileApp } from './MobileAppContext';
 import { Option, OptionSheet } from './components/OptionSheet';
 import { TabBar } from './components/TabBar';
 import { useColors } from './components/ui';
+import { useSectionUrlSync } from './hooks/useSectionUrlSync';
 import { AvisosScreen } from './screens/AvisosScreen';
 import { ClimaScreen } from './screens/ClimaScreen';
 import { EventOverlay } from './screens/EventoScreen';
@@ -55,6 +56,8 @@ function Shell() {
     if (!isAuthenticated) openAuthModal(auth);
     router.setParams({ auth: undefined });
   }, [auth, isAuthenticated, openAuthModal]);
+
+  useSectionUrlSync(tab, setTab);
 
   // Las pestañas visitadas quedan montadas: conservan scroll, chat y el mapa ya cargado
   const [mounted, setMounted] = useState<Set<MobileTab>>(() => new Set<MobileTab>([tab]));

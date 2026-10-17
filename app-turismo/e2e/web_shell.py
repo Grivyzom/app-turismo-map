@@ -27,6 +27,8 @@ def open_page(browser, viewport, query=''):
     page.set_default_timeout(TIMEOUT)
     page.goto(BASE + query)
     page.wait_for_selector('[data-testid="app-shell"]')
+    # El toast de errores de desarrollo (LogBox web) tapa el dock; no existe en producción
+    page.add_style_tag(content='#error-toast{display:none!important}')
     return page
 
 
@@ -70,6 +72,62 @@ def auth_param_opens_modal(browser):
     page.wait_for_selector('[aria-label="Cerrar modal de autenticación"]')
     assert len(page.query_selector_all('[aria-label="Cerrar modal de autenticación"]')) == 1, \
         'hay más de un AuthModal abierto'
+
+
+def click_section(page, label):
+    """Navega con el dock o el rail, el que esté visible."""
+    page.get_by_role('tab', name=label, exact=True).first.click()
+
+
+def wait_param(page, value):
+    page.wait_for_function(f"new URLSearchParams(location.search).get('s') === '{value}'")
+
+
+@check
+def url_tracks_section(browser):
+    page = open_page(browser, COMPACT)
+    click_section(page, 'Rutas')
+    expect_section(page, 'rutas')
+    wait_param(page, 'rutas')
+
+
+@check
+def back_button_restores_section(browser):
+    page = open_page(browser, COMPACT)
+    click_section(page, 'Rutas')
+    expect_section(page, 'rutas')
+    click_section(page, 'Perfil')
+    expect_section(page, 'perfil')
+    page.go_back()
+    expect_section(page, 'rutas')
+    page.go_back()
+    expect_section(page, 'inicio')
+
+
+@check
+def url_keeps_other_params(browser):
+    page = open_page(browser, COMPACT, '?foo=1')
+    click_section(page, 'Rutas')
+    wait_param(page, 'rutas')
+    assert search_param(page, 'foo') == '1', f'se perdió foo: {page.url}'
+
+
+@check
+def invalid_param_falls_back(browser):
+    page = open_page(browser, COMPACT, '?s=xyz')
+    expect_section(page, 'inicio')
+    page = open_page(browser, COMPACT, '?s=RUTAS')
+    expect_section(page, 'rutas')
+
+
+@check
+def reload_keeps_section(browser):
+    page = open_page(browser, COMPACT)
+    click_section(page, 'Perfil')
+    wait_param(page, 'perfil')
+    page.reload()
+    page.wait_for_selector('[data-testid="app-shell"]')
+    expect_section(page, 'perfil')
 
 
 def main(names):
