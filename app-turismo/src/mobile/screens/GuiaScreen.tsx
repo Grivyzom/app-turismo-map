@@ -9,6 +9,8 @@ import { Card, PillButton, T, useColors } from '../components/ui';
 import { answerQuestion, GUIDE_SUGGESTIONS, GuideAction, GuideAnswer } from '../data/guideBrain';
 import { PlaceRow } from '../sections/PlaceRow';
 import { openEmergencyMenu, searchNearbyInMaps } from '../utils/external';
+import { useLayoutMode } from '../hooks/useLayoutMode';
+import { WIDE_CONTENT_MAX } from '../layout';
 import { MobileRadii, MobileSpacing, TAB_BAR_HEIGHT } from '../theme';
 
 type Message = { from: 'user'; text: string } | { from: 'guide'; answer: GuideAnswer };
@@ -19,6 +21,7 @@ export function GuiaScreen() {
   const { guidePrompt, prefs, sectorName, setTab, setOverlay, openOnMap, origin } = app;
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const wide = useLayoutMode() === 'wide';
   const scrollRef = useRef<ScrollView>(null);
   const [messages, setMessages] = useState<Message[]>([]);
 
@@ -65,7 +68,14 @@ export function GuiaScreen() {
       style={{ flex: 1, backgroundColor: colors.background }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+      <View
+        style={[
+          styles.header,
+          { paddingTop: insets.top + 8 },
+          wide && styles.column,
+          wide && { paddingTop: 24 },
+        ]}
+      >
         <Card style={styles.headerCard}>
           <View style={[styles.spark, { backgroundColor: colors.accent }]}>
             <Ionicons name="sparkles" size={18} color={colors.onAccent} />
@@ -84,8 +94,9 @@ export function GuiaScreen() {
 
       <ScrollView
         ref={scrollRef}
+        testID="guia-scroll"
         style={{ flex: 1 }}
-        contentContainerStyle={{ padding: MobileSpacing.screen, gap: 12 }}
+        contentContainerStyle={[{ padding: MobileSpacing.screen, gap: 12 }, wide && styles.column]}
         onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
         keyboardShouldPersistTaps="handled"
       >
@@ -134,11 +145,14 @@ export function GuiaScreen() {
       </ScrollView>
 
       <View
-        style={{
-          paddingHorizontal: MobileSpacing.screen,
-          paddingBottom: insets.bottom + TAB_BAR_HEIGHT + 30,
-          paddingTop: 8,
-        }}
+        style={[
+          {
+            paddingHorizontal: MobileSpacing.screen,
+            paddingBottom: wide ? 24 : insets.bottom + TAB_BAR_HEIGHT + 30,
+            paddingTop: 8,
+          },
+          wide && styles.column,
+        ]}
       >
         <Card style={{ padding: 8, borderRadius: MobileRadii.pill }}>
           <QuestionInput onSubmit={ask} />
@@ -150,6 +164,7 @@ export function GuiaScreen() {
 
 const styles = StyleSheet.create({
   header: { paddingHorizontal: MobileSpacing.screen },
+  column: { width: '100%', maxWidth: WIDE_CONTENT_MAX, alignSelf: 'center' },
   headerCard: {
     flexDirection: 'row',
     alignItems: 'center',

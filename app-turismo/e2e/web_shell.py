@@ -170,6 +170,50 @@ def resize_keeps_section(browser):
     expect_section(page, 'rutas')
 
 
+def content_box(page, section, scroll_testid):
+    sel = f'[data-testid="section-{section}-active"] [data-testid="{scroll_testid}"] > div'
+    return page.wait_for_selector(sel).bounding_box()
+
+
+@check
+def screens_centered_on_wide(browser):
+    page = open_page(browser, WIDE)
+    area_x, area_w = 88, WIDE['width'] - 88
+    for label, key, scroll in [('Inicio', 'inicio', 'screen-scroll'), ('Rutas', 'rutas', 'screen-scroll'),
+                               ('Perfil', 'perfil', 'screen-scroll'), ('Guía', 'guia', 'guia-scroll')]:
+        click_section(page, label)
+        expect_section(page, key)
+        box = content_box(page, key, scroll)
+        assert box['width'] <= 761, f'{key}: columna de {box["width"]}px, máx 760'
+        center = box['x'] + box['width'] / 2
+        assert abs(center - (area_x + area_w / 2)) <= 2, f'{key}: columna no centrada ({box})'
+
+
+@check
+def screens_full_width_on_compact(browser):
+    page = open_page(browser, COMPACT)
+    box = content_box(page, 'inicio', 'screen-scroll')
+    assert abs(box['width'] - COMPACT['width']) <= 1, f'en teléfono el contenido usa todo el ancho: {box}'
+
+
+@check
+def carousel_fits_column(browser):
+    page = open_page(browser, WIDE)
+    col = content_box(page, 'inicio', 'screen-scroll')
+    page.wait_for_selector('[data-testid="events-carousel"]')
+    page.wait_for_timeout(1000)
+    box = page.query_selector('[data-testid="events-carousel"]').bounding_box()
+    assert box['x'] >= col['x'] - 1 and box['x'] + box['width'] <= col['x'] + col['width'] + 1, \
+        f'carrusel {box} fuera de la columna {col}'
+    imgs = page.eval_on_selector_all(
+        '[data-testid="events-carousel"] img',
+        'els => els.map(e => e.getBoundingClientRect()).filter(r => r.width > 0 && r.left < innerWidth && r.right > 0).map(r => [r.left, r.right])')
+    assert imgs, 'no se ve ninguna ilustración'
+    for left, right in imgs:
+        if right > col['x'] and left < col['x'] + col['width']:
+            assert right <= col['x'] + col['width'] + 1, f'ilustración desborda: {left}-{right}, columna {col}'
+
+
 def main(names):
     selected = names or list(CHECKS)
     failed = []
