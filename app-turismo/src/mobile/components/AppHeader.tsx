@@ -2,8 +2,10 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+import { useAuth } from '../../context/AuthContext';
 import { useMobileApp } from '../MobileAppContext';
 import type { IoniconName } from '../data/categories';
+import { useCurrentUser } from '../hooks/useCurrentUser';
 import { notificationsMuted } from '../hooks/useMobilePreferences';
 import { MobileRadii } from '../theme';
 
@@ -26,6 +28,8 @@ function placeName(sectorName: string) {
 export function AppHeader() {
   const { prefs, sectorName, setSectorPickerOpen, setTab, setOverlay, notifications } =
     useMobileApp();
+  const { openAuthModal } = useAuth();
+  const me = useCurrentUser();
   const colors = useColors();
 
   // El punto rojo solo aparece cuando hay avisos sin leer (como en la web)
@@ -41,13 +45,21 @@ export function AppHeader() {
   return (
     <Card style={styles.bar}>
       <View style={styles.left}>
+        {/* Invitado: el avatar abre el acceso; con sesión, el perfil */}
         <Tap
-          onPress={() => setTab('perfil')}
+          onPress={me.isGuest ? () => openAuthModal('login') : () => setTab('perfil')}
           accessibilityRole="button"
-          accessibilityLabel="Abrir mi perfil"
+          accessibilityLabel={
+            me.isGuest ? 'Iniciar sesión o crear cuenta' : `Abrir mi perfil (${me.displayName})`
+          }
           hitSlop={6}
         >
-          <Avatar name={prefs.nick || 'Visitante'} uri={prefs.photoUri} size={40} />
+          <Avatar
+            name={me.displayName}
+            uri={me.avatarUrl}
+            icon={me.isGuest ? 'person-outline' : undefined}
+            size={40}
+          />
         </Tap>
 
         <Tap

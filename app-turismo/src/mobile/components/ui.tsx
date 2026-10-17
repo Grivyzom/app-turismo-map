@@ -337,10 +337,13 @@ export function Avatar({
   name,
   size = 44,
   uri,
+  icon,
 }: {
   name: string;
   size?: number;
   uri?: string | null;
+  /** Ícono en lugar de iniciales (p. ej. el invitado). */
+  icon?: IoniconName;
 }) {
   const colors = useColors();
   if (uri) {
@@ -374,9 +377,13 @@ export function Avatar({
         justifyContent: 'center',
       }}
     >
-      <T variant={size > 60 ? 'headline' : 'small'} weight="600">
-        {initials}
-      </T>
+      {icon ? (
+        <Ionicons name={icon} size={size * 0.5} color={colors.textSecondary} />
+      ) : (
+        <T variant={size > 60 ? 'headline' : 'small'} weight="600">
+          {initials}
+        </T>
+      )}
     </View>
   );
 }
