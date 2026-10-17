@@ -6,6 +6,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MapContainer } from '../../components/Map/MapContainer';
 import type { MapLayer, TurismoEvent } from '../../components/Map/types';
 import { useUserLocationContext } from '../../context/UserLocationContext';
+import {
+  formatPdfSize,
+  hasAnyLink,
+  openInApp,
+  openWhatsapp,
+  useBranchLinks,
+} from '../../hooks/useBranchLinks';
 import { useWalkPreview } from '../../hooks/useWalkPreview';
 import { useMobileApp } from '../MobileAppContext';
 import { GpsButton } from '../components/GpsButton';
@@ -106,6 +113,7 @@ export function MapaScreen() {
       : 0;
   const saved = selected ? prefs.savedEventIds.includes(String(selected.id)) : false;
   const selectedIsEvent = selected ? isEventLike(selected) : false;
+  const links = useBranchLinks(selected?.id);
 
   return (
     <View style={styles.root}>
@@ -249,6 +257,31 @@ export function MapaScreen() {
                 accessibilityLabel="Cerrar"
               />
             </View>
+            {hasAnyLink(links) ? (
+              <View style={styles.links}>
+                {links.menuPdfUrl ? (
+                  <PillButton
+                    label={`Carta${links.menuPdfSize ? ` · ${formatPdfSize(links.menuPdfSize)}` : ''}`}
+                    icon="restaurant-outline"
+                    onPress={() => openInApp(links.menuPdfUrl!)}
+                  />
+                ) : null}
+                {links.whatsapp ? (
+                  <PillButton
+                    label="WhatsApp"
+                    icon="logo-whatsapp"
+                    onPress={() => openWhatsapp(links)}
+                  />
+                ) : null}
+                {links.websiteUrl ? (
+                  <PillButton
+                    label="Web"
+                    icon="globe-outline"
+                    onPress={() => openInApp(links.websiteUrl!)}
+                  />
+                ) : null}
+              </View>
+            ) : null}
             <View style={styles.peekActions}>
               <PrimaryButton
                 label="Cómo llegar"
@@ -291,5 +324,6 @@ const styles = StyleSheet.create({
   peek: { paddingTop: 8 },
   grabber: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, marginBottom: 10 },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
+  links: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   peekActions: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
 });

@@ -145,6 +145,13 @@ func InitDB() {
 		`ALTER TABLE events ADD COLUMN IF NOT EXISTS image_url TEXT;`,
 		`ALTER TABLE events ADD COLUMN IF NOT EXISTS is_live BOOLEAN DEFAULT false;`,
 		`ALTER TABLE company_branches ADD COLUMN IF NOT EXISTS is_indoor BOOLEAN DEFAULT false;`,
+		// ── Enlaces del comercio: carta PDF (object storage), WhatsApp y web ──
+		`ALTER TABLE company_branches ADD COLUMN IF NOT EXISTS whatsapp VARCHAR(20);`,
+		`ALTER TABLE company_branches ADD COLUMN IF NOT EXISTS whatsapp_message TEXT;`,
+		`ALTER TABLE company_branches ADD COLUMN IF NOT EXISTS website_url TEXT;`,
+		`ALTER TABLE company_branches ADD COLUMN IF NOT EXISTS menu_pdf_url TEXT;`,
+		`ALTER TABLE company_branches ADD COLUMN IF NOT EXISTS menu_pdf_size INT;`,
+		`ALTER TABLE company_branches ADD COLUMN IF NOT EXISTS menu_updated_at TIMESTAMPTZ;`,
 		`CREATE TABLE IF NOT EXISTS fauna_types (
 			id SERIAL PRIMARY KEY,
 			name VARCHAR(255) UNIQUE NOT NULL,

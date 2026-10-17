@@ -27,6 +27,44 @@ services:
     volumes:
       - redis_data:/data
 
+  # Object storage S3-compatible para desarrollo (en producción: Cloudflare R2).
+  # RustFS reemplaza a MinIO, que ya no publica imágenes Docker.
+  # Levantar con: docker compose --profile storage up -d s3 s3-init
+  s3:
+    profiles:
+      - storage
+    image: rustfs/rustfs:1.0.2
+    container_name: turismo_s3
+    restart: unless-stopped
+    environment:
+      RUSTFS_ACCESS_KEY: ${S3_ACCESS_KEY:-devaccess}
+      RUSTFS_SECRET_KEY: ${S3_SECRET_KEY:-devsecret123}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - s3_data:/data
+
+  # Crea el bucket con lectura pública anónima (las cartas se sirven sin firma).
+  s3-init:
+    profiles:
+      - storage
+    image: amazon/aws-cli:2.27.0
+    depends_on:
+      - s3
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-devaccess}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-devsecret123}
+      AWS_DEFAULT_REGION: us-east-1
+      BUCKET: ${S3_BUCKET:-turismo-media}
+    entrypoint: >
+      /bin/sh -c '
+      until aws --endpoint-url http://s3:9000 s3api list-buckets >/dev/null 2>&1; do sleep 1; done;
+      aws --endpoint-url http://s3:9000 s3api create-bucket --bucket "$$BUCKET" 2>/dev/null || true;
+      aws --endpoint-url http://s3:9000 s3api put-bucket-policy --bucket "$$BUCKET" --policy "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"AWS\":[\"*\"]},\"Action\":[\"s3:GetObject\"],\"Resource\":[\"arn:aws:s3:::$$BUCKET/*\"]}]}";
+      aws --endpoint-url http://s3:9000 s3api put-bucket-cors --bucket "$$BUCKET" --cors-configuration "{\"CORSRules\":[{\"AllowedOrigins\":[\"*\"],\"AllowedMethods\":[\"PUT\",\"GET\"],\"AllowedHeaders\":[\"*\"],\"MaxAgeSeconds\":3600}]}";
+      echo bucket listo'
+
   backend:
     build:
       context: ./backend
@@ -94,6 +132,8 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
+    driver: local
+  s3_data:
     driver: local
   whisper_cache:
     driver: local

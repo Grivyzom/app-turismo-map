@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Linking, Platform, Pressable } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import Animated, {
   ZoomIn,
@@ -8,6 +9,13 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 
+import {
+  formatPdfSize,
+  hasAnyLink,
+  openInApp,
+  openWhatsapp,
+  useBranchLinks,
+} from '../../../hooks/useBranchLinks';
 import { getCategoryColor } from '../../../utils/mapUtils';
 import { TurismoEvent } from '../types';
 
@@ -36,6 +44,7 @@ const useTactileScale = () => {
 
 export const StoreModal = ({ event, isLightMode }: StoreModalProps) => {
   const color = getCategoryColor(event.category);
+  const links = useBranchLinks(event.id);
 
   const handleDirections = () => {
     const url = Platform.select({
@@ -175,6 +184,56 @@ export const StoreModal = ({ event, isLightMode }: StoreModalProps) => {
                 <Text style={[styles.buttonText, { color: textColor }]}>Ir</Text>
               </AnimatedPressable>
             </View>
+
+            {/* Enlaces del comercio: se cargan al abrir el modal */}
+            {hasAnyLink(links) && (
+              <View style={styles.linksRow}>
+                {links.menuPdfUrl ? (
+                  <Pressable
+                    style={[styles.linkChip, { borderColor }]}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      openInApp(links.menuPdfUrl!);
+                    }}
+                    accessibilityLabel="Ver carta"
+                  >
+                    <MaterialIcons name="restaurant-menu" size={14} color={color} />
+                    <Text style={[styles.linkText, { color: textColor }]}>Carta</Text>
+                    {links.menuPdfSize ? (
+                      <Text style={[styles.linkMeta, { color: subtextColor }]}>
+                        {formatPdfSize(links.menuPdfSize)}
+                      </Text>
+                    ) : null}
+                  </Pressable>
+                ) : null}
+                {links.whatsapp ? (
+                  <Pressable
+                    style={[styles.linkChip, { borderColor }]}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      openWhatsapp(links);
+                    }}
+                    accessibilityLabel="Escribir por WhatsApp"
+                  >
+                    <Ionicons name="logo-whatsapp" size={14} color="#25D366" />
+                    <Text style={[styles.linkText, { color: textColor }]}>WhatsApp</Text>
+                  </Pressable>
+                ) : null}
+                {links.websiteUrl ? (
+                  <Pressable
+                    style={[styles.linkChip, { borderColor }]}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      openInApp(links.websiteUrl!);
+                    }}
+                    accessibilityLabel="Abrir sitio web"
+                  >
+                    <MaterialIcons name="language" size={14} color={color} />
+                    <Text style={[styles.linkText, { color: textColor }]}>Web</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            )}
           </View>
         </View>
       </View>
@@ -266,6 +325,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 12,
     gap: 6,
+  },
+  linksRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
+  },
+  linkChip: {
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    gap: 5,
+  },
+  linkText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  linkMeta: {
+    fontSize: 10,
+    fontWeight: '500',
   },
   buttonText: {
     color: '#FFFFFF',
