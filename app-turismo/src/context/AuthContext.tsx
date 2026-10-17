@@ -1,9 +1,21 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+  ReactNode,
+} from 'react';
 import { useRouter, useSegments, useRootNavigationState } from 'expo-router';
 import { Platform } from 'react-native';
-import { useAuth as useClerkAuth, useUser as useClerkUser, useClerk } from '../components/Auth/clerkHooks';
+import {
+  useAuth as useClerkAuth,
+  useUser as useClerkUser,
+  useClerk,
+} from '../components/Auth/clerkHooks';
 
-import { getAuthTokenAsync, saveAuthTokenAsync, clearAuthTokenAsync } from '../utils/authStorage';
+import { saveAuthTokenAsync, clearAuthTokenAsync } from '../utils/authStorage';
+import { AuthUser, toAuthUser } from '../utils/authUser';
 import {
   loadUserProfile,
   saveUserProfile,
@@ -15,6 +27,7 @@ import { resetCameraSpawnInSession } from '../components/Map/camera/cameraAnimat
 import { API_URL } from '../config/api';
 
 export type AuthModalMode = 'login' | 'register';
+export type { AuthUser } from '../utils/authUser';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -22,6 +35,8 @@ interface AuthState {
   token: string | null;
   userType: string | null;
   clerkUser?: any;
+  /** Datos de la cuenta para mostrar (nombre, email, foto); null sin sesión. */
+  user: AuthUser | null;
   isAuthModalOpen: boolean;
   authModalMode: AuthModalMode;
 }
@@ -44,9 +59,7 @@ export function useAuth() {
   return context;
 }
 
-function useProtectedRoute(
-  user: AuthState & { openAuthModal?: (mode?: AuthModalMode) => void },
-) {
+function useProtectedRoute(user: AuthState & { openAuthModal?: (mode?: AuthModalMode) => void }) {
   const segments = useSegments() as string[];
   const router = useRouter();
   const rootNavigationState = useRootNavigationState();
@@ -87,7 +100,14 @@ function useProtectedRoute(
     } else if (user.isAuthenticated && segments[0] === 'index') {
       router.replace('/(home)');
     }
-  }, [user.isAuthenticated, user.isLoading, user.userType, segments, rootNavigationState?.key, user.openAuthModal]);
+  }, [
+    user.isAuthenticated,
+    user.isLoading,
+    user.userType,
+    segments,
+    rootNavigationState?.key,
+    user.openAuthModal,
+  ]);
 }
 
 interface AuthProviderProps {
@@ -104,9 +124,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   } = useClerkAuth();
   const { user: clerkUser } = useClerkUser();
 
-  const isActuallySignedIn = Boolean(
-    isClerkSignedIn || clerk?.session || clerkUser || clerk?.user,
-  );
+  const isActuallySignedIn = Boolean(isClerkSignedIn || clerk?.session || clerkUser || clerk?.user);
   const activeUser = clerkUser || clerk?.user;
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -127,6 +145,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     token: null,
     userType: null,
     clerkUser: null,
+    user: null,
   });
   const router = useRouter();
 
@@ -175,16 +194,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
           }
 
           const profile = await loadUserProfile();
+          const user = toAuthUser(activeUser, profile);
           const newProfile: NormalUserProfile = {
-            fullName:
-              activeUser?.fullName ||
-              activeUser?.firstName ||
-              profile?.fullName ||
-              'Usuario',
-            email:
-              activeUser?.primaryEmailAddress?.emailAddress ||
-              profile?.email ||
-              '',
+            fullName: user.fullName,
+            email: user.email,
             location: profile?.location || 'Chile',
             avatarIcon: profile?.avatarIcon || 'verified-user',
             userType: userType,
@@ -201,6 +214,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             token: appToken,
             userType: userType,
             clerkUser: activeUser,
+            user,
           });
           return;
         } catch (e) {
@@ -211,30 +225,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
             token: 'clerk_session',
             userType: (activeUser?.publicMetadata?.userType as any) || 'citizen',
             clerkUser: activeUser,
+            user: toAuthUser(activeUser),
           });
           return;
         }
       }
 
+      // Clerk cargó y no hay sesión: la sesión depende solo de Clerk. Un token del backend que
+      // quedó guardado de un login anterior (p. ej. al instalar el APK encima) no cuenta como sesión.
       try {
-        const token = await getAuthTokenAsync();
-        const profile = await loadUserProfile();
-        setState({
-          isAuthenticated: !!token,
-          isLoading: false,
-          token,
-          userType: profile?.userType ?? null,
-          clerkUser: null,
-        });
-      } catch (error) {
-        setState({
-          isAuthenticated: false,
-          isLoading: false,
-          token: null,
-          userType: null,
-          clerkUser: null,
-        });
+        clearTokenCache();
+        await clearAuthTokenAsync();
+      } catch (e) {
+        console.warn('[AuthProvider] No se pudo borrar el token guardado:', e);
       }
+      setState({
+        isAuthenticated: false,
+        isLoading: false,
+        token: null,
+        userType: null,
+        clerkUser: null,
+        user: null,
+      });
     }
     loadInitialState();
   }, [isClerkLoaded, isActuallySignedIn, activeUser]);
@@ -259,6 +271,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       token,
       userType: profile?.userType ?? null,
       clerkUser: null,
+      user: null,
     });
     setIsAuthModalOpen(false);
     if (redirectPath) {
@@ -290,6 +303,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       token: null,
       userType: null,
       clerkUser: null,
+      user: null,
     });
   };
 

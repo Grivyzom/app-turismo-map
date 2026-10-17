@@ -7,6 +7,7 @@ import type { Section } from './layout';
 import { buildRecommendedRoute, RecommendedRoute } from './data/routes';
 import { IoniconName, QuickCategory } from './data/categories';
 import { useMobileNotifications } from './hooks/useMobileNotifications';
+import { shouldShowWelcome } from './session';
 import { MobilePreferences, TEXT_SCALE, useMobilePreferences } from './hooks/useMobilePreferences';
 import { MobileWeather, useMobileWeather } from './hooks/useMobileWeather';
 import {
@@ -156,11 +157,14 @@ export function MobileAppProvider({
   const [eventDetail, setEventDetail] = useState<PlaceWithDistance | null>(null);
   const [guestDismissed, setGuestDismissed] = useState(false);
   const [accountGate, setAccountGate] = useState<GatedFeature | null>(null);
-  // Si la sesión tarda demasiado en restaurarse (p. ej. sin conexión) no bloqueamos la app
+  // Si la sesión tarda demasiado en restaurarse (p. ej. sin conexión) se deja de esperar y sale la bienvenida
   const [authWaitExpired, setAuthWaitExpired] = useState(false);
   useEffect(() => {
     if (!authLoading) return;
-    const timer = setTimeout(() => setAuthWaitExpired(true), AUTH_WAIT_MS);
+    const timer = setTimeout(() => {
+      console.warn('[MobileApp] La sesión no se resolvió en 6 s; se muestra la bienvenida');
+      setAuthWaitExpired(true);
+    }, AUTH_WAIT_MS);
     return () => clearTimeout(timer);
   }, [authLoading]);
 
@@ -297,7 +301,12 @@ export function MobileAppProvider({
   const value: MobileAppContextValue = {
     isGuest: !isAuthenticated,
     authLoading: authLoading && !authWaitExpired,
-    showWelcome: !authLoading && !isAuthenticated && !guestDismissed,
+    showWelcome: shouldShowWelcome({
+      authLoading,
+      authWaitExpired,
+      isAuthenticated,
+      guestDismissed,
+    }),
     continueAsGuest: () => setGuestDismissed(true),
     requireAccount,
     accountGate,
