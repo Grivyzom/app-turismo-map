@@ -52,7 +52,7 @@ reubica en la sección que corresponda.
 - Hook nuevo `useLayoutMode()` en `src/mobile/hooks/useLayoutMode.ts`:
   devuelve `'wide'` si `Platform.OS === 'web'` y `useWindowDimensions().width >= 768`;
   si no, `'compact'`.
-- Constante `WIDE_BREAKPOINT = 768` y `SIDE_RAIL_WIDTH = 88` en `src/mobile/theme.ts`.
+- Constantes de layout en `src/mobile/layout.ts` (sin imports, testeable con node).
 - Native siempre `compact` → la app móvil no cambia visualmente.
 
 ### 3. Navegación
@@ -64,7 +64,7 @@ reubica en la sección que corresponda.
   - 5 ítems (mismo array de pestañas que `TabBar`, extraído a `src/mobile/navigation.tsx`
     para compartirlo): ícono 22px + etiqueta `caption`; activo `text`, inactivo `textSecondary`;
   - Guía como círculo negro (`accent`) destacado, igual que en el dock;
-  - avatar + avisos (con `BadgeDot`) al fondo del rail.
+  - sin avatar ni avisos: siguen en `AppHeader`.
 - Al elegir sección se hace `setOverlay(null)` + `setTab(key)` (mismo comportamiento que `TabBar`).
 - `Shell` en `wide`: fila `[SideRail][contenido flex:1]`; las pantallas montadas se
   posicionan dentro del área de contenido, no sobre el rail.
@@ -72,7 +72,9 @@ reubica en la sección que corresponda.
 ### 4. URL ↔ sección (solo web)
 
 - `tab` se sincroniza con el query param `s` (`?s=inicio|mapa|guia|rutas|perfil`)
-  usando `router.setParams` de expo-router; al montar se lee el param inicial.
+  con `history.pushState` (primera sincronización con `replaceState`) y `popstate`,
+  para que Atrás vuelva a la sección anterior; al montar se lee el param inicial.
+  Un `?action=create_*` legacy sin `s` abre Mapa.
 - Valor inválido o ausente → `inicio`.
 - Otros params se conservan. El manejo de `?auth=login|register` (abrir `AuthModal`
   si no hay sesión) se mueve de `WebHomeScreen` al `Shell` en web, porque al entrar
@@ -87,7 +89,6 @@ reubica en la sección que corresponda.
 - `GuiaScreen` no usa `Screen` (chat con `KeyboardAvoidingView` + `ScrollView` propio):
   en `wide` se envuelve su cabecera y su lista en un contenedor centrado
   `maxWidth: 760` con el mismo criterio.
-- `AppHeader` en `wide`: se oculta el avatar (vive en el rail); quedan sector y avisos.
 - Overlays Clima y Avisos en `wide`: panel lateral derecho de 440px, alto completo,
   con `Scrim` detrás; click en el scrim cierra.
 - `EventOverlay` en `wide`: mismo panel lateral derecho de 440px (animación desde
