@@ -115,7 +115,9 @@ Sin esto, el resto de las propuestas no se nota.
 1. ✅ **P0 (hecho):** quitar el token viejo, exponer `user` y mostrar la bienvenida cuando vence la espera. Verificar en el APK con *Borrar datos* y sin borrarlos.
    - `AuthContext` borra `auth_token` cuando Clerk cargó sin sesión y expone `user` (`src/utils/authUser.ts`).
    - La regla de la bienvenida vive en `src/mobile/session.ts` (`shouldShowWelcome`), con tests en `tests/session.test.mjs`.
-2. `useCurrentUser()` y su uso en `AppHeader` y en el saludo, para que la sesión **se vea**.
+2. ✅ **Hecho:** `useCurrentUser()` y su uso en `AppHeader` y en el saludo, para que la sesión **se vea**.
+   - La regla vive en `resolveCurrentUser` (`src/mobile/session.ts`): apodo y foto del perfil → datos de la cuenta → "Visitante". El invitado no usa lo local.
+   - La usan `AppHeader` (el invitado ve un ícono y al tocarlo se abre el acceso), el saludo del Inicio, la Guía y la tarjeta de identidad del Perfil (nombre y email de la cuenta).
 3. Separar `GreetingHeader`, `GuestBanner`, `GuideCard` y `LodgingCard`: son las piezas con lógica de sesión.
 4. Redirigir a `requireAccount` las acciones de invitado que hoy llevan a Perfil.
 5. Separar el resto de las secciones: `WeatherChip`, `CityAlertCard`, `QuickCategoriesCard`, `ServicesCard`, `BenefitCard`.

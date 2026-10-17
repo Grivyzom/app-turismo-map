@@ -16,6 +16,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAuth } from '../../context/AuthContext';
 import { useMobileApp } from '../MobileAppContext';
 import { AppHeader } from '../components/AppHeader';
+import { useCurrentUser } from '../hooks/useCurrentUser';
 import { Option, SelectField } from '../components/OptionSheet';
 import { Screen } from '../components/Screen';
 import {
@@ -105,7 +106,8 @@ const ACCOUNT_PERKS = [
 export function PerfilScreen() {
   const { prefs, updatePrefs, resetPrefs, places, sectorName, openOnMap, isGuest, requireAccount } =
     useMobileApp();
-  const { isAuthenticated, openAuthModal, signOut } = useAuth();
+  const { isAuthenticated, openAuthModal, signOut, user } = useAuth();
+  const me = useCurrentUser();
   const colors = useColors();
   const [locating, setLocating] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -276,9 +278,12 @@ export function PerfilScreen() {
           {/* Identidad */}
           <Card>
             <View style={styles.photoRow}>
-              <Avatar name={prefs.nick || 'Visitante'} uri={prefs.photoUri} size={88} />
+              <Avatar name={me.displayName} uri={me.avatarUrl} size={88} />
               <View style={{ flex: 1 }}>
-                <T weight="700">Foto de perfil</T>
+                <T weight="700" numberOfLines={1}>
+                  {me.displayName}
+                </T>
+                {me.email ? <Hint>{me.email}</Hint> : null}
                 <Hint>Así te verán en tus reseñas y rutas compartidas.</Hint>
                 <PillButton
                   label="Cambiar foto"
@@ -291,9 +296,11 @@ export function PerfilScreen() {
             <Field
               value={prefs.nick}
               onChangeText={(nick) => updatePrefs({ nick })}
-              placeholder="Tu nombre o apodo"
+              placeholder={user?.firstName || user?.fullName || 'Tu nombre o apodo'}
             />
-            <Hint>Aparece en el saludo del inicio. Puede ser un apodo.</Hint>
+            <Hint>
+              Aparece en el saludo del inicio. Si lo dejas vacío, usamos el nombre de tu cuenta.
+            </Hint>
             <View style={{ marginTop: 14 }}>
               <OutlineButton label="Cerrar sesión" onPress={signOut} />
             </View>

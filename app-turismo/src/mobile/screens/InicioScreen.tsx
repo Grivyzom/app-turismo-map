@@ -6,6 +6,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useMobileApp } from '../MobileAppContext';
 import { AppHeader } from '../components/AppHeader';
 import { MarqueeText } from '../components/MarqueeText';
+import { useCurrentUser } from '../hooks/useCurrentUser';
 import { QuestionInput } from '../components/QuestionInput';
 import { Screen } from '../components/Screen';
 import { Card, IconButton, PillButton, SectionHeader, T, Thumb, useColors } from '../components/ui';
@@ -50,6 +51,7 @@ export function InicioScreen() {
     requireAccount,
   } = app;
   const colors = useColors();
+  const { greetingName } = useCurrentUser();
   const [now] = useState(() => new Date());
 
   const nearby = places.slice(0, 3);
@@ -108,7 +110,7 @@ export function InicioScreen() {
             {formatToday(now)}
           </T>
           <T variant="headline" weight="700" numberOfLines={2}>
-            {prefs.nick ? `Hola, ${prefs.nick}` : greeting(now)}
+            {greetingName ? `Hola, ${greetingName}` : greeting(now)}
           </T>
         </View>
         <Pressable
