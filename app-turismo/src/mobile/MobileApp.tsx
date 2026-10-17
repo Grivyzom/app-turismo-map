@@ -55,10 +55,10 @@ function Shell() {
     accountGate,
     closeAccountGate,
   } = useMobileApp();
-  const { isAuthenticated, isAuthModalOpen, openAuthModal, closeAuthModal } = useAuth();
   const colors = useColors();
 
   // Enlaces `?auth=login|register` (p. ej. desde el onboarding) abren el modal de acceso
+  const { isAuthenticated, isAuthModalOpen, openAuthModal, closeAuthModal } = useAuth();
   const { auth } = useLocalSearchParams<{ auth?: string }>();
   useEffect(() => {
     if (auth !== 'login' && auth !== 'register') return;
@@ -120,7 +120,7 @@ function Shell() {
       return false;
     });
     return () => sub.remove();
-  }, [closeTopLayer, tab, setTab, showWelcome, isAuthModalOpen, closeAuthModal]);
+  }, [closeTopLayer, tab, setTab, isAuthModalOpen, closeAuthModal, showWelcome]);
 
   // Web: Escape cierra la capa de más arriba (los modales manejan su propio cierre)
   useEffect(() => {
