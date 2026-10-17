@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { BackHandler, Platform, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, BackHandler, Platform, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { router, useLocalSearchParams } from 'expo-router';
 
@@ -7,6 +7,7 @@ import { AuthModal } from '../components/Auth/AuthModal';
 import { useAuth } from '../context/AuthContext';
 
 import { MobileAppProvider, MobileTab, useMobileApp } from './MobileAppContext';
+import { AccountGateSheet } from './components/AccountGateSheet';
 import { Option, OptionSheet } from './components/OptionSheet';
 import { SidePanel } from './components/SidePanel';
 import { SideRail } from './components/SideRail';
@@ -15,6 +16,7 @@ import { useColors } from './components/ui';
 import { useLayoutMode } from './hooks/useLayoutMode';
 import { useSectionUrlSync } from './hooks/useSectionUrlSync';
 import { AvisosScreen } from './screens/AvisosScreen';
+import { BienvenidaScreen } from './screens/BienvenidaScreen';
 import { ClimaScreen } from './screens/ClimaScreen';
 import { EventOverlay, EventoScreen } from './screens/EventoScreen';
 import { GuiaScreen } from './screens/GuiaScreen';
@@ -48,11 +50,15 @@ function Shell() {
     hasGps,
     eventDetail,
     closeEvent,
+    showWelcome,
+    authLoading,
+    accountGate,
+    closeAccountGate,
   } = useMobileApp();
   const colors = useColors();
 
   // Enlaces `?auth=login|register` (p. ej. desde el onboarding) abren el modal de acceso
-  const { isAuthenticated, isAuthModalOpen, openAuthModal } = useAuth();
+  const { isAuthenticated, isAuthModalOpen, openAuthModal, closeAuthModal } = useAuth();
   const { auth } = useLocalSearchParams<{ auth?: string }>();
   useEffect(() => {
     if (auth !== 'login' && auth !== 'register') return;
@@ -67,8 +73,12 @@ function Shell() {
   const [mounted, setMounted] = useState<Set<MobileTab>>(() => new Set<MobileTab>([tab]));
   if (!mounted.has(tab)) setMounted(new Set(mounted).add(tab));
 
-  // Cierra la capa de más arriba (selector → evento → overlay). Devuelve si cerró algo.
+  // Cierra la capa de más arriba (cuenta → selector → evento → overlay). Devuelve si cerró algo.
   const closeTopLayer = useCallback(() => {
+    if (accountGate) {
+      closeAccountGate();
+      return true;
+    }
     if (sectorPickerOpen) {
       setSectorPickerOpen(false);
       return true;
@@ -82,11 +92,26 @@ function Shell() {
       return true;
     }
     return false;
-  }, [sectorPickerOpen, eventDetail, overlay, setSectorPickerOpen, closeEvent, setOverlay]);
+  }, [
+    accountGate,
+    closeAccountGate,
+    sectorPickerOpen,
+    eventDetail,
+    overlay,
+    setSectorPickerOpen,
+    closeEvent,
+    setOverlay,
+  ]);
 
   // Botón "atrás" de Android: cierra capas y vuelve al Inicio antes de salir
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (isAuthModalOpen) {
+        closeAuthModal();
+        return true;
+      }
+      // En la bienvenida, "atrás" sale de la app
+      if (showWelcome) return false;
       if (closeTopLayer()) return true;
       if (tab !== 'inicio') {
         setTab('inicio');
@@ -95,7 +120,7 @@ function Shell() {
       return false;
     });
     return () => sub.remove();
-  }, [closeTopLayer, tab, setTab]);
+  }, [closeTopLayer, tab, setTab, isAuthModalOpen, closeAuthModal, showWelcome]);
 
   // Web: Escape cierra la capa de más arriba (los modales manejan su propio cierre)
   useEffect(() => {
@@ -188,6 +213,20 @@ function Shell() {
         onClose={() => setSectorPickerOpen(false)}
       />
 
+      <AccountGateSheet />
+
+      {/* Mientras se restaura la sesión se tapa todo, para no mostrar el Inicio un instante antes de la bienvenida */}
+      {authLoading ? (
+        <View
+          style={[StyleSheet.absoluteFill, styles.loading, { backgroundColor: colors.background }]}
+        >
+          <ActivityIndicator color={colors.text} />
+        </View>
+      ) : showWelcome ? (
+        <BienvenidaScreen />
+      ) : null}
+
+      {/* Va al final para quedar sobre la bienvenida */}
       <AuthModal />
     </View>
   );
@@ -207,4 +246,5 @@ const styles = StyleSheet.create({
   rootWide: { flexDirection: 'row' },
   content: { flex: 1, position: 'relative' },
   hidden: { opacity: 0, zIndex: -1 },
+  loading: { alignItems: 'center', justifyContent: 'center' },
 });
