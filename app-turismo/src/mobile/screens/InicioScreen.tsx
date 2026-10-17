@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -6,29 +6,19 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useMobileApp } from '../MobileAppContext';
 import { AppHeader } from '../components/AppHeader';
 import { MarqueeText } from '../components/MarqueeText';
-import { useCurrentUser } from '../hooks/useCurrentUser';
-import { QuestionInput } from '../components/QuestionInput';
 import { Screen } from '../components/Screen';
 import { Card, IconButton, PillButton, SectionHeader, T, Thumb, useColors } from '../components/ui';
 import { IoniconName, QUICK_CATEGORIES } from '../data/categories';
 import { EventsCarousel } from '../sections/EventsCarousel';
+import { GreetingHeader } from '../sections/GreetingHeader';
+import { GuestBanner } from '../sections/GuestBanner';
+import { GuideCard } from '../sections/GuideCard';
+import { LodgingCard } from '../sections/LodgingCard';
 import { MiniMap } from '../sections/MiniMap';
 import { PlaceRow } from '../sections/PlaceRow';
 import { RouteCard } from '../sections/RouteCard';
-import { openEmergencyMenu, openWalkingDirections, searchNearbyInMaps } from '../utils/external';
+import { openEmergencyMenu, searchNearbyInMaps } from '../utils/external';
 import { MobileRadii } from '../theme';
-
-function greeting(date: Date): string {
-  const h = date.getHours();
-  if (h < 12) return 'Buenos días';
-  if (h < 20) return 'Buenas tardes';
-  return 'Buenas noches';
-}
-
-function formatToday(date: Date): string {
-  const s = date.toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', month: 'short' });
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
 
 export function InicioScreen() {
   const app = useMobileApp();
@@ -44,30 +34,15 @@ export function InicioScreen() {
     setOverlay,
     setTab,
     openOnMap,
-    askGuide,
     refresh,
     loadingPlaces,
-    isGuest,
-    requireAccount,
   } = app;
   const colors = useColors();
-  const { greetingName } = useCurrentUser();
-  const [now] = useState(() => new Date());
 
   const nearby = places.slice(0, 3);
   const alert = weather?.alert ?? null;
   const showAlert =
     alert !== null && prefs.dismissedAlert !== alert && prefs.notifications.weatherAndCity;
-
-  const recommendation = useMemo(() => {
-    if (recommendedRoute) {
-      const first = recommendedRoute.stops[0].place.title;
-      return weather?.isRainy
-        ? `Día de lluvia: parte por ${first} y sigue con planes bajo techo.`
-        : `Parte por ${first}: está a pocos minutos y abre el recorrido de hoy.`;
-    }
-    return weather?.recommendation ?? 'Pregúntale a la guía qué hacer cerca de ti.';
-  }, [recommendedRoute, weather]);
 
   const benefit = useMemo(
     () => places.find((p) => p.hasActiveUpdate && p.activeUpdates?.length),
@@ -99,52 +74,44 @@ export function InicioScreen() {
     },
   ];
 
-  const hasLodging = prefs.lodging.latitude !== null && prefs.lodging.longitude !== null;
-
   return (
     <Screen header={<AppHeader />} onRefresh={refresh} refreshing={loadingPlaces}>
       {/* Saludo + clima */}
-      <View style={styles.greetingRow}>
-        <View style={{ flex: 1 }}>
-          <T variant="caption" color={colors.textSecondary}>
-            {formatToday(now)}
-          </T>
-          <T variant="headline" weight="700" numberOfLines={2}>
-            {greetingName ? `Hola, ${greetingName}` : greeting(now)}
-          </T>
-        </View>
-        <Pressable
-          onPress={() => setOverlay('clima')}
-          accessibilityRole="button"
-          accessibilityLabel="Ver clima"
-        >
-          <Card style={styles.weatherChip}>
-            <View style={styles.weatherCell}>
-              <Ionicons
-                name={(weather?.icon ?? 'cloud-outline') as IoniconName}
-                size={18}
-                color={colors.text}
-              />
-              <View>
-                <T weight="700">{weather ? `${weather.temp}°` : '--°'}</T>
-                <MarqueeText width={76} variant="caption" color={colors.textSecondary}>
-                  {weather?.condition ?? 'Cargando'}
-                </MarqueeText>
+      <GreetingHeader
+        trailing={
+          <Pressable
+            onPress={() => setOverlay('clima')}
+            accessibilityRole="button"
+            accessibilityLabel="Ver clima"
+          >
+            <Card style={styles.weatherChip}>
+              <View style={styles.weatherCell}>
+                <Ionicons
+                  name={(weather?.icon ?? 'cloud-outline') as IoniconName}
+                  size={18}
+                  color={colors.text}
+                />
+                <View>
+                  <T weight="700">{weather ? `${weather.temp}°` : '--°'}</T>
+                  <MarqueeText width={76} variant="caption" color={colors.textSecondary}>
+                    {weather?.condition ?? 'Cargando'}
+                  </MarqueeText>
+                </View>
               </View>
-            </View>
-            <View style={[styles.weatherDivider, { backgroundColor: colors.border }]} />
-            <View style={styles.weatherCell}>
-              <MaterialCommunityIcons name="weather-windy" size={18} color={colors.text} />
-              <View>
-                <T weight="700">{weather ? weather.windSpeed : '--'}</T>
-                <T variant="caption" color={colors.textSecondary}>
-                  km/h {weather?.windDirLabel ?? ''}
-                </T>
+              <View style={[styles.weatherDivider, { backgroundColor: colors.border }]} />
+              <View style={styles.weatherCell}>
+                <MaterialCommunityIcons name="weather-windy" size={18} color={colors.text} />
+                <View>
+                  <T weight="700">{weather ? weather.windSpeed : '--'}</T>
+                  <T variant="caption" color={colors.textSecondary}>
+                    km/h {weather?.windDirLabel ?? ''}
+                  </T>
+                </View>
               </View>
-            </View>
-          </Card>
-        </Pressable>
-      </View>
+            </Card>
+          </Pressable>
+        }
+      />
 
       {/* Aviso de la ciudad */}
       {showAlert ? (
@@ -171,42 +138,10 @@ export function InicioScreen() {
       ) : null}
 
       {/* Invitado: recordatorio para crear cuenta */}
-      {isGuest ? (
-        <Card style={styles.alert}>
-          <View style={[styles.alertIcon, { backgroundColor: colors.surfaceMuted }]}>
-            <Ionicons name="person-outline" size={18} color={colors.text} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <T variant="small" weight="600">
-              Estás como invitado
-            </T>
-            <T variant="caption" color={colors.textSecondary}>
-              Inicia sesión para guardar lugares, usar la guía y seguir rutas.
-            </T>
-          </View>
-          <PillButton label="Entrar" onPress={() => requireAccount('perfil')} />
-        </Card>
-      ) : null}
+      <GuestBanner />
 
       {/* Recomendación del día + Guía */}
-      <Card>
-        <View style={styles.recoRow}>
-          <View style={[styles.spark, { backgroundColor: colors.accent }]}>
-            <Ionicons name="sparkles" size={18} color={colors.onAccent} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <T weight="600">{recommendation}</T>
-            <PillButton
-              label="Ver ruta recomendada"
-              onPress={() => setTab('rutas')}
-              style={{ alignSelf: 'flex-start', marginTop: 10 }}
-            />
-          </View>
-        </View>
-        <View style={{ marginTop: 14 }}>
-          <QuestionInput onSubmit={askGuide} />
-        </View>
-      </Card>
+      <GuideCard />
 
       {/* Eventos */}
       <SectionHeader
@@ -236,32 +171,7 @@ export function InicioScreen() {
       </Card>
 
       {/* Volver a mi alojamiento */}
-      <Card style={styles.lodging}>
-        <View style={[styles.lodgingIcon, { backgroundColor: colors.accent }]}>
-          <Ionicons name="home-outline" size={20} color={colors.onAccent} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <T weight="600">Volver a mi alojamiento</T>
-          <T variant="caption" color={colors.textSecondary} numberOfLines={2}>
-            {hasLodging
-              ? prefs.lodging.street
-              : 'Agrega tu dirección en Perfil para usar esta opción'}
-          </T>
-        </View>
-        {hasLodging ? (
-          <PillButton
-            label="Ir"
-            onPress={() =>
-              openWalkingDirections({
-                latitude: prefs.lodging.latitude as number,
-                longitude: prefs.lodging.longitude as number,
-              })
-            }
-          />
-        ) : (
-          <PillButton label="Agregar" onPress={() => setTab('perfil')} />
-        )}
-      </Card>
+      <LodgingCard />
 
       {/* Ruta recomendada */}
       <RouteCard route={recommendedRoute} onAdjust={() => setTab('perfil')} />
@@ -332,7 +242,6 @@ export function InicioScreen() {
 }
 
 const styles = StyleSheet.create({
-  greetingRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 4 },
   weatherChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -351,28 +260,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  recoRow: { flexDirection: 'row', gap: 12 },
-  spark: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   categories: { flexDirection: 'row', justifyContent: 'space-between' },
   category: { flex: 1, alignItems: 'center', paddingVertical: 4 },
   categoryIcon: {
     width: 52,
     height: 52,
     borderRadius: MobileRadii.inner,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  lodging: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  lodgingIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },

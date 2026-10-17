@@ -118,7 +118,10 @@ Sin esto, el resto de las propuestas no se nota.
 2. ✅ **Hecho:** `useCurrentUser()` y su uso en `AppHeader` y en el saludo, para que la sesión **se vea**.
    - La regla vive en `resolveCurrentUser` (`src/mobile/session.ts`): apodo y foto del perfil → datos de la cuenta → "Visitante". El invitado no usa lo local.
    - La usan `AppHeader` (el invitado ve un ícono y al tocarlo se abre el acceso), el saludo del Inicio, la Guía y la tarjeta de identidad del Perfil (nombre y email de la cuenta).
-3. Separar `GreetingHeader`, `GuestBanner`, `GuideCard` y `LodgingCard`: son las piezas con lógica de sesión.
+3. ✅ **Hecho:** separar `GreetingHeader`, `GuestBanner`, `GuideCard` y `LodgingCard`: son las piezas con lógica de sesión.
+   - Viven en `src/mobile/sections/`. El saludo por hora y la fecha están en `src/mobile/data/greeting.ts`, con tests.
+   - `GuideCard`: el invitado ve la caja de la guía bloqueada con "Entrar", en vez de escribir y recién al enviar enterarse.
+   - `LodgingCard`: el invitado no usa un alojamiento guardado de otra sesión. "Agregar" abre el acceso en vez de llevar al Perfil bloqueado.
 4. Redirigir a `requireAccount` las acciones de invitado que hoy llevan a Perfil.
 5. Separar el resto de las secciones: `WeatherChip`, `CityAlertCard`, `QuickCategoriesCard`, `ServicesCard`, `BenefitCard`.
 6. Guardados y me gusta en el backend, y separación de preferencias de dispositivo y de cuenta.
