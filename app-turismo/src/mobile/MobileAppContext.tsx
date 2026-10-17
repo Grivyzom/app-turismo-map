@@ -1,10 +1,10 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import { useAuth } from '../context/AuthContext';
 import { useUserLocationContext } from '../context/UserLocationContext';
 
 import { buildRecommendedRoute, RecommendedRoute } from './data/routes';
-import { QuickCategory } from './data/categories';
+import { IoniconName, QuickCategory } from './data/categories';
 import { useMobileNotifications } from './hooks/useMobileNotifications';
 import { MobilePreferences, TEXT_SCALE, useMobilePreferences } from './hooks/useMobilePreferences';
 import { MobileWeather, useMobileWeather } from './hooks/useMobileWeather';
@@ -20,12 +20,51 @@ import {
 export type MobileTab = 'inicio' | 'mapa' | 'guia' | 'rutas' | 'perfil';
 export type MobileOverlay = 'clima' | 'avisos' | null;
 
+/** Funciones que requieren cuenta: el invitado ve una hoja que lo invita a iniciar sesión. */
+export type GatedFeature = 'guardar' | 'meGusta' | 'guia' | 'rutas' | 'perfil';
+
+export const GATED_FEATURE_COPY: Record<GatedFeature, { icon: IoniconName; message: string }> = {
+  guardar: {
+    icon: 'bookmark-outline',
+    message: 'Crea una cuenta para guardar eventos y lugares y encontrarlos después.',
+  },
+  meGusta: {
+    icon: 'heart-outline',
+    message: 'Crea una cuenta para marcar lo que te gusta y recibir mejores recomendaciones.',
+  },
+  guia: {
+    icon: 'sparkles-outline',
+    message: 'Inicia sesión para preguntarle a la guía y planear tu día.',
+  },
+  rutas: {
+    icon: 'walk-outline',
+    message: 'Inicia sesión para seguir rutas guiadas paso a paso.',
+  },
+  perfil: {
+    icon: 'person-outline',
+    message:
+      'Con una cuenta puedes guardar tu alojamiento, preferencias, mapas sin conexión y más.',
+  },
+};
+
 export interface ActiveRoute {
   route: RecommendedRoute;
   stopIndex: number;
 }
 
 interface MobileAppContextValue {
+  // Sesión e invitado
+  isGuest: boolean;
+  /** La sesión todavía se está restaurando (no sabemos si es invitado). */
+  authLoading: boolean;
+  /** Bienvenida con login/registro: sale en cada apertura mientras no haya sesión. */
+  showWelcome: boolean;
+  continueAsGuest: () => void;
+  /** Devuelve true si hay sesión; si no, abre la hoja "Necesitas una cuenta". */
+  requireAccount: (feature: GatedFeature) => boolean;
+  accountGate: GatedFeature | null;
+  closeAccountGate: () => void;
+
   // Navegación
   tab: MobileTab;
   setTab: (tab: MobileTab) => void;
@@ -85,10 +124,12 @@ interface MobileAppContextValue {
   toggleLikedEvent: (id: string) => void;
 }
 
+const AUTH_WAIT_MS = 6000;
+
 const MobileAppContext = createContext<MobileAppContextValue | undefined>(undefined);
 
 export function MobileAppProvider({ children }: { children: React.ReactNode }) {
-  const { token } = useAuth();
+  const { token, isAuthenticated, isLoading: authLoading } = useAuth();
   const { userLocation, retryLocation, locationError, isLoadingLocation } =
     useUserLocationContext();
   const { prefs, update: updatePrefs, reset: resetPrefs } = useMobilePreferences();
@@ -105,6 +146,34 @@ export function MobileAppProvider({ children }: { children: React.ReactNode }) {
   const [sectorOverride, setSectorOverride] = useState<Sector | null>(null);
   const [activeRoute, setActiveRoute] = useState<ActiveRoute | null>(null);
   const [eventDetail, setEventDetail] = useState<PlaceWithDistance | null>(null);
+  const [guestDismissed, setGuestDismissed] = useState(false);
+  const [accountGate, setAccountGate] = useState<GatedFeature | null>(null);
+  // Si la sesión tarda demasiado en restaurarse (p. ej. sin conexión) no bloqueamos la app
+  const [authWaitExpired, setAuthWaitExpired] = useState(false);
+  useEffect(() => {
+    if (!authLoading) return;
+    const timer = setTimeout(() => setAuthWaitExpired(true), AUTH_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [authLoading]);
+
+  // Al iniciar sesión se olvida el "seguir como invitado": si luego cierra sesión, vuelve la bienvenida
+  const [prevAuthenticated, setPrevAuthenticated] = useState(isAuthenticated);
+  if (prevAuthenticated !== isAuthenticated) {
+    setPrevAuthenticated(isAuthenticated);
+    if (isAuthenticated) {
+      setGuestDismissed(false);
+      setAccountGate(null);
+    }
+  }
+
+  const requireAccount = useCallback(
+    (feature: GatedFeature) => {
+      if (isAuthenticated) return true;
+      setAccountGate(feature);
+      return false;
+    },
+    [isAuthenticated],
+  );
 
   const gps = useMemo<Coordinate | null>(
     () =>
@@ -156,23 +225,31 @@ export function MobileAppProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
-  const askGuide = useCallback((question: string) => {
-    setGuidePrompt((prev) => ({ text: question, nonce: (prev?.nonce ?? 0) + 1 }));
-    setOverlay(null);
-    setEventDetail(null);
-    setTab('guia');
-  }, []);
+  const askGuide = useCallback(
+    (question: string) => {
+      if (!requireAccount('guia')) return;
+      setGuidePrompt((prev) => ({ text: question, nonce: (prev?.nonce ?? 0) + 1 }));
+      setOverlay(null);
+      setEventDetail(null);
+      setTab('guia');
+    },
+    [requireAccount],
+  );
 
   const recenter = useCallback(() => {
     setSectorOverride(null);
     retryLocation();
   }, [retryLocation]);
 
-  const startRoute = useCallback((route: RecommendedRoute) => {
-    setActiveRoute({ route, stopIndex: 0 });
-    setEventDetail(null);
-    setTab('rutas');
-  }, []);
+  const startRoute = useCallback(
+    (route: RecommendedRoute) => {
+      if (!requireAccount('rutas')) return;
+      setActiveRoute({ route, stopIndex: 0 });
+      setEventDetail(null);
+      setTab('rutas');
+    },
+    [requireAccount],
+  );
 
   const advanceRoute = useCallback(() => {
     setActiveRoute((prev) => {
@@ -186,28 +263,37 @@ export function MobileAppProvider({ children }: { children: React.ReactNode }) {
 
   const toggleSavedEvent = useCallback(
     (id: string) => {
+      if (!requireAccount('guardar')) return;
       const saved = prefs.savedEventIds.includes(id)
         ? prefs.savedEventIds.filter((x) => x !== id)
         : [...prefs.savedEventIds, id];
       updatePrefs({ savedEventIds: saved });
     },
-    [prefs.savedEventIds, updatePrefs],
+    [prefs.savedEventIds, updatePrefs, requireAccount],
   );
 
   const toggleLikedEvent = useCallback(
     (id: string) => {
+      if (!requireAccount('meGusta')) return;
       const liked = prefs.likedEventIds.includes(id)
         ? prefs.likedEventIds.filter((x) => x !== id)
         : [...prefs.likedEventIds, id];
       updatePrefs({ likedEventIds: liked });
     },
-    [prefs.likedEventIds, updatePrefs],
+    [prefs.likedEventIds, updatePrefs, requireAccount],
   );
 
   const openEvent = useCallback((event: PlaceWithDistance) => setEventDetail(event), []);
   const closeEvent = useCallback(() => setEventDetail(null), []);
 
   const value: MobileAppContextValue = {
+    isGuest: !isAuthenticated,
+    authLoading: authLoading && !authWaitExpired,
+    showWelcome: !authLoading && !isAuthenticated && !guestDismissed,
+    continueAsGuest: () => setGuestDismissed(true),
+    requireAccount,
+    accountGate,
+    closeAccountGate: () => setAccountGate(null),
     tab,
     setTab,
     overlay,

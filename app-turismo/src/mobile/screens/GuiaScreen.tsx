@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useMobileApp } from '../MobileAppContext';
 import { QuestionInput } from '../components/QuestionInput';
-import { Card, PillButton, T, useColors } from '../components/ui';
+import { Card, EmptyState, PillButton, T, useColors } from '../components/ui';
 import { answerQuestion, GUIDE_SUGGESTIONS, GuideAction, GuideAnswer } from '../data/guideBrain';
 import { PlaceRow } from '../sections/PlaceRow';
 import { openEmergencyMenu, searchNearbyInMaps } from '../utils/external';
@@ -17,6 +17,7 @@ type Message = { from: 'user'; text: string } | { from: 'guide'; answer: GuideAn
 export function GuiaScreen() {
   const app = useMobileApp();
   const { guidePrompt, prefs, sectorName, setTab, setOverlay, openOnMap, origin } = app;
+  const { isGuest, requireAccount } = app;
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
@@ -36,7 +37,10 @@ export function GuiaScreen() {
     },
   ];
 
-  const ask = (text: string) => setMessages((prev) => [...prev, ...reply(text)]);
+  const ask = (text: string) => {
+    if (!requireAccount('guia')) return;
+    setMessages((prev) => [...prev, ...reply(text)]);
+  };
 
   // Preguntas que llegan desde el Inicio (se procesan una sola vez por nonce)
   const [handledPrompt, setHandledPrompt] = useState(0);
@@ -76,74 +80,88 @@ export function GuiaScreen() {
               Te ayudo a planear tu día en {sectorName}
             </T>
           </View>
-          {messages.length > 0 ? (
+          {!isGuest && messages.length > 0 ? (
             <PillButton label="Limpiar" onPress={() => setMessages([])} />
           ) : null}
         </Card>
       </View>
 
-      <ScrollView
-        ref={scrollRef}
-        style={{ flex: 1 }}
-        contentContainerStyle={{ padding: MobileSpacing.screen, gap: 12 }}
-        onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
-        keyboardShouldPersistTaps="handled"
-      >
-        {messages.length === 0 ? (
-          <Card>
-            <T variant="title" weight="700">
-              {prefs.nick ? `Hola, ${prefs.nick}.` : 'Hola.'} ¿Qué quieres hacer hoy?
-            </T>
-            <T variant="small" color={colors.textSecondary} style={{ marginTop: 6 }}>
-              Pregúntame por comida, museos, parques, el clima o una ruta a pie.
-            </T>
-            <View style={styles.suggestions}>
-              {GUIDE_SUGGESTIONS.map((s) => (
-                <PillButton key={s} label={s} onPress={() => ask(s)} />
-              ))}
-            </View>
-          </Card>
-        ) : null}
+      {isGuest ? (
+        <View style={{ padding: MobileSpacing.screen }}>
+          <EmptyState
+            icon="sparkles-outline"
+            title="Inicia sesión para preguntarle a la guía"
+            message="Te ayudará a encontrar comida, museos, parques y rutas según el clima y tu ritmo."
+            actionLabel="Iniciar sesión o crear cuenta"
+            onAction={() => requireAccount('guia')}
+          />
+        </View>
+      ) : (
+        <>
+          <ScrollView
+            ref={scrollRef}
+            style={{ flex: 1 }}
+            contentContainerStyle={{ padding: MobileSpacing.screen, gap: 12 }}
+            onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+            keyboardShouldPersistTaps="handled"
+          >
+            {messages.length === 0 ? (
+              <Card>
+                <T variant="title" weight="700">
+                  {prefs.nick ? `Hola, ${prefs.nick}.` : 'Hola.'} ¿Qué quieres hacer hoy?
+                </T>
+                <T variant="small" color={colors.textSecondary} style={{ marginTop: 6 }}>
+                  Pregúntame por comida, museos, parques, el clima o una ruta a pie.
+                </T>
+                <View style={styles.suggestions}>
+                  {GUIDE_SUGGESTIONS.map((s) => (
+                    <PillButton key={s} label={s} onPress={() => ask(s)} />
+                  ))}
+                </View>
+              </Card>
+            ) : null}
 
-        {messages.map((m, idx) =>
-          m.from === 'user' ? (
-            <View key={idx} style={[styles.userBubble, { backgroundColor: colors.accent }]}>
-              <T color={colors.onAccent}>{m.text}</T>
-            </View>
-          ) : (
-            <Card key={idx} style={styles.guideBubble}>
-              <T>{m.answer.text}</T>
-              {m.answer.places.map((p, i) => (
-                <PlaceRow
-                  key={p.id}
-                  place={p}
-                  onPress={() => openOnMap(p)}
-                  divider={i < m.answer.places.length - 1}
-                />
-              ))}
-              {m.answer.action ? (
-                <PillButton
-                  label={m.answer.action.label}
-                  onPress={() => runAction(m.answer.action!.action)}
-                  style={{ alignSelf: 'flex-start', marginTop: 8 }}
-                />
-              ) : null}
+            {messages.map((m, idx) =>
+              m.from === 'user' ? (
+                <View key={idx} style={[styles.userBubble, { backgroundColor: colors.accent }]}>
+                  <T color={colors.onAccent}>{m.text}</T>
+                </View>
+              ) : (
+                <Card key={idx} style={styles.guideBubble}>
+                  <T>{m.answer.text}</T>
+                  {m.answer.places.map((p, i) => (
+                    <PlaceRow
+                      key={p.id}
+                      place={p}
+                      onPress={() => openOnMap(p)}
+                      divider={i < m.answer.places.length - 1}
+                    />
+                  ))}
+                  {m.answer.action ? (
+                    <PillButton
+                      label={m.answer.action.label}
+                      onPress={() => runAction(m.answer.action!.action)}
+                      style={{ alignSelf: 'flex-start', marginTop: 8 }}
+                    />
+                  ) : null}
+                </Card>
+              ),
+            )}
+          </ScrollView>
+
+          <View
+            style={{
+              paddingHorizontal: MobileSpacing.screen,
+              paddingBottom: insets.bottom + TAB_BAR_HEIGHT + 30,
+              paddingTop: 8,
+            }}
+          >
+            <Card style={{ padding: 8, borderRadius: MobileRadii.pill }}>
+              <QuestionInput onSubmit={ask} />
             </Card>
-          ),
-        )}
-      </ScrollView>
-
-      <View
-        style={{
-          paddingHorizontal: MobileSpacing.screen,
-          paddingBottom: insets.bottom + TAB_BAR_HEIGHT + 30,
-          paddingTop: 8,
-        }}
-      >
-        <Card style={{ padding: 8, borderRadius: MobileRadii.pill }}>
-          <QuestionInput onSubmit={ask} />
-        </Card>
-      </View>
+          </View>
+        </>
+      )}
     </KeyboardAvoidingView>
   );
 }

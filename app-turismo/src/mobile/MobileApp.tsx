@@ -1,14 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { BackHandler, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, BackHandler, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
 import { AuthModal } from '../components/Auth/AuthModal';
+import { useAuth } from '../context/AuthContext';
 
 import { MobileAppProvider, MobileTab, useMobileApp } from './MobileAppContext';
+import { AccountGateSheet } from './components/AccountGateSheet';
 import { Option, OptionSheet } from './components/OptionSheet';
 import { TabBar } from './components/TabBar';
 import { useColors } from './components/ui';
 import { AvisosScreen } from './screens/AvisosScreen';
+import { BienvenidaScreen } from './screens/BienvenidaScreen';
 import { ClimaScreen } from './screens/ClimaScreen';
 import { EventOverlay } from './screens/EventoScreen';
 import { GuiaScreen } from './screens/GuiaScreen';
@@ -42,7 +45,12 @@ function Shell() {
     hasGps,
     eventDetail,
     closeEvent,
+    showWelcome,
+    authLoading,
+    accountGate,
+    closeAccountGate,
   } = useMobileApp();
+  const { isAuthModalOpen, closeAuthModal } = useAuth();
   const colors = useColors();
 
   // Las pestañas visitadas quedan montadas: conservan scroll, chat y el mapa ya cargado
@@ -52,6 +60,16 @@ function Shell() {
   // Botón "atrás" de Android: cierra overlays y vuelve al Inicio antes de salir
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (isAuthModalOpen) {
+        closeAuthModal();
+        return true;
+      }
+      // En la bienvenida, "atrás" sale de la app
+      if (showWelcome) return false;
+      if (accountGate) {
+        closeAccountGate();
+        return true;
+      }
       if (sectorPickerOpen) {
         setSectorPickerOpen(false);
         return true;
@@ -80,6 +98,11 @@ function Shell() {
     setOverlay,
     setTab,
     setSectorPickerOpen,
+    showWelcome,
+    accountGate,
+    closeAccountGate,
+    isAuthModalOpen,
+    closeAuthModal,
   ]);
 
   const sectorOptions: Option<string>[] = [
@@ -141,6 +164,20 @@ function Shell() {
         onClose={() => setSectorPickerOpen(false)}
       />
 
+      <AccountGateSheet />
+
+      {/* Mientras se restaura la sesión se tapa todo, para no mostrar el Inicio un instante antes de la bienvenida */}
+      {authLoading ? (
+        <View
+          style={[StyleSheet.absoluteFill, styles.loading, { backgroundColor: colors.background }]}
+        >
+          <ActivityIndicator color={colors.text} />
+        </View>
+      ) : showWelcome ? (
+        <BienvenidaScreen />
+      ) : null}
+
+      {/* Va al final para quedar sobre la bienvenida */}
       <AuthModal />
     </View>
   );
@@ -158,4 +195,5 @@ export default function MobileApp() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   hidden: { opacity: 0, zIndex: -1 },
+  loading: { alignItems: 'center', justifyContent: 'center' },
 });
